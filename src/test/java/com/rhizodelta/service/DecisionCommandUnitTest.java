@@ -45,6 +45,22 @@ class DecisionCommandUnitTest {
     }
 
     @Test
+    void mergeCommandShouldRejectNullOperatorType() {
+        assertThatThrownBy(() -> new MergeDecisionCommand(
+                "dec-1",
+                "req-1",
+                UUID.randomUUID(),
+                "gpt-1",
+                "summary",
+                List.of(UUID.randomUUID()),
+                null,
+                "agent-1",
+                "reason"
+        )).isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("operator_type");
+    }
+
+    @Test
     void branchCommandShouldRejectBlankContent() {
         assertThatThrownBy(() -> new BranchDecisionCommand(
                 "dec-1",

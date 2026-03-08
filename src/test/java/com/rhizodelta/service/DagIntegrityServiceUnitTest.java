@@ -60,4 +60,16 @@ class DagIntegrityServiceUnitTest {
         assertThatCode(() -> service.assertNoVersionEvolutionCycle(sourceNodeId, targetNodeId))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    void shouldRejectNullNodeIds() {
+        DagIntegrityService service = new DagIntegrityService(mock(Neo4jClient.class));
+
+        assertThatThrownBy(() -> service.assertNoVersionEvolutionCycle(null, UUID.randomUUID()))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("sourceNodeId");
+        assertThatThrownBy(() -> service.assertNoVersionEvolutionCycle(UUID.randomUUID(), null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("targetNodeId");
+    }
 }
