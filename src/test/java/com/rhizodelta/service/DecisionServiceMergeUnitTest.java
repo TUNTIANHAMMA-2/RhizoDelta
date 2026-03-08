@@ -1,0 +1,122 @@
+package com.rhizodelta.service;
+
+import com.rhizodelta.domain.node.HumanPost;
+import com.rhizodelta.repository.AIConsensusRepository;
+import com.rhizodelta.repository.HumanPostRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.neo4j.core.Neo4jClient;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class DecisionServiceMergeUnitTest {
+    @Mock
+    private HumanPostRepository humanPostRepository;
+
+    @Mock
+    private AIConsensusRepository aiConsensusRepository;
+
+    @Mock
+    private DagIntegrityService dagIntegrityService;
+
+    @Test
+    void executeMergeShouldRejectMissingSourceNode() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        DecisionService decisionService = new DecisionService(
+                neo4jClient,
+                humanPostRepository,
+                aiConsensusRepository,
+                dagIntegrityService
+        );
+        MergeDecisionCommand command = newMergeCommand(UUID.randomUUID(), UUID.randomUUID());
+
+        when(humanPostRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> decisionService.executeMerge(command))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("source_node_id");
+    }
+
+    @Test
+    void executeMergeShouldRejectMissingSynthesizedFromNode() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        DecisionService decisionService = new DecisionService(
+                neo4jClient,
+                humanPostRepository,
+                aiConsensusRepository,
+                dagIntegrityService
+        );
+        UUID sourceNodeId = UUID.randomUUID();
+        UUID missingSynthesizedNodeId = UUID.randomUUID();
+        MergeDecisionCommand command = newMergeCommand(sourceNodeId, missingSynthesizedNodeId);
+
+        when(humanPostRepository.findByNodeId(sourceNodeId))
+                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
+        when(humanPostRepository.findByNodeId(missingSynthesizedNodeId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> decisionService.executeMerge(command))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("synthesized_from");
+    }
+
+    @Test
+    void executeMergeShouldReturnQueuedDecisionResult() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        DecisionService decisionService = new DecisionService(
+                neo4jClient,
+                humanPostRepository,
+                aiConsensusRepository,
+                dagIntegrityService
+        );
+        UUID sourceNodeId = UUID.randomUUID();
+        UUID synthesizedNodeId = UUID.randomUUID();
+        UUID decisionNodeId = UUID.randomUUID();
+        MergeDecisionCommand command = newMergeCommand(sourceNodeId, synthesizedNodeId);
+
+        when(humanPostRepository.findByNodeId(sourceNodeId))
+                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
+        when(humanPostRepository.findByNodeId(synthesizedNodeId))
+                .thenReturn(Optional.of(HumanPost.create(synthesizedNodeId, "synth", "author", "req-synth")));
+        when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:AI_Consensus")))
+                .bindAll(anyMap())
+                .fetchAs(String.class)
+                .one()).thenReturn(Optional.of(decisionNodeId.toString()));
+
+        DecisionResult result = decisionService.executeMerge(command);
+
+        assertThat(result.decision_id()).isEqualTo(command.decision_id());
+        assertThat(result.node_id()).isEqualTo(decisionNodeId);
+        assertThat(result.status()).isEqualTo("QUEUED");
+        verify(dagIntegrityService).assertNoVersionEvolutionCycle(decisionNodeId, sourceNodeId);
+    }
+
+    private static MergeDecisionCommand newMergeCommand(UUID sourceNodeId, UUID synthesizedNodeId) {
+        return new MergeDecisionCommand(
+                "decision-001",
+                "request-001",
+                sourceNodeId,
+                "gpt-4.1",
+                "summary",
+                List.of(synthesizedNodeId),
+                DecisionOperatorType.AGENT,
+                "agent-1",
+                "merge"
+        );
+    }
+}
