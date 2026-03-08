@@ -55,6 +55,30 @@ public class DecisionService {
               synthesized.reason = reason
             """;
 
+    private static final String UPSERT_BRANCH_NODE_QUERY = """
+            MERGE (decision:Human_Post {decision_id: $decisionId})
+            ON CREATE SET
+              decision:GraphNode,
+              decision.node_id = $nodeId,
+              decision.request_id = $requestId,
+              decision.content = $content,
+              decision.author_id = $authorId,
+              decision.created_at = $createdAt,
+              decision.embedding = null
+            RETURN toString(decision.node_id) AS nodeId
+            """;
+
+    private static final String BRANCH_RELATIONSHIP_QUERY = """
+            MATCH (decision:Human_Post {node_id: $decisionNodeId})
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
+            MERGE (decision)-[branched:BRANCHED_FROM]->(source)
+            ON CREATE SET
+              branched.operator_type = $operatorType,
+              branched.operator_id = $operatorId,
+              branched.created_at = $createdAt,
+              branched.reason = $reason
+            """;
+
     private final Neo4jClient neo4jClient;
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
@@ -81,6 +105,18 @@ public class DecisionService {
         UUID decisionNodeId = upsertMergeNode(command);
         dagIntegrityService.assertNoVersionEvolutionCycle(decisionNodeId, command.source_node_id());
         createMergeRelationships(decisionNodeId, command);
+
+        return new DecisionResult(command.decision_id(), decisionNodeId, QUEUED_STATUS);
+    }
+
+    @Transactional(transactionManager = "transactionManager")
+    public DecisionResult executeBranch(BranchDecisionCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        validateSourceNodeExists(command.source_node_id());
+
+        UUID decisionNodeId = upsertBranchNode(command);
+        dagIntegrityService.assertNoVersionEvolutionCycle(decisionNodeId, command.source_node_id());
+        createBranchRelationship(decisionNodeId, command);
 
         return new DecisionResult(command.decision_id(), decisionNodeId, QUEUED_STATUS);
     }
@@ -113,6 +149,37 @@ public class DecisionService {
                         "createdAt", relationshipCreatedAt,
                         "reason", command.reason(),
                         "synthesizedFromNodeIds", command.synthesized_from().stream().map(UUID::toString).toList()
+                ))
+                .run();
+    }
+
+    private UUID upsertBranchNode(BranchDecisionCommand command) {
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        String nodeId = neo4jClient.query(UPSERT_BRANCH_NODE_QUERY)
+                .bindAll(Map.of(
+                        "decisionId", command.decision_id(),
+                        "nodeId", UUID.randomUUID().toString(),
+                        "requestId", command.request_id(),
+                        "content", command.content(),
+                        "authorId", command.author_id(),
+                        "createdAt", createdAt
+                ))
+                .fetchAs(String.class)
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to resolve Human_Post node_id from upsert query"));
+        return UUID.fromString(nodeId);
+    }
+
+    private void createBranchRelationship(UUID decisionNodeId, BranchDecisionCommand command) {
+        OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        neo4jClient.query(BRANCH_RELATIONSHIP_QUERY)
+                .bindAll(Map.of(
+                        "decisionNodeId", decisionNodeId.toString(),
+                        "sourceNodeId", command.source_node_id().toString(),
+                        "operatorType", command.operator_type().name(),
+                        "operatorId", command.operator_id(),
+                        "createdAt", relationshipCreatedAt,
+                        "reason", command.reason()
                 ))
                 .run();
     }
