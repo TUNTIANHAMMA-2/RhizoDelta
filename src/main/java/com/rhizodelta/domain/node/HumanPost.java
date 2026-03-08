@@ -4,11 +4,15 @@ import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.Node;
 import org.springframework.data.neo4j.core.schema.Property;
+import org.springframework.data.neo4j.core.schema.Relationship;
+import org.springframework.data.neo4j.core.schema.RelationshipProperties;
+import org.springframework.data.neo4j.core.schema.TargetNode;
 import org.springframework.lang.Nullable;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Node("Human_Post")
@@ -30,23 +34,28 @@ public final class HumanPost {
     @Property("embedding")
     private final List<Float> embedding;
 
+    @Relationship(type = "BRANCHED_FROM", direction = Relationship.Direction.OUTGOING)
+    private final Set<BranchedFromRelationship> branchedFrom;
+
     @PersistenceCreator
     public HumanPost(
             UUID nodeId,
             String content,
             String authorId,
             Instant createdAt,
-            @Nullable List<Float> embedding
+            @Nullable List<Float> embedding,
+            @Nullable Set<BranchedFromRelationship> branchedFrom
     ) {
         this.nodeId = Objects.requireNonNull(nodeId, "nodeId must not be null");
         this.content = Objects.requireNonNull(content, "content must not be null");
         this.authorId = Objects.requireNonNull(authorId, "authorId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.embedding = embedding == null ? null : List.copyOf(embedding);
+        this.branchedFrom = branchedFrom == null ? Set.of() : Set.copyOf(branchedFrom);
     }
 
     public static HumanPost create(UUID nodeId, String content, String authorId) {
-        return new HumanPost(nodeId, content, authorId, Instant.now(), null);
+        return new HumanPost(nodeId, content, authorId, Instant.now(), null, Set.of());
     }
 
     public UUID getNodeId() {
@@ -68,5 +77,173 @@ public final class HumanPost {
     @Nullable
     public List<Float> getEmbedding() {
         return embedding == null ? null : List.copyOf(embedding);
+    }
+
+    public Set<BranchedFromRelationship> getBranchedFrom() {
+        return Set.copyOf(branchedFrom);
+    }
+}
+
+enum OperatorType {
+    AGENT,
+    HUMAN
+}
+
+@RelationshipProperties
+final class BranchedFromRelationship {
+    @Property("operator_type")
+    private final OperatorType operatorType;
+
+    @Property("operator_id")
+    private final String operatorId;
+
+    @Property("created_at")
+    private final Instant createdAt;
+
+    @Property("reason")
+    private final String reason;
+
+    @TargetNode
+    private final HumanPost sourceNode;
+
+    @PersistenceCreator
+    BranchedFromRelationship(
+            OperatorType operatorType,
+            String operatorId,
+            Instant createdAt,
+            String reason,
+            HumanPost sourceNode
+    ) {
+        this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
+        this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+        this.reason = Objects.requireNonNull(reason, "reason must not be null");
+        this.sourceNode = Objects.requireNonNull(sourceNode, "sourceNode must not be null");
+    }
+
+    public OperatorType getOperatorType() {
+        return operatorType;
+    }
+
+    public String getOperatorId() {
+        return operatorId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public HumanPost getSourceNode() {
+        return sourceNode;
+    }
+}
+
+@RelationshipProperties
+final class MergedIntoRelationship {
+    @Property("operator_type")
+    private final OperatorType operatorType;
+
+    @Property("operator_id")
+    private final String operatorId;
+
+    @Property("created_at")
+    private final Instant createdAt;
+
+    @Property("reason")
+    private final String reason;
+
+    @TargetNode
+    private final AIConsensus targetNode;
+
+    @PersistenceCreator
+    MergedIntoRelationship(
+            OperatorType operatorType,
+            String operatorId,
+            Instant createdAt,
+            String reason,
+            AIConsensus targetNode
+    ) {
+        this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
+        this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+        this.reason = Objects.requireNonNull(reason, "reason must not be null");
+        this.targetNode = Objects.requireNonNull(targetNode, "targetNode must not be null");
+    }
+
+    public OperatorType getOperatorType() {
+        return operatorType;
+    }
+
+    public String getOperatorId() {
+        return operatorId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public AIConsensus getTargetNode() {
+        return targetNode;
+    }
+}
+
+@RelationshipProperties
+final class SynthesizedFromRelationship {
+    @Property("operator_type")
+    private final OperatorType operatorType;
+
+    @Property("operator_id")
+    private final String operatorId;
+
+    @Property("created_at")
+    private final Instant createdAt;
+
+    @Property("reason")
+    private final String reason;
+
+    @TargetNode
+    private final HumanPost sourceNode;
+
+    @PersistenceCreator
+    SynthesizedFromRelationship(
+            OperatorType operatorType,
+            String operatorId,
+            Instant createdAt,
+            String reason,
+            HumanPost sourceNode
+    ) {
+        this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
+        this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+        this.reason = Objects.requireNonNull(reason, "reason must not be null");
+        this.sourceNode = Objects.requireNonNull(sourceNode, "sourceNode must not be null");
+    }
+
+    public OperatorType getOperatorType() {
+        return operatorType;
+    }
+
+    public String getOperatorId() {
+        return operatorId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public HumanPost getSourceNode() {
+        return sourceNode;
     }
 }
