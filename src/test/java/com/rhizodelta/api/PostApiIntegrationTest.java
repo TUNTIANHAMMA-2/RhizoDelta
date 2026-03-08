@@ -119,4 +119,152 @@ class PostApiIntegrationTest {
                 .run())
                 .isInstanceOf(Exception.class);
     }
+
+    @Test
+    void shouldGetHumanPostById() {
+        UUID nodeId = UUID.randomUUID();
+        createHumanPostNode(nodeId, "req-get-human", "author-human", "human content");
+
+        ResponseEntity<Map> response = restTemplate.getForEntity("/api/nodes/" + nodeId, Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
+        assertThat(data.get("label")).isEqualTo("Human_Post");
+        assertThat(data.get("content")).isEqualTo("human content");
+    }
+
+    @Test
+    void shouldGetAIConsensusById() {
+        UUID nodeId = UUID.randomUUID();
+        neo4jClient.query("""
+                CREATE (:AI_Consensus {
+                  node_id: $nodeId,
+                  summary_content: 'summary',
+                  agent_version: 'v1',
+                  created_at: $createdAt
+                })
+                """)
+                .bind(nodeId)
+                .to("nodeId")
+                .bind(Instant.now())
+                .to("createdAt")
+                .run();
+
+        ResponseEntity<Map> response = restTemplate.getForEntity("/api/nodes/" + nodeId, Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
+        assertThat(data.get("label")).isEqualTo("AI_Consensus");
+        assertThat(data.get("summary_content")).isEqualTo("summary");
+    }
+
+    @Test
+    void shouldGetLineageByBranchedFrom() {
+        UUID ancestorId = UUID.randomUUID();
+        UUID childId = UUID.randomUUID();
+        createHumanPostNode(ancestorId, "req-ancestor", "author-a", "ancestor");
+        createHumanPostNode(childId, "req-child", "author-b", "child");
+
+        neo4jClient.query("""
+                MATCH (child:Human_Post {node_id: $childId}), (ancestor:Human_Post {node_id: $ancestorId})
+                CREATE (child)-[:BRANCHED_FROM {
+                  operator_type: 'HUMAN',
+                  operator_id: 'tester',
+                  created_at: $createdAt,
+                  reason: 'branch'
+                }]->(ancestor)
+                """)
+                .bind(childId)
+                .to("childId")
+                .bind(ancestorId)
+                .to("ancestorId")
+                .bind(Instant.now())
+                .to("createdAt")
+                .run();
+
+        ResponseEntity<Map> response = restTemplate.getForEntity("/api/nodes/" + childId + "/lineage?max_depth=10", Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(data).extracting(item -> item.get("node_id")).contains(ancestorId.toString());
+    }
+
+    @Test
+    void shouldGetProvenanceFromConsensus() {
+        UUID sourceA = UUID.randomUUID();
+        UUID sourceB = UUID.randomUUID();
+        UUID consensusId = UUID.randomUUID();
+        createHumanPostNode(sourceA, "req-source-a", "author-a", "source a");
+        createHumanPostNode(sourceB, "req-source-b", "author-b", "source b");
+
+        neo4jClient.query("""
+                CREATE (:AI_Consensus {
+                  node_id: $consensusId,
+                  summary_content: 'combined',
+                  agent_version: 'v1',
+                  created_at: $createdAt
+                })
+                """)
+                .bind(consensusId)
+                .to("consensusId")
+                .bind(Instant.now())
+                .to("createdAt")
+                .run();
+
+        neo4jClient.query("""
+                MATCH (consensus:AI_Consensus {node_id: $consensusId}),
+                      (a:Human_Post {node_id: $sourceA}),
+                      (b:Human_Post {node_id: $sourceB})
+                CREATE (consensus)-[:SYNTHESIZED_FROM {
+                    operator_type: 'AGENT',
+                    operator_id: 'agent-1',
+                    created_at: $createdAt,
+                    reason: 'summary'
+                }]->(a)
+                CREATE (consensus)-[:SYNTHESIZED_FROM {
+                    operator_type: 'AGENT',
+                    operator_id: 'agent-1',
+                    created_at: $createdAt,
+                    reason: 'summary'
+                }]->(b)
+                """)
+                .bind(consensusId)
+                .to("consensusId")
+                .bind(sourceA)
+                .to("sourceA")
+                .bind(sourceB)
+                .to("sourceB")
+                .bind(Instant.now())
+                .to("createdAt")
+                .run();
+
+        ResponseEntity<Map> response = restTemplate.getForEntity("/api/nodes/" + consensusId + "/provenance", Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(data).extracting(item -> item.get("node_id")).contains(sourceA.toString(), sourceB.toString());
+    }
+
+    private void createHumanPostNode(UUID nodeId, String requestId, String authorId, String content) {
+        neo4jClient.query("""
+                CREATE (:Human_Post {
+                  node_id: $nodeId,
+                  request_id: $requestId,
+                  author_id: $authorId,
+                  content: $content,
+                  created_at: $createdAt
+                })
+                """)
+                .bind(nodeId)
+                .to("nodeId")
+                .bind(requestId)
+                .to("requestId")
+                .bind(authorId)
+                .to("authorId")
+                .bind(content)
+                .to("content")
+                .bind(Instant.now())
+                .to("createdAt")
+                .run();
+    }
 }
