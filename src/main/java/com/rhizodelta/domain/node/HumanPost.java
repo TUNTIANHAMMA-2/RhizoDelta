@@ -27,6 +27,9 @@ public final class HumanPost {
     @Property("author_id")
     private final String authorId;
 
+    @Property("request_id")
+    private final String requestId;
+
     @Property("created_at")
     private final Instant createdAt;
 
@@ -42,6 +45,7 @@ public final class HumanPost {
             UUID nodeId,
             String content,
             String authorId,
+            String requestId,
             Instant createdAt,
             @Nullable List<Float> embedding,
             @Nullable Set<BranchedFromRelationship> branchedFrom
@@ -49,13 +53,14 @@ public final class HumanPost {
         this.nodeId = Objects.requireNonNull(nodeId, "nodeId must not be null");
         this.content = Objects.requireNonNull(content, "content must not be null");
         this.authorId = Objects.requireNonNull(authorId, "authorId must not be null");
+        this.requestId = Objects.requireNonNull(requestId, "requestId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.embedding = embedding == null ? null : List.copyOf(embedding);
         this.branchedFrom = branchedFrom == null ? Set.of() : Set.copyOf(branchedFrom);
     }
 
-    public static HumanPost create(UUID nodeId, String content, String authorId) {
-        return new HumanPost(nodeId, content, authorId, Instant.now(), null, Set.of());
+    public static HumanPost create(UUID nodeId, String content, String authorId, String requestId) {
+        return new HumanPost(nodeId, content, authorId, requestId, Instant.now(), null, Set.of());
     }
 
     public UUID getNodeId() {
@@ -68,6 +73,10 @@ public final class HumanPost {
 
     public String getAuthorId() {
         return authorId;
+    }
+
+    public String getRequestId() {
+        return requestId;
     }
 
     public Instant getCreatedAt() {
