@@ -1,5 +1,6 @@
 package com.rhizodelta.api;
 
+import com.rhizodelta.service.DagIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoSuchElementException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.notFound(exception.getMessage()));
+    }
+
+    @ExceptionHandler(DagIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDagIntegrityViolation(DagIntegrityViolationException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.conflict("cycle detected"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
