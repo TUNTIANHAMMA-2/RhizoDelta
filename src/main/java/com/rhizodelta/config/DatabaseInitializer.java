@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +47,7 @@ public class DatabaseInitializer {
     }
 
     private void logConstraintStatus() {
-        List<Map<String, Object>> constraints = neo4jClient.query("""
+        Collection<Map<String, Object>> constraints = neo4jClient.query("""
                 SHOW CONSTRAINTS
                 YIELD name
                 WHERE name STARTS WITH 'rhizodelta_'

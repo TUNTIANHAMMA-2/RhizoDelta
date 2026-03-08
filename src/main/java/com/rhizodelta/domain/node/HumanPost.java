@@ -1,6 +1,7 @@
 package com.rhizodelta.domain.node;
 
 import org.springframework.data.annotation.PersistenceCreator;
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
 import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.Node;
 import org.springframework.data.neo4j.core.schema.Property;
@@ -100,6 +101,10 @@ enum OperatorType {
 
 @RelationshipProperties
 final class BranchedFromRelationship {
+    @Id
+    @GeneratedValue
+    private final Long id;
+
     @Property("operator_type")
     private final OperatorType operatorType;
 
@@ -117,17 +122,24 @@ final class BranchedFromRelationship {
 
     @PersistenceCreator
     BranchedFromRelationship(
+            @Nullable Long id,
             OperatorType operatorType,
             String operatorId,
             Instant createdAt,
             String reason,
             HumanPost sourceNode
     ) {
+        this.id = id;
         this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
         this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.reason = Objects.requireNonNull(reason, "reason must not be null");
         this.sourceNode = Objects.requireNonNull(sourceNode, "sourceNode must not be null");
+    }
+
+    @Nullable
+    public Long getId() {
+        return id;
     }
 
     public OperatorType getOperatorType() {
@@ -153,6 +165,10 @@ final class BranchedFromRelationship {
 
 @RelationshipProperties
 final class MergedIntoRelationship {
+    @Id
+    @GeneratedValue
+    private final Long id;
+
     @Property("operator_type")
     private final OperatorType operatorType;
 
@@ -170,17 +186,24 @@ final class MergedIntoRelationship {
 
     @PersistenceCreator
     MergedIntoRelationship(
+            @Nullable Long id,
             OperatorType operatorType,
             String operatorId,
             Instant createdAt,
             String reason,
             AIConsensus targetNode
     ) {
+        this.id = id;
         this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
         this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.reason = Objects.requireNonNull(reason, "reason must not be null");
         this.targetNode = Objects.requireNonNull(targetNode, "targetNode must not be null");
+    }
+
+    @Nullable
+    public Long getId() {
+        return id;
     }
 
     public OperatorType getOperatorType() {
@@ -206,6 +229,10 @@ final class MergedIntoRelationship {
 
 @RelationshipProperties
 final class SynthesizedFromRelationship {
+    @Id
+    @GeneratedValue
+    private final Long id;
+
     @Property("operator_type")
     private final OperatorType operatorType;
 
@@ -223,17 +250,24 @@ final class SynthesizedFromRelationship {
 
     @PersistenceCreator
     SynthesizedFromRelationship(
+            @Nullable Long id,
             OperatorType operatorType,
             String operatorId,
             Instant createdAt,
             String reason,
             HumanPost sourceNode
     ) {
+        this.id = id;
         this.operatorType = Objects.requireNonNull(operatorType, "operatorType must not be null");
         this.operatorId = Objects.requireNonNull(operatorId, "operatorId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.reason = Objects.requireNonNull(reason, "reason must not be null");
         this.sourceNode = Objects.requireNonNull(sourceNode, "sourceNode must not be null");
+    }
+
+    @Nullable
+    public Long getId() {
+        return id;
     }
 
     public OperatorType getOperatorType() {

@@ -21,7 +21,10 @@ done_at:2026-03-08
 evidence:实现BranchedFromRelationship/MergedIntoRelationship/SynthesizedFromRelationship并挂接到HumanPost与AIConsensus的@Relationship字段
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && timeout 60s mvn test
-risk:medium 关系映射未在真实Neo4j运行时完成端到端验证"
+risk:medium 关系映射未在真实Neo4j运行时完成端到端验证
+validation_resolved:2026-03-08 JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64 timeout 60s mvn test -Dspring.profiles.active=test -> Tests run:15, Failures:0, Errors:0
+evidence_update:relationship @Id/@GeneratedValue mapping validated by full integration+unit suite
+risk_update:low 关系属性持久化路径已在真实Neo4j环境验证"
 CGF-03-01,P1,3,backend,Create Repository Interfaces,Create HumanPostRepository and AIConsensusRepository extending Neo4jRepository. Add findByNodeId methods to both. Only expose create and read operations—no update/delete methods to enforce immutability.,WHEN client queries node by node_id THEN returns entity with all properties; WHEN generating node_id for new node THEN uses UUID v4; SHALL enforce node_id uniqueness across all node types using database constraints; ref: specs/node-entities/spec.md:10-12; ref: specs/node-entities/spec.md:36-45; ref: Doc/req.md:233 (§6.2 node_id 必须唯一),AUTOSERVER,Only create methods exposed (immutability enforcement at repository boundary); Repository pattern aligns with SDN conventions (Decision 1); findByNodeId must handle both Human_Post and AI_Consensus,Verify no update/delete methods leak through repository interface; Integration test with Testcontainers validates repository operations end-to-end,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/node-entities/spec.md; openspec/changes/core-graph-foundation/tasks.md:17-24; Doc/req.md:232-236 (§6.2 必要约束); src/main/java/com/rhizodelta/repository/HumanPostRepository.java:9; src/main/java/com/rhizodelta/repository/AIConsensusRepository.java:8,"Blocked by: CGF-02-01, CGF-02-02 (entities must exist). Repository is immutability enforcement boundary.
 picked_reason:P1仓储接口是服务层实现入口，先提供只读/创建能力与node_id检索
 done_at:2026-03-08
@@ -42,7 +45,10 @@ done_at:2026-03-08
 evidence:新增DatabaseInitializer在@PostConstruct执行约束/索引创建并在失败时抛异常终止启动，随后记录约束校验结果
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && mvn spring-boot:run -Dspring-boot.run.profiles=test
-risk:medium Cypher初始化脚本未在真实Neo4j实例完成联调"
+risk:medium Cypher初始化脚本未在真实Neo4j实例完成联调
+validation_resolved:2026-03-08 JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64 timeout 60s mvn test -Dspring.profiles.active=test -> Tests run:15, Failures:0, Errors:0
+evidence_update:DatabaseInitializer constraint fetch type aligned to Collection and startup schema checks executed in integration tests
+risk_update:low 启动期约束/索引初始化与校验链路已验证"
 CGF-05-01,P1,5,backend,Implement Post Submission Service,Create PostService with createHumanPost method. Generate UUID node_id. Implement idempotency check via request_id before node creation. Add @Transactional for ACID guarantees.,WHEN user submits post THEN creates Human_Post with generated UUID; WHEN client provides request_id THEN system stores it for audit trail; WHEN duplicate request_id received THEN returns previous result without creating duplicate node; WHEN service method completes THEN all graph changes committed atomically; WHEN exception thrown THEN transaction rolled back; ref: specs/post-submission-api/spec.md:29-38; ref: specs/graph-storage/spec.md:14-23; ref: Doc/req.md:176-179 (§5.5 POST /api/posts 请求字段); ref: Doc/req.md:40 (§2.2.2 幂等与去重: request_id/event_id),AUTOSERVER,request_id must be client-provided for idempotency (Open Question 2 resolved); UUID v4 for node_id (Decision 2); @Transactional with ACID per graph-storage spec; Verify idempotency handles concurrent duplicate requests,Transaction rollback verified on exception; Idempotency check must not create race condition; Verify request_id stored and queryable for full-chain tracing per req.md §5.6,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/post-submission-api/spec.md; openspec/changes/core-graph-foundation/tasks.md:32-38; Doc/req.md:176-179 (§5.5); Doc/req.md:40 (§2.2.2 幂等); src/main/java/com/rhizodelta/service/PostService.java:15; src/main/java/com/rhizodelta/domain/node/HumanPost.java:25,"Blocked by: CGF-03-01. Open Question 2 resolved: client provides request_id. req.md §5.6 requires request_id全链路透传.
 picked_reason:P1先实现请求去重与事务写入，确保POST链路具备幂等基础
 done_at:2026-03-08
