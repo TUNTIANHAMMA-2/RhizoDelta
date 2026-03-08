@@ -1,0 +1,10 @@
+spring:
+  neo4j:
+    uri: ${TEST_NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${TEST_NEO4J_USERNAME:neo4j}
+      password: ${TEST_NEO4J_PASSWORD:test-password}
+    pool:
+      max-connection-pool-size: 10
+      connection-acquisition-timeout: 5s
+      max-connection-lifetime: 10m
