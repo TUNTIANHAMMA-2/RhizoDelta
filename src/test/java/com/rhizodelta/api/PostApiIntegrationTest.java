@@ -8,13 +8,10 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.Neo4jContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,24 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 class PostApiIntegrationTest {
-    @Container
-    private static final Neo4jContainer<?> NEO4J = new Neo4jContainer<>("neo4j:5.22")
-            .withAdminPassword("test-password");
-
     @Autowired
     private TestRestTemplate restTemplate;
 
     @Autowired
     private Neo4jClient neo4jClient;
-
-    @DynamicPropertySource
-    static void neo4jProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.neo4j.uri", NEO4J::getBoltUrl);
-        registry.add("spring.neo4j.authentication.username", () -> "neo4j");
-        registry.add("spring.neo4j.authentication.password", NEO4J::getAdminPassword);
-    }
 
     @BeforeEach
     void cleanDatabase() {
@@ -97,9 +82,9 @@ class PostApiIntegrationTest {
                   created_at: $createdAt
                 })
                 """)
-                .bind(duplicateNodeId)
+                .bind(duplicateNodeId.toString())
                 .to("nodeId")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
 
@@ -112,9 +97,9 @@ class PostApiIntegrationTest {
                           created_at: $createdAt
                         })
                         """)
-                .bind(duplicateNodeId)
+                .bind(duplicateNodeId.toString())
                 .to("nodeId")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run())
                 .isInstanceOf(Exception.class);
@@ -144,9 +129,9 @@ class PostApiIntegrationTest {
                   created_at: $createdAt
                 })
                 """)
-                .bind(nodeId)
+                .bind(nodeId.toString())
                 .to("nodeId")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
 
@@ -174,11 +159,11 @@ class PostApiIntegrationTest {
                   reason: 'branch'
                 }]->(ancestor)
                 """)
-                .bind(childId)
+                .bind(childId.toString())
                 .to("childId")
-                .bind(ancestorId)
+                .bind(ancestorId.toString())
                 .to("ancestorId")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
 
@@ -205,9 +190,9 @@ class PostApiIntegrationTest {
                   created_at: $createdAt
                 })
                 """)
-                .bind(consensusId)
+                .bind(consensusId.toString())
                 .to("consensusId")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
 
@@ -228,13 +213,13 @@ class PostApiIntegrationTest {
                     reason: 'summary'
                 }]->(b)
                 """)
-                .bind(consensusId)
+                .bind(consensusId.toString())
                 .to("consensusId")
-                .bind(sourceA)
+                .bind(sourceA.toString())
                 .to("sourceA")
-                .bind(sourceB)
+                .bind(sourceB.toString())
                 .to("sourceB")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
 
@@ -255,7 +240,7 @@ class PostApiIntegrationTest {
                   created_at: $createdAt
                 })
                 """)
-                .bind(nodeId)
+                .bind(nodeId.toString())
                 .to("nodeId")
                 .bind(requestId)
                 .to("requestId")
@@ -263,8 +248,12 @@ class PostApiIntegrationTest {
                 .to("authorId")
                 .bind(content)
                 .to("content")
-                .bind(Instant.now())
+                .bind(nowUtc())
                 .to("createdAt")
                 .run();
+    }
+
+    private static OffsetDateTime nowUtc() {
+        return OffsetDateTime.now(ZoneOffset.UTC);
     }
 }
