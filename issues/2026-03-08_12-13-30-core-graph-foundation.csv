@@ -31,14 +31,20 @@ done_at:2026-03-08
 evidence:新增HumanPostRepository/AIConsensusRepository并提供findByNodeId(UUID)；通过ImmutableNeo4jRepository默认禁用delete系列方法
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && timeout 60s mvn test
-risk:medium 仓储接口代理行为未在真实Spring上下文完成验证"
+risk:medium 仓储接口代理行为未在真实Spring上下文完成验证
+validation_resolved:2026-03-08 full mvn test passed after adding @NoRepositoryBean to ImmutableNeo4jRepository
+evidence_update:repository scanning reduced to concrete interfaces only, eliminating Object persistent-entity startup failure
+risk_update:low repository bean creation path verified by integration tests"
 CGF-03-02,P1,3,backend,Add Custom Cypher Lineage & Provenance Queries,Add @Query Cypher for lineage traversal: -[:BRANCHED_FROM|MERGED_INTO*1..N]-> with configurable max_depth. Add @Query Cypher for provenance lookup: -[:SYNTHESIZED_FROM]-> single-hop retrieval.,"WHEN system executes lineage query THEN uses Cypher -[:BRANCHED_FROM|MERGED_INTO*1..{max_depth}]->; WHEN system executes provenance query THEN uses -[:SYNTHESIZED_FROM]->; WHEN traversing lineage THEN only follows version evolution relationships, ignoring CONCEPTUAL_OVERLAP and RELATES_TO; ref: specs/node-query-api/spec.md:53-61; ref: Doc/req.md:267-273 (§6.5 场景一: 溯源路径 Cypher 示例); ref: Doc/req.md:279-285 (§6.5 场景二: 穿透式确权 Cypher); ref: Doc/req.md:107 (§3.3 验收2: 溯源返回完整路径; 验收4: 语义关联不参与溯源)",AUTOSERVER,Decision 5: Cypher @Query over SDN derived queries for variable-length paths; Verify Cypher patterns align with req.md §6.5 examples; max_depth default 10 per req.md §5.5 lineage endpoint and Open Question 3,Lineage must exclude semantic relationships (req.md §3.3 验收4); Performance: must be efficient for 10-hop traversal (design.md Constraints); Verify correct paths in multi-parent DAG scenarios,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/node-query-api/spec.md:53-61; openspec/changes/core-graph-foundation/tasks.md:21-24; Doc/req.md:267-285 (§6.5 Cypher 查询示例); src/main/java/com/rhizodelta/repository/HumanPostRepository.java:14; src/main/java/com/rhizodelta/repository/AIConsensusRepository.java:14,"Blocked by: CGF-03-01. Decision 5: Cypher for complex traversals. Open Question 3 resolved: max_depth default 10, configurable via query param.
 picked_reason:P1查询能力直接支撑lineage/provenance接口，先补Cypher确保后续服务层可复用
 done_at:2026-03-08
 evidence:在HumanPostRepository新增BRANCHED_FROM|MERGED_INTO lineage查询（maxDepth过滤）；在AIConsensusRepository新增SYNTHESIZED_FROM provenance查询
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && timeout 60s mvn test
-risk:medium Cypher语句未在真实Neo4j数据上完成执行验证"
+risk:medium Cypher语句未在真实Neo4j数据上完成执行验证
+validation_resolved:2026-03-08 full mvn test passed with provenance query mapped via HumanPost repository
+evidence_update:provenance query now returns Human_Post records without AI_Consensus mapping exception
+risk_update:low lineage/provenance query mapping validated in integration tests"
 CGF-04-01,P1,4,backend,Implement Database Schema Initialization,"Create DatabaseInitializer with @PostConstruct. Execute Cypher for: node_id uniqueness constraint (IF NOT EXISTS), author_id index on Human_Post, created_at indexes on both node types. Log constraint verification results; fail startup if constraint creation fails.","WHEN app starts and connects to Neo4j THEN creates uniqueness constraint on node_id IF NOT EXISTS; WHEN app starts THEN creates index on Human_Post.author_id IF NOT EXISTS; WHEN app starts THEN creates created_at indexes for both node types IF NOT EXISTS; WHEN constraint creation fails THEN system fails startup to prevent inconsistent state; WHEN app restarts with existing constraints THEN skips creation without errors; SHALL use IF NOT EXISTS for idempotent schema initialization; ref: specs/graph-constraints/spec.md:4-56; ref: Doc/req.md:232-236 (§6.2 必要约束: node_id唯一, author_id索引, created_at索引, embedding向量索引)",AUTOSERVER,IF NOT EXISTS clauses for idempotency (spec requirement); Verify constraint names are clear and logged; Schema init must complete before accepting traffic,Verify partial constraint state recovery (some but not all constraints present); Startup failure must be clean and descriptive; Repeated startup must be safe,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/graph-constraints/spec.md; openspec/changes/core-graph-foundation/tasks.md:25-31; Doc/req.md:232-236 (§6.2 必要约束); src/main/java/com/rhizodelta/config/DatabaseInitializer.java:13,"Blocked by: CGF-01-01 (Neo4j connection required). Idempotent schema init supports safe restarts. Vector index deferred per Non-Goals.
 picked_reason:P1先落库约束与索引，避免后续服务/API写入时出现数据一致性隐患
 done_at:2026-03-08
@@ -62,7 +68,10 @@ done_at:2026-03-08
 evidence:新增NodeQueryService实现getNodeById(支持Human_Post/AI_Consensus)、getLineage(maxDepth默认10)、getProvenance，并统一@Transactional(readOnly=true)
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && timeout 60s mvn test
-risk:medium getLineage当前返回HumanPost列表，复杂混合节点路径的返回结构仍需后续接口层联调确认"
+risk:medium getLineage当前返回HumanPost列表，复杂混合节点路径的返回结构仍需后续接口层联调确认
+validation_resolved:2026-03-08 full mvn test passed with NodeQueryService using explicit transactionManager and HumanPost provenance query path
+evidence_update:GET lineage/provenance endpoints returned expected payloads in PostApiIntegrationTest
+risk_update:low 查询服务事务与仓储路由已通过回归验证"
 CGF-06-01,P1,6,backend,Create API Response Wrapper & Error Handling,"Create ApiResponse<T> wrapper with code (Integer), message (String), data (T). Implement @ControllerAdvice with @ExceptionHandler for 400/404/500 returning unified ApiResponse format.","WHEN API succeeds THEN returns {code: 0, message: ""ok"", data: {...}}; WHEN API fails THEN returns {code: non-zero, message: error description, data: null or error details}; ref: specs/post-submission-api/spec.md:18-27; ref: Doc/req.md:131-139 (§5.1 统一响应结构); ref: Doc/req.md:164-171 (§5.4 最小响应约定)",AUTOSERVER,"Response format must exactly match req.md §5.1 structure: {code, message, data}; Error codes consistent and documented; Exception handlers must not leak stack traces to client","Verify all endpoints use ApiResponse wrapper consistently; Verify error format in edge cases (null body, malformed JSON, unexpected exceptions)",已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/post-submission-api/spec.md:18-27; openspec/changes/core-graph-foundation/tasks.md:44-54; Doc/req.md:131-139 (§5.1); Doc/req.md:164-171 (§5.4); src/main/java/com/rhizodelta/api/ApiResponse.java:3; src/main/java/com/rhizodelta/api/GlobalExceptionHandler.java:12,"API response convention is project-wide; must be established before controllers. No external dependencies—can be built in parallel with Phase 3-5.
 picked_reason:P1先统一响应与异常语义，保证后续控制器行为一致
 done_at:2026-03-08

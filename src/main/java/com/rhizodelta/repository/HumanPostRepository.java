@@ -4,6 +4,7 @@ import com.rhizodelta.domain.node.HumanPost;
 import org.springframework.data.neo4j.repository.query.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
+import org.springframework.data.repository.NoRepositoryBean;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,8 +23,16 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
             @Param("nodeId") UUID nodeId,
             @Param("maxDepth") Integer maxDepth
     );
+
+    @Query("""
+            MATCH (:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            RETURN source
+            ORDER BY source.created_at DESC
+            """)
+    List<HumanPost> findProvenance(@Param("consensusNodeId") UUID consensusNodeId);
 }
 
+@NoRepositoryBean
 interface ImmutableNeo4jRepository<T, ID> extends Neo4jRepository<T, ID> {
     @Override
     default void deleteById(ID id) {

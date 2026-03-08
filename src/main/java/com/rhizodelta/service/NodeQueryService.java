@@ -23,7 +23,7 @@ public class NodeQueryService {
         this.aiConsensusRepository = aiConsensusRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
     public NodeResult getNodeById(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
 
@@ -33,21 +33,21 @@ public class NodeQueryService {
                 .orElseThrow(() -> new IllegalArgumentException("Node not found: " + nodeId));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<HumanPost> getLineage(UUID nodeId, Integer maxDepth) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
         int resolvedMaxDepth = resolveMaxDepth(maxDepth);
         return humanPostRepository.findLineage(nodeId, resolvedMaxDepth);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<HumanPost> getProvenance(UUID consensusNodeId) {
         Objects.requireNonNull(consensusNodeId, "consensusNodeId must not be null");
 
         aiConsensusRepository.findByNodeId(consensusNodeId)
                 .orElseThrow(() -> new IllegalArgumentException("AI_Consensus not found: " + consensusNodeId));
 
-        return aiConsensusRepository.findProvenance(consensusNodeId);
+        return humanPostRepository.findProvenance(consensusNodeId);
     }
 
     private int resolveMaxDepth(Integer maxDepth) {
