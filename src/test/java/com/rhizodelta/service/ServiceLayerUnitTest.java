@@ -134,7 +134,7 @@ class ServiceLayerUnitTest {
         HumanPost source = HumanPost.create(UUID.randomUUID(), "source", "author", "req-src");
 
         when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.of(AIConsensus.create(nodeId, "summary", "v1")));
-        when(aiConsensusRepository.findProvenance(nodeId)).thenReturn(List.of(source));
+        when(humanPostRepository.findProvenance(nodeId)).thenReturn(List.of(source));
 
         List<HumanPost> provenance = service.getProvenance(nodeId);
 

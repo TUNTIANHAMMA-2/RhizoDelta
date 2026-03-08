@@ -61,7 +61,10 @@ done_at:2026-03-08
 evidence:新增PostService.createHumanPost，使用MERGE(request_id)实现幂等写入并返回既有node_id；添加@Transactional与请求级并发锁防重复写
 validation_limited:当前环境仅JRE，mvn -DskipTests compile无法执行Java编译
 manual_test:安装JDK17后执行 JAVA_HOME=<jdk17> mvn -DskipTests compile && timeout 60s mvn test
-risk:medium 并发锁仅覆盖单实例进程，多实例幂等仍依赖数据库唯一约束（尚未添加request_id约束）"
+risk:medium 并发锁仅覆盖单实例进程，多实例幂等仍依赖数据库唯一约束（尚未添加request_id约束）
+validation_resolved:2026-03-08 full mvn test passed after converting Neo4jClient parameters to supported String/OffsetDateTime types
+evidence_update:POST /api/posts returns 202 in integration tests and idempotency case validated
+risk_update:low 写入链路事务管理器与参数类型已回归验证"
 CGF-05-02,P1,5,backend,Implement Node Query Service,Create NodeQueryService. Implement getNodeById supporting both Human_Post and AI_Consensus. Implement getLineage with configurable max_depth (default 10). Implement getProvenance for AI_Consensus nodes. Add @Transactional(readOnly=true).,WHEN client queries by node_id THEN returns correct node type with all properties; WHEN client requests lineage THEN traverses up to max_depth hops via BRANCHED_FROM and MERGED_INTO only; WHEN client requests provenance for AI_Consensus THEN returns all Human_Post via SYNTHESIZED_FROM; WHEN provenance requested for Human_Post THEN returns empty list (not error); WHEN lineage for root node THEN returns single node with empty edges; ref: specs/node-query-api/spec.md:3-61; ref: Doc/req.md:193-204 (§5.5 GET 接口响应字段); ref: Doc/req.md:116 (§4.1 P0用例: 溯源查询),AUTOSERVER,getNodeById must support polymorphic query across both node types; Lineage must exclude semantic relationships per req.md §3.3验收4; Provenance for non-AI_Consensus returns empty array not error per spec,Performance: lineage efficient for 10-hop traversal (design.md Constraints); Verify correct paths for complex multi-parent DAG topologies; Root node edge case returns single-node result,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/specs/node-query-api/spec.md; openspec/changes/core-graph-foundation/tasks.md:39-42; Doc/req.md:193-204 (§5.5); Doc/req.md:116 (§4.1 P0用例); src/main/java/com/rhizodelta/service/NodeQueryService.java:15,"Blocked by: CGF-03-02 (Cypher queries required). Implements P0 use case: user queries lineage and gets explainable result (req.md §4.1).
 picked_reason:P1查询服务是NodeController前置，先统一封装按ID/lineage/provenance读取逻辑
 done_at:2026-03-08
@@ -113,7 +116,10 @@ done_at:2026-03-08
 evidence:新增ServiceLayerUnitTest，覆盖PostService命令校验/幂等返回分支与NodeQueryService主要分支与边界
 validation_limited:已执行 timeout 60s mvn test -Dspring.profiles.active=test（沙箱外），但compile阶段失败：No compiler is provided (仅JRE)
 manual_test:安装可用JDK17后执行 timeout 60s mvn test -Dspring.profiles.active=test
-risk:high 单元测试尚未实际执行，mock链路正确性待编译验证"
+risk:high 单元测试尚未实际执行，mock链路正确性待编译验证
+validation_resolved:2026-03-08 ServiceLayerUnitTest (8 tests) passed under JDK17
+evidence_update:unit test mocks aligned with NodeQueryService provenance repository routing
+risk_update:low 服务层单测与实际调用链保持一致"
 CGF-08-01,P2,8,infra,Documentation & Dev Environment Setup,Create docker-compose.yml for local Neo4j 5.x instance. Add application.yml.example with placeholder values only. Document API endpoints with request/response examples. Update README with Neo4j setup instructions.,"WHEN developer runs docker-compose up THEN Neo4j 5.x starts and is accessible; application.yml.example contains only placeholder values (your_database_ip_here, your_jwt_secret_key_here); API documentation covers all 5 endpoints per req.md §5.3; ref: Doc/req.md:362-366 (§8.3 配置约束: 禁止暴露真实密钥); ref: Doc/req.md:337-360 (§8.1-8.2 环境搭建与启动)",MANUAL,"No real IPs, keys, or passwords per req.md §8.3 security constraint; Docker Compose uses official Neo4j 5.x image; API docs suggest future OpenAPI/Swagger integration per req.md §5.1",Verify docker-compose.yml matches application.yml config expectations; Placeholder values consistent with req.md §8.3 examples; README covers mvn test and mvn spring-boot:run per req.md §8.2,已完成,已完成,已完成,已提交,,openspec/changes/core-graph-foundation/tasks.md:69-74; Doc/req.md:337-366 (§8 本地开发环境搭建); docker-compose.yml:1; src/main/resources/application.yml.example:1; README.md:1,"req.md §8.3: 严禁真实IP/密钥/密码. Docker recommended for Neo4j dev instance. Can be done in parallel with any phase.
 picked_reason:P2收口交付，补齐本地环境与接口文档便于开发联调
 done_at:2026-03-08

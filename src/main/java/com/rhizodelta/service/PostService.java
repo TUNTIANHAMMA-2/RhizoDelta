@@ -6,7 +6,8 @@ import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,7 @@ public class PostService {
         this.humanPostRepository = humanPostRepository;
     }
 
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public HumanPost createHumanPost(CreateHumanPostCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         Object requestLock = REQUEST_LOCKS.computeIfAbsent(command.requestId(), ignored -> new Object());
@@ -44,7 +45,7 @@ public class PostService {
         synchronized (requestLock) {
             try {
                 UUID generatedNodeId = UUID.randomUUID();
-                Instant createdAt = Instant.now();
+                OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
                 String nodeIdString = upsertByRequestId(command, generatedNodeId, createdAt);
                 UUID persistedNodeId = UUID.fromString(nodeIdString);
 
@@ -56,10 +57,14 @@ public class PostService {
         }
     }
 
-    private String upsertByRequestId(CreateHumanPostCommand command, UUID generatedNodeId, Instant createdAt) {
+    private String upsertByRequestId(
+            CreateHumanPostCommand command,
+            UUID generatedNodeId,
+            OffsetDateTime createdAt
+    ) {
         return neo4jClient.query(UPSERT_HUMAN_POST_QUERY)
                 .bind(command.requestId()).to("requestId")
-                .bind(generatedNodeId).to("nodeId")
+                .bind(generatedNodeId.toString()).to("nodeId")
                 .bind(command.content()).to("content")
                 .bind(command.authorId()).to("authorId")
                 .bind(createdAt).to("createdAt")
