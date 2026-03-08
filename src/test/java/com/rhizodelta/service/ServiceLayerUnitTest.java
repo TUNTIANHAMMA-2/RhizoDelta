@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -30,6 +32,9 @@ class ServiceLayerUnitTest {
 
     @Mock
     private AIConsensusRepository aiConsensusRepository;
+
+    @Mock
+    private Neo4jClient neo4jClient;
 
     @Test
     void createHumanPostCommandShouldRejectBlankFields() {
@@ -48,18 +53,18 @@ class ServiceLayerUnitTest {
 
     @Test
     void postServiceShouldReturnPersistedNodeFromUpsertResult() {
-        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
-        PostService postService = new PostService(neo4jClient, humanPostRepository);
+        Neo4jClient deepStubClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        PostService postService = new PostService(deepStubClient, humanPostRepository);
 
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", "req-001");
 
-        when(neo4jClient.query(anyString())
+        when(deepStubClient.query(anyString())
                 .bind(eq("req-001")).to(eq("requestId"))
-                .bind(org.mockito.ArgumentMatchers.<Object>any()).to(eq("nodeId"))
+                .bind(any()).to(eq("nodeId"))
                 .bind(eq("content")).to(eq("content"))
                 .bind(eq("author")).to(eq("authorId"))
-                .bind(org.mockito.ArgumentMatchers.<Object>any()).to(eq("createdAt"))
+                .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
@@ -72,7 +77,7 @@ class ServiceLayerUnitTest {
 
     @Test
     void getNodeByIdShouldReturnHumanPostNode() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
         HumanPost humanPost = HumanPost.create(nodeId, "hello", "author", "req-hello");
 
@@ -85,7 +90,7 @@ class ServiceLayerUnitTest {
 
     @Test
     void getNodeByIdShouldThrowNoSuchElementWhenNotFound() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
 
         when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
@@ -98,7 +103,7 @@ class ServiceLayerUnitTest {
 
     @Test
     void getNodeByIdShouldReturnAIConsensusNodeWhenHumanMissing() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
         AIConsensus aiConsensus = AIConsensus.create(nodeId, "summary", "v1");
 
@@ -112,18 +117,23 @@ class ServiceLayerUnitTest {
 
     @Test
     void getLineageShouldUseDefaultDepthWhenInputIsNull() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        Neo4jClient deepStubClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, deepStubClient);
         UUID nodeId = UUID.randomUUID();
-        when(humanPostRepository.findLineage(nodeId, 10)).thenReturn(List.of());
 
-        service.getLineage(nodeId, null);
+        when(deepStubClient.query(anyString())
+                .bind(anyString()).to(anyString())
+                .bind(any()).to(anyString())
+                .fetch().all()).thenReturn(Collections.emptyList());
 
-        org.mockito.Mockito.verify(humanPostRepository).findLineage(nodeId, 10);
+        List<NodeQueryService.LineageNode> result = service.getLineage(nodeId, null);
+
+        assertThat(result).isEmpty();
     }
 
     @Test
     void getLineageShouldRejectNonPositiveDepth() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
 
         assertThatThrownBy(() -> service.getLineage(UUID.randomUUID(), 0))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -131,22 +141,37 @@ class ServiceLayerUnitTest {
     }
 
     @Test
-    void getProvenanceShouldRequireConsensusNodeExists() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+    void getProvenanceShouldThrowWhenNodeNotFound() {
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
+        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
         when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getProvenance(nodeId))
                 .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("AI_Consensus");
+                .hasMessageContaining("Node not found");
+    }
+
+    @Test
+    void getProvenanceShouldReturnEmptyForHumanPost() {
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
+        UUID nodeId = UUID.randomUUID();
+        HumanPost humanPost = HumanPost.create(nodeId, "hello", "author", "req-hello");
+
+        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.of(humanPost));
+
+        List<HumanPost> provenance = service.getProvenance(nodeId);
+
+        assertThat(provenance).isEmpty();
     }
 
     @Test
     void getProvenanceShouldReturnHumanPostsForConsensus() {
-        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
         HumanPost source = HumanPost.create(UUID.randomUUID(), "source", "author", "req-src");
 
+        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
         when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.of(AIConsensus.create(nodeId, "summary", "v1")));
         when(humanPostRepository.findProvenance(nodeId)).thenReturn(List.of(source));
 

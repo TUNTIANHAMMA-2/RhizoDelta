@@ -41,7 +41,7 @@ public class NodeController {
         UUID nodeId = parseUuid(id);
         List<NodePayload> lineage = nodeQueryService.getLineage(nodeId, maxDepth)
                 .stream()
-                .map(this::fromHumanPost)
+                .map(this::fromLineageNode)
                 .toList();
         return ApiResponse.ok(lineage);
     }
@@ -87,6 +87,18 @@ public class NodeController {
                 null,
                 node.getAgentVersion(),
                 node.getCreatedAt()
+        );
+    }
+
+    private NodePayload fromLineageNode(NodeQueryService.LineageNode node) {
+        return new NodePayload(
+                node.nodeId(),
+                node.label(),
+                node.content(),
+                node.summaryContent(),
+                node.authorId(),
+                node.agentVersion(),
+                node.createdAt()
         );
     }
 

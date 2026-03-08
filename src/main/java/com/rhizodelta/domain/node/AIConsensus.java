@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-@Node("AI_Consensus")
+@Node({"AI_Consensus", "GraphNode"})
 public final class AIConsensus {
     @Id
     @Property("node_id")

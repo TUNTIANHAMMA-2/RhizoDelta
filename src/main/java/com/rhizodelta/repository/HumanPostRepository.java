@@ -14,17 +14,6 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
     Optional<HumanPost> findByNodeId(UUID nodeId);
 
     @Query("""
-            MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*1..50]->(ancestor)
-            WHERE length(path) <= $maxDepth
-            RETURN DISTINCT ancestor
-            ORDER BY ancestor.created_at DESC
-            """)
-    List<HumanPost> findLineage(
-            @Param("nodeId") UUID nodeId,
-            @Param("maxDepth") Integer maxDepth
-    );
-
-    @Query("""
             MATCH (:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
             RETURN source
             ORDER BY source.created_at DESC
@@ -34,6 +23,16 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
 
 @NoRepositoryBean
 interface ImmutableNeo4jRepository<T, ID> extends Neo4jRepository<T, ID> {
+    @Override
+    default <S extends T> S save(S entity) {
+        throw immutableGraphError();
+    }
+
+    @Override
+    default <S extends T> List<S> saveAll(Iterable<S> entities) {
+        throw immutableGraphError();
+    }
+
     @Override
     default void deleteById(ID id) {
         throw immutableGraphError();
@@ -60,6 +59,6 @@ interface ImmutableNeo4jRepository<T, ID> extends Neo4jRepository<T, ID> {
     }
 
     private static UnsupportedOperationException immutableGraphError() {
-        return new UnsupportedOperationException("Graph nodes are immutable. Delete operations are not allowed.");
+        return new UnsupportedOperationException("Graph nodes are immutable. Direct mutation operations are not allowed.");
     }
 }

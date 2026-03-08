@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-@Node("Human_Post")
+@Node({"Human_Post", "GraphNode"})
 public final class HumanPost {
     @Id
     @Property("node_id")

@@ -91,7 +91,7 @@ class PostApiIntegrationTest {
         UUID duplicateNodeId = UUID.randomUUID();
 
         neo4jClient.query("""
-                CREATE (:Human_Post {
+                CREATE (:Human_Post:GraphNode {
                   node_id: $nodeId,
                   request_id: 'req-1',
                   author_id: 'author-1',
@@ -106,7 +106,7 @@ class PostApiIntegrationTest {
                 .run();
 
         assertThatThrownBy(() -> neo4jClient.query("""
-                        CREATE (:Human_Post {
+                        CREATE (:Human_Post:GraphNode {
                           node_id: $nodeId,
                           request_id: 'req-2',
                           author_id: 'author-2',
@@ -139,7 +139,7 @@ class PostApiIntegrationTest {
     void shouldGetAIConsensusById() {
         UUID nodeId = UUID.randomUUID();
         neo4jClient.query("""
-                CREATE (:AI_Consensus {
+                CREATE (:AI_Consensus:GraphNode {
                   node_id: $nodeId,
                   summary_content: 'summary',
                   agent_version: 'v1',
@@ -200,7 +200,7 @@ class PostApiIntegrationTest {
         createHumanPostNode(sourceB, "req-source-b", "author-b", "source b");
 
         neo4jClient.query("""
-                CREATE (:AI_Consensus {
+                CREATE (:AI_Consensus:GraphNode {
                   node_id: $consensusId,
                   summary_content: 'combined',
                   agent_version: 'v1',
@@ -249,7 +249,7 @@ class PostApiIntegrationTest {
 
     private void createHumanPostNode(UUID nodeId, String requestId, String authorId, String content) {
         neo4jClient.query("""
-                CREATE (:Human_Post {
+                CREATE (:Human_Post:GraphNode {
                   node_id: $nodeId,
                   request_id: $requestId,
                   author_id: $authorId,

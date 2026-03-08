@@ -16,6 +16,7 @@ public class PostService {
     private static final String UPSERT_HUMAN_POST_QUERY = """
             MERGE (post:Human_Post {request_id: $requestId})
             ON CREATE SET
+              post:GraphNode,
               post.node_id = $nodeId,
               post.content = $content,
               post.author_id = $authorId,
