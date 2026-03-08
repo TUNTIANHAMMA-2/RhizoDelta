@@ -8,12 +8,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
 @Service
 public class NodeQueryService {
     private static final int DEFAULT_MAX_DEPTH = 10;
+    private static final int MAX_ALLOWED_DEPTH = 50;
 
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
@@ -30,7 +32,7 @@ public class NodeQueryService {
         return humanPostRepository.findByNodeId(nodeId)
                 .<NodeResult>map(HumanPostNode::new)
                 .or(() -> aiConsensusRepository.findByNodeId(nodeId).map(AIConsensusNode::new))
-                .orElseThrow(() -> new IllegalArgumentException("Node not found: " + nodeId));
+                .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
@@ -45,7 +47,7 @@ public class NodeQueryService {
         Objects.requireNonNull(consensusNodeId, "consensusNodeId must not be null");
 
         aiConsensusRepository.findByNodeId(consensusNodeId)
-                .orElseThrow(() -> new IllegalArgumentException("AI_Consensus not found: " + consensusNodeId));
+                .orElseThrow(() -> new NoSuchElementException("AI_Consensus not found: " + consensusNodeId));
 
         return humanPostRepository.findProvenance(consensusNodeId);
     }
@@ -57,7 +59,7 @@ public class NodeQueryService {
         if (maxDepth <= 0) {
             throw new IllegalArgumentException("maxDepth must be greater than 0");
         }
-        return maxDepth;
+        return Math.min(maxDepth, MAX_ALLOWED_DEPTH);
     }
 
     public sealed interface NodeResult permits HumanPostNode, AIConsensusNode {

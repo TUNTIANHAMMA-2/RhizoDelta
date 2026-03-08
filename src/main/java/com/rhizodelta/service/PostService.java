@@ -10,13 +10,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Service
 public class PostService {
-    private static final ConcurrentMap<String, Object> REQUEST_LOCKS = new ConcurrentHashMap<>();
-
     private static final String UPSERT_HUMAN_POST_QUERY = """
             MERGE (post:Human_Post {request_id: $requestId})
             ON CREATE SET
@@ -40,21 +36,14 @@ public class PostService {
     @Transactional(transactionManager = "transactionManager")
     public HumanPost createHumanPost(CreateHumanPostCommand command) {
         Objects.requireNonNull(command, "command must not be null");
-        Object requestLock = REQUEST_LOCKS.computeIfAbsent(command.requestId(), ignored -> new Object());
 
-        synchronized (requestLock) {
-            try {
-                UUID generatedNodeId = UUID.randomUUID();
-                OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
-                String nodeIdString = upsertByRequestId(command, generatedNodeId, createdAt);
-                UUID persistedNodeId = UUID.fromString(nodeIdString);
+        UUID generatedNodeId = UUID.randomUUID();
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        String nodeIdString = upsertByRequestId(command, generatedNodeId, createdAt);
+        UUID persistedNodeId = UUID.fromString(nodeIdString);
 
-                return humanPostRepository.findByNodeId(persistedNodeId)
-                        .orElseThrow(() -> new IllegalStateException("Human_Post not found after upsert"));
-            } finally {
-                REQUEST_LOCKS.remove(command.requestId(), requestLock);
-            }
-        }
+        return humanPostRepository.findByNodeId(persistedNodeId)
+                .orElseThrow(() -> new IllegalStateException("Human_Post not found after upsert"));
     }
 
     private String upsertByRequestId(

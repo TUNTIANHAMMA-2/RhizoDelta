@@ -8,6 +8,11 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.Neo4jContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -19,7 +24,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
 class PostApiIntegrationTest {
+    @Container
+    static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5")
+            .withAdminPassword("testpassword");
+
+    @DynamicPropertySource
+    static void neo4jProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.neo4j.uri", neo4j::getBoltUrl);
+        registry.add("spring.neo4j.authentication.username", () -> "neo4j");
+        registry.add("spring.neo4j.authentication.password", neo4j::getAdminPassword);
+    }
+
     @Autowired
     private TestRestTemplate restTemplate;
 

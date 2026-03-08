@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -83,6 +84,19 @@ class ServiceLayerUnitTest {
     }
 
     @Test
+    void getNodeByIdShouldThrowNoSuchElementWhenNotFound() {
+        NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
+        UUID nodeId = UUID.randomUUID();
+
+        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getNodeById(nodeId))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Node not found");
+    }
+
+    @Test
     void getNodeByIdShouldReturnAIConsensusNodeWhenHumanMissing() {
         NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository);
         UUID nodeId = UUID.randomUUID();
@@ -123,7 +137,7 @@ class ServiceLayerUnitTest {
         when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getProvenance(nodeId))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("AI_Consensus");
     }
 

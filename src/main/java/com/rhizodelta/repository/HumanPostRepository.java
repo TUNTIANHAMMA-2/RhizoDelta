@@ -14,7 +14,7 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
     Optional<HumanPost> findByNodeId(UUID nodeId);
 
     @Query("""
-            MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*1..10]->(ancestor)
+            MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*1..50]->(ancestor)
             WHERE length(path) <= $maxDepth
             RETURN DISTINCT ancestor
             ORDER BY ancestor.created_at DESC
