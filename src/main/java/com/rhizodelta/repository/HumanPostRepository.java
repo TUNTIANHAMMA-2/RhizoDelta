@@ -1,13 +1,27 @@
 package com.rhizodelta.repository;
 
 import com.rhizodelta.domain.node.HumanPost;
+import org.springframework.data.neo4j.repository.query.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost, UUID> {
     Optional<HumanPost> findByNodeId(UUID nodeId);
+
+    @Query("""
+            MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*1..10]->(ancestor)
+            WHERE length(path) <= $maxDepth
+            RETURN DISTINCT ancestor
+            ORDER BY ancestor.created_at DESC
+            """)
+    List<HumanPost> findLineage(
+            @Param("nodeId") UUID nodeId,
+            @Param("maxDepth") Integer maxDepth
+    );
 }
 
 interface ImmutableNeo4jRepository<T, ID> extends Neo4jRepository<T, ID> {
