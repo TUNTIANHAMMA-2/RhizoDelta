@@ -56,6 +56,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.badRequest("Invalid parameter type: " + exception.getName()));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException exception) {
+        LOGGER.error("Internal error: {}", exception.getMessage(), exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.internalError("internal server error"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleInternalError(Exception exception) {
         LOGGER.error("Unhandled exception", exception);
