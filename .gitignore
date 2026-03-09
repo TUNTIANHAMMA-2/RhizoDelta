@@ -1,0 +1,9 @@
+# Environment variables (contains credentials)
+.env
+
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
