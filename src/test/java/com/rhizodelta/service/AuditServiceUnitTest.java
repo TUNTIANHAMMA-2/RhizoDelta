@@ -94,6 +94,45 @@ class AuditServiceUnitTest {
     }
 
     @Test
+    void listDecisionsShouldBindSinceAndUntilRange() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        Instant since = Instant.parse("2026-01-01T00:00:00Z");
+        Instant until = Instant.parse("2026-01-02T00:00:00Z");
+        when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all()).thenReturn(List.of(record(1)));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditListResponse response = auditService.listDecisions(null, null, since, until, null, 5);
+
+        assertThat(response.records()).hasSize(1);
+        verify(neo4jClient.query(anyString())).bindAll(argThat((Map<String, Object> params) ->
+                OffsetDateTime.ofInstant(since, java.time.ZoneOffset.UTC).equals(params.get("since"))
+                        && OffsetDateTime.ofInstant(until, java.time.ZoneOffset.UTC).equals(params.get("until"))
+        ));
+    }
+
+    @Test
+    void listDecisionsShouldRejectInvalidCursor() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        AuditService auditService = new AuditService(neo4jClient);
+
+        assertThatThrownBy(() -> auditService.listDecisions(null, null, null, null, "not-a-cursor", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid cursor");
+    }
+
+    @Test
+    void cursorEncodeDecodeShouldRoundTrip() {
+        Instant createdAt = Instant.parse("2026-02-01T08:10:11Z");
+        String decisionId = "decision-round-trip-001";
+
+        String cursor = AuditService.encodeCursor(createdAt, decisionId);
+        AuditService.Cursor decoded = AuditService.decodeCursor(cursor);
+
+        assertThat(decoded.createdAt()).isEqualTo(createdAt);
+        assertThat(decoded.decisionId()).isEqualTo(decisionId);
+    }
+
+    @Test
     void getDecisionDetailShouldReturnMergeDetailWithSynthesizedFrom() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         UUID contributorA = UUID.randomUUID();
