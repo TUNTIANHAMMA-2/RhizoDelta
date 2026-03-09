@@ -29,6 +29,15 @@ final class DecisionCommandValidation {
         return value;
     }
 
+    static void validateConfidence(Float confidence) {
+        if (confidence == null) {
+            return;
+        }
+        if (confidence < 0.0f || confidence > 1.0f) {
+            throw new IllegalArgumentException("confidence must be within [0.0,1.0]");
+        }
+    }
+
     static List<UUID> requireUuidList(List<UUID> values) {
         if (values == null || values.isEmpty()) {
             throw new IllegalArgumentException("synthesized_from must not be empty");

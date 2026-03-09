@@ -25,10 +25,10 @@ public class AssociationService {
             RETURN count(node) > 0 AS exists
             """;
 
-    private static final String CREATE_CONCEPTUAL_OVERLAP_QUERY = """
+    private static final String CREATE_ASSOCIATION_QUERY_TEMPLATE = """
             MATCH (source:GraphNode {node_id: $sourceNodeId})
             MATCH (target:GraphNode {node_id: $targetNodeId})
-            MERGE (source)-[association:CONCEPTUAL_OVERLAP]->(target)
+            MERGE (source)-[association:%s]->(target)
             ON CREATE SET
               association.association_id = $associationId,
               association.creator_id = $creatorId,
@@ -39,24 +39,10 @@ public class AssociationService {
                    source.node_id AS sourceNodeId,
                    target.node_id AS targetNodeId,
                    association.association_id = $associationId AS created,
-                   association.created_at AS createdAt
-            """;
-
-    private static final String CREATE_RELATES_TO_QUERY = """
-            MATCH (source:GraphNode {node_id: $sourceNodeId})
-            MATCH (target:GraphNode {node_id: $targetNodeId})
-            MERGE (source)-[association:RELATES_TO]->(target)
-            ON CREATE SET
-              association.association_id = $associationId,
-              association.creator_id = $creatorId,
-              association.reason = $reason,
-              association.created_at = $createdAt,
-              association.confidence = $confidence
-            RETURN association.association_id AS associationId,
-                   source.node_id AS sourceNodeId,
-                   target.node_id AS targetNodeId,
-                   association.association_id = $associationId AS created,
-                   association.created_at AS createdAt
+                   association.created_at AS createdAt,
+                   association.confidence AS confidence,
+                   association.reason AS reason,
+                   association.creator_id AS creatorId
             """;
 
     private static final String DELETE_ASSOCIATION_QUERY = """
@@ -86,7 +72,10 @@ public class AssociationService {
                    association.creator_id AS creatorId,
                    association.created_at AS createdAt
             ORDER BY createdAt DESC
+            LIMIT $limit
             """;
+
+    static final int DEFAULT_ASSOCIATION_LIMIT = 100;
 
     private final Neo4jClient neo4jClient;
 
@@ -97,7 +86,7 @@ public class AssociationService {
     @Transactional(transactionManager = "transactionManager")
     public CreateAssociationOutcome createAssociation(CreateAssociationCommand command) {
         Objects.requireNonNull(command, "command must not be null");
-        validateConfidence(command.confidence());
+        DecisionCommandValidation.validateConfidence(command.confidence());
         validateAssociationNodes(command.source_node_id(), command.target_node_id());
 
         UUID associationId = UUID.randomUUID();
@@ -136,15 +125,17 @@ public class AssociationService {
     }
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
-    public List<AssociationInfo> findAssociationsByNodeId(UUID nodeId, AssociationType type) {
+    public List<AssociationInfo> findAssociationsByNodeId(UUID nodeId, AssociationType type, Integer limit) {
         UUID validatedNodeId = DecisionCommandValidation.requireUuid(nodeId, "node_id");
         if (!nodeExists(validatedNodeId)) {
             throw new NoSuchElementException("node_id not found: " + validatedNodeId);
         }
         String associationType = type == null ? null : type.name();
+        int effectiveLimit = (limit != null && limit > 0) ? limit : DEFAULT_ASSOCIATION_LIMIT;
         Collection<Map<String, Object>> records = neo4jClient.query(FIND_ASSOCIATIONS_QUERY)
                 .bind(validatedNodeId.toString()).to("nodeId")
                 .bind(associationType).to("associationType")
+                .bind(effectiveLimit).to("limit")
                 .fetch()
                 .all();
         return records.stream().map(AssociationService::toAssociationInfo).toList();
@@ -172,10 +163,7 @@ public class AssociationService {
     }
 
     private static String resolveCreateQuery(AssociationType type) {
-        return switch (type) {
-            case CONCEPTUAL_OVERLAP -> CREATE_CONCEPTUAL_OVERLAP_QUERY;
-            case RELATES_TO -> CREATE_RELATES_TO_QUERY;
-        };
+        return String.format(CREATE_ASSOCIATION_QUERY_TEMPLATE, type.name());
     }
 
     private static CreateAssociationOutcome toCreateOutcome(Map<String, Object> result, AssociationType type) {
@@ -184,6 +172,9 @@ public class AssociationService {
                 UUID.fromString((String) result.get("sourceNodeId")),
                 UUID.fromString((String) result.get("targetNodeId")),
                 type,
+                toFloat(result.get("confidence")),
+                (String) result.get("reason"),
+                (String) result.get("creatorId"),
                 toInstant(result.get("createdAt"))
         );
         boolean created = Boolean.TRUE.equals(result.get("created"));
@@ -213,15 +204,6 @@ public class AssociationService {
         if (value instanceof Instant instant) return instant;
         if (value instanceof OffsetDateTime odt) return odt.toInstant();
         return null;
-    }
-
-    private static void validateConfidence(Float confidence) {
-        if (confidence == null) {
-            return;
-        }
-        if (confidence < 0.0f || confidence > 1.0f) {
-            throw new IllegalArgumentException("confidence must be within [0.0,1.0]");
-        }
     }
 
     private static Float toFloat(Object value) {

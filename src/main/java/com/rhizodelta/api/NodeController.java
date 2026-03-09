@@ -64,10 +64,11 @@ public class NodeController {
     @GetMapping("/{id}/associations")
     public ApiResponse<List<AssociationInfo>> getAssociations(
             @PathVariable("id") String id,
-            @RequestParam(value = "type", required = false) AssociationType type
+            @RequestParam(value = "type", required = false) AssociationType type,
+            @RequestParam(value = "limit", required = false) Integer limit
     ) {
         UUID nodeId = parseUuid(id);
-        List<AssociationInfo> associations = associationService.findAssociationsByNodeId(nodeId, type);
+        List<AssociationInfo> associations = associationService.findAssociationsByNodeId(nodeId, type, limit);
         return ApiResponse.ok(associations);
     }
 

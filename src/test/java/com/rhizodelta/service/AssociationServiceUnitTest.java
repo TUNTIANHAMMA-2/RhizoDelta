@@ -90,7 +90,9 @@ class AssociationServiceUnitTest {
                 "sourceNodeId", sourceNodeId.toString(),
                 "targetNodeId", targetNodeId.toString(),
                 "created", false,
-                "createdAt", OffsetDateTime.now(ZoneOffset.UTC)
+                "createdAt", OffsetDateTime.now(ZoneOffset.UTC),
+                "reason", "reason",
+                "creatorId", "creator-1"
         )));
 
         AssociationService.CreateAssociationOutcome outcome = service.createAssociation(command);
@@ -126,7 +128,9 @@ class AssociationServiceUnitTest {
                 "sourceNodeId", sourceNodeId.toString(),
                 "targetNodeId", targetNodeId.toString(),
                 "created", true,
-                "createdAt", OffsetDateTime.now(ZoneOffset.UTC)
+                "createdAt", OffsetDateTime.now(ZoneOffset.UTC),
+                "reason", "reason",
+                "creatorId", "creator-1"
         )));
 
         AssociationService.CreateAssociationOutcome outcome = service.createAssociation(command);
@@ -176,9 +180,10 @@ class AssociationServiceUnitTest {
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MATCH (node)-[association:CONCEPTUAL_OVERLAP|RELATES_TO]-(related:GraphNode)")))
                 .bind(eq(nodeId.toString())).to("nodeId")
                 .bind(eq("RELATES_TO")).to("associationType")
+                .bind(eq(100)).to("limit")
                 .fetch().all()).thenReturn(List.of(record));
 
-        List<AssociationInfo> infos = service.findAssociationsByNodeId(nodeId, AssociationType.RELATES_TO);
+        List<AssociationInfo> infos = service.findAssociationsByNodeId(nodeId, AssociationType.RELATES_TO, null);
 
         assertThat(infos).hasSize(1);
         assertThat(infos.get(0).direction()).isEqualTo(AssociationInfo.Direction.INCOMING);

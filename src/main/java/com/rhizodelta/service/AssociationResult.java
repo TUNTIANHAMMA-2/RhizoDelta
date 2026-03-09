@@ -11,6 +11,9 @@ public record AssociationResult(
         @JsonProperty("source_node_id") UUID source_node_id,
         @JsonProperty("target_node_id") UUID target_node_id,
         @JsonProperty("type") AssociationType type,
+        @JsonProperty("confidence") Float confidence,
+        @JsonProperty("reason") String reason,
+        @JsonProperty("creator_id") String creator_id,
         @JsonProperty("created_at") Instant created_at
 ) {
     public AssociationResult {

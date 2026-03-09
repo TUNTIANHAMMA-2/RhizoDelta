@@ -24,16 +24,7 @@ public record AssociationInfo(
         reason = DecisionCommandValidation.requireText(reason, "reason");
         creator_id = DecisionCommandValidation.requireText(creator_id, "creator_id");
         created_at = Objects.requireNonNull(created_at, "created_at must not be null");
-        validateConfidence(confidence);
-    }
-
-    private static void validateConfidence(Float confidence) {
-        if (confidence == null) {
-            return;
-        }
-        if (confidence < 0.0f || confidence > 1.0f) {
-            throw new IllegalArgumentException("confidence must be within [0.0,1.0]");
-        }
+        DecisionCommandValidation.validateConfidence(confidence);
     }
 
     public enum Direction {

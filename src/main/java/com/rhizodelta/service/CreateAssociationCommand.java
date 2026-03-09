@@ -37,15 +37,6 @@ public record CreateAssociationCommand(
         }
         creator_id = DecisionCommandValidation.requireText(creator_id, "creator_id");
         reason = DecisionCommandValidation.requireText(reason, "reason");
-        validateConfidence(confidence);
-    }
-
-    private static void validateConfidence(Float confidence) {
-        if (confidence == null) {
-            return;
-        }
-        if (confidence < 0.0f || confidence > 1.0f) {
-            throw new IllegalArgumentException("confidence must be within [0.0,1.0]");
-        }
+        DecisionCommandValidation.validateConfidence(confidence);
     }
 }

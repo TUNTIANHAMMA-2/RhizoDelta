@@ -3,6 +3,7 @@ package com.rhizodelta.api;
 import com.rhizodelta.service.AssociationResult;
 import com.rhizodelta.service.AssociationService;
 import com.rhizodelta.service.CreateAssociationCommand;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +25,7 @@ public class AssociationController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<AssociationResult>> create(@RequestBody CreateAssociationCommand command) {
+    public ResponseEntity<ApiResponse<AssociationResult>> create(@Valid @RequestBody CreateAssociationCommand command) {
         AssociationService.CreateAssociationOutcome outcome = associationService.createAssociation(command);
         HttpStatus status = outcome.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.ok(outcome.association()));
