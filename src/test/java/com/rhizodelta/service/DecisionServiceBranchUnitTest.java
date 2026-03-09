@@ -14,6 +14,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -70,8 +72,8 @@ class DecisionServiceBranchUnitTest {
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
         when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
-                .fetchAs(String.class)
-                .one()).thenReturn(Optional.of(decisionNodeId.toString()));
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString(), "created", true)));
 
         DecisionResult result = decisionService.executeBranch(command);
 
@@ -97,8 +99,8 @@ class DecisionServiceBranchUnitTest {
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
         when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
-                .fetchAs(String.class)
-                .one()).thenReturn(Optional.of(sourceNodeId.toString()));
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("nodeId", sourceNodeId.toString(), "created", true)));
         doThrow(new DagIntegrityViolationException("source_node_id and target_node_id must not be the same"))
                 .when(dagIntegrityService)
                 .assertNoVersionEvolutionCycle(sourceNodeId, sourceNodeId);

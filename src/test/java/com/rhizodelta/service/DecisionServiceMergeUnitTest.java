@@ -15,6 +15,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -95,8 +97,8 @@ class DecisionServiceMergeUnitTest {
                 .thenReturn(Optional.of(HumanPost.create(synthesizedNodeId, "synth", "author", "req-synth")));
         when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:AI_Consensus")))
                 .bindAll(anyMap())
-                .fetchAs(String.class)
-                .one()).thenReturn(Optional.of(decisionNodeId.toString()));
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString(), "created", true)));
 
         DecisionResult result = decisionService.executeMerge(command);
 

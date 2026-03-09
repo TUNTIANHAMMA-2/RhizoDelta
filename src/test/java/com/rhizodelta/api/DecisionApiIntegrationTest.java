@@ -188,19 +188,19 @@ class DecisionApiIntegrationTest {
     }
 
     @Test
-    void shouldReturnConflictWhenBranchWouldCreateCycle() {
+    void shouldReturnExistingResultWhenBranchDecisionIdAlreadyUsed() {
         UUID sourceNodeId = UUID.randomUUID();
-        String decisionId = "branch-cycle-001";
-        createHumanPostNode(sourceNodeId, "req-cycle", "author-cycle", "cycle", decisionId);
+        String decisionId = "branch-existing-001";
+        createHumanPostNode(sourceNodeId, "req-existing", "author-existing", "existing content", decisionId);
 
         ResponseEntity<Map> response = restTemplate.postForEntity(
                 "/api/decisions/branch",
-                branchRequest(decisionId, sourceNodeId, "cycle"),
+                branchRequest(decisionId, sourceNodeId, "new content"),
                 Map.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(response.getBody().get("code")).isEqualTo(40901);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("node_id")).isEqualTo(sourceNodeId.toString());
     }
 
     @Test
