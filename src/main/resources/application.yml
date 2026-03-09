@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   neo4j:
     uri: ${NEO4J_URI}
     authentication:
