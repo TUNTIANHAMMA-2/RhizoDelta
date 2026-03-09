@@ -47,9 +47,7 @@ public class RollbackService {
         UUID decisionNodeId = resolveDecisionNodeId(validatedDecisionId);
         List<UUID> dependentNodeIds = findDependentNodeIds(decisionNodeId);
         if (!dependentNodeIds.isEmpty()) {
-            throw new DagIntegrityViolationException(
-                    "cannot rollback: node has downstream dependents " + dependentNodeIds
-            );
+            throw new RollbackBlockedException(dependentNodeIds);
         }
         long relationshipsRemoved = deleteDecisionNode(decisionNodeId);
         return new RollbackResult(validatedDecisionId, decisionNodeId, relationshipsRemoved);

@@ -96,10 +96,12 @@ class RollbackServiceUnitTest {
         RollbackService rollbackService = new RollbackService(neo4jClient);
 
         assertThatThrownBy(() -> rollbackService.rollbackDecision("decision-blocked"))
-                .isInstanceOf(DagIntegrityViolationException.class)
-                .hasMessageContaining("cannot rollback: node has downstream dependents")
-                .hasMessageContaining(dependentA.toString())
-                .hasMessageContaining(dependentB.toString());
+                .isInstanceOf(RollbackBlockedException.class)
+                .satisfies(exception -> {
+                    RollbackBlockedException rollbackBlockedException = (RollbackBlockedException) exception;
+                    assertThat(rollbackBlockedException.dependent_node_ids())
+                            .containsExactly(dependentA, dependentB);
+                });
     }
 
     @Test

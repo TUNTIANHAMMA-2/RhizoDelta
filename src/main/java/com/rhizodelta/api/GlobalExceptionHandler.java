@@ -2,6 +2,7 @@ package com.rhizodelta.api;
 
 import com.rhizodelta.service.DagIntegrityViolationException;
 import com.rhizodelta.service.AssociationType;
+import com.rhizodelta.service.RollbackBlockedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -11,10 +12,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+    private static final int CONFLICT_CODE = 40901;
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -33,6 +37,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleDagIntegrityViolation(DagIntegrityViolationException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.conflict(exception.getMessage()));
+    }
+
+    @ExceptionHandler(RollbackBlockedException.class)
+    public ResponseEntity<ApiResponse<RollbackBlockedData>> handleRollbackBlocked(RollbackBlockedException exception) {
+        RollbackBlockedData data = new RollbackBlockedData(exception.dependent_node_ids());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiResponse<>(CONFLICT_CODE, exception.getMessage(), data));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -68,5 +79,8 @@ public class GlobalExceptionHandler {
         LOGGER.error("Unhandled exception", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.internalError("internal server error"));
+    }
+
+    public record RollbackBlockedData(List<UUID> dependent_node_ids) {
     }
 }
