@@ -19,6 +19,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -70,7 +71,7 @@ class DecisionServiceMergeUnitTest {
 
         when(humanPostRepository.findByNodeId(sourceNodeId))
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(humanPostRepository.findByNodeId(missingSynthesizedNodeId)).thenReturn(Optional.empty());
+        when(humanPostRepository.findAllByNodeIdIn(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> decisionService.executeMerge(command))
                 .isInstanceOf(NoSuchElementException.class)
@@ -91,14 +92,19 @@ class DecisionServiceMergeUnitTest {
         UUID decisionNodeId = UUID.randomUUID();
         MergeDecisionCommand command = newMergeCommand(sourceNodeId, synthesizedNodeId);
 
+        HumanPost synthesizedPost = HumanPost.create(synthesizedNodeId, "synth", "author", "req-synth");
         when(humanPostRepository.findByNodeId(sourceNodeId))
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(humanPostRepository.findByNodeId(synthesizedNodeId))
-                .thenReturn(Optional.of(HumanPost.create(synthesizedNodeId, "synth", "author", "req-synth")));
-        when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:AI_Consensus")))
+        when(humanPostRepository.findAllByNodeIdIn(any()))
+                .thenReturn(List.of(synthesizedPost));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:AI_Consensus")))
                 .bindAll(anyMap())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString(), "created", true)));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGED_INTO")))
+                .bindAll(anyMap())
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("synthesizedCount", 1L)));
 
         DecisionResult result = decisionService.executeMerge(command);
 

@@ -70,10 +70,14 @@ class DecisionServiceBranchUnitTest {
 
         when(humanPostRepository.findByNodeId(sourceNodeId))
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:Human_Post")))
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString(), "created", true)));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("BRANCHED_FROM")))
+                .bindAll(anyMap())
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("relType", "BRANCHED_FROM")));
 
         DecisionResult result = decisionService.executeBranch(command);
 
@@ -97,7 +101,7 @@ class DecisionServiceBranchUnitTest {
 
         when(humanPostRepository.findByNodeId(sourceNodeId))
                 .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(neo4jClient.query(argThat((String query) -> query.contains("MERGE (decision:Human_Post")))
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", sourceNodeId.toString(), "created", true)));

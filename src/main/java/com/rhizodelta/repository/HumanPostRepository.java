@@ -6,12 +6,15 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
 import org.springframework.data.repository.NoRepositoryBean;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost, UUID> {
     Optional<HumanPost> findByNodeId(UUID nodeId);
+
+    List<HumanPost> findAllByNodeIdIn(Collection<UUID> nodeIds);
 
     @Query("""
             MATCH (:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)

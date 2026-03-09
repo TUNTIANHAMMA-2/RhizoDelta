@@ -31,11 +31,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DagIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDagIntegrityViolation(DagIntegrityViolationException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.conflict("cycle detected"));
+                .body(ApiResponse.conflict(exception.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadableMessage(HttpMessageNotReadableException exception) {
+        Throwable cause = exception.getMostSpecificCause();
+        if (cause instanceof IllegalArgumentException) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest(cause.getMessage()));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.badRequest("Malformed request body"));
     }

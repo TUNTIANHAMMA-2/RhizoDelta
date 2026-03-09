@@ -23,7 +23,10 @@ final class DecisionCommandValidation {
     }
 
     static DecisionOperatorType requireOperatorType(DecisionOperatorType value) {
-        return Objects.requireNonNull(value, "operator_type must not be null");
+        if (value == null) {
+            throw new IllegalArgumentException("operator_type must not be null");
+        }
+        return value;
     }
 
     static List<UUID> requireUuidList(List<UUID> values) {

@@ -56,7 +56,7 @@ class DecisionCommandUnitTest {
                 null,
                 "agent-1",
                 "reason"
-        )).isInstanceOf(NullPointerException.class)
+        )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operator_type");
     }
 

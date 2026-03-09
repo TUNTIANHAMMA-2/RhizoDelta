@@ -1,5 +1,6 @@
 package com.rhizodelta.service;
 
+import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import org.springframework.data.neo4j.core.Neo4jClient;
@@ -56,6 +57,7 @@ public class DecisionService {
               synthesized.operator_id = operatorId,
               synthesized.created_at = createdAt,
               synthesized.reason = reason
+            RETURN count(synthesized) AS synthesizedCount
             """;
 
     private static final String UPSERT_BRANCH_NODE_QUERY = """
@@ -81,6 +83,7 @@ public class DecisionService {
               branched.operator_id = $operatorId,
               branched.created_at = $createdAt,
               branched.reason = $reason
+            RETURN type(branched) AS relType
             """;
 
     private final Neo4jClient neo4jClient;
@@ -150,7 +153,7 @@ public class DecisionService {
 
     private void createMergeRelationships(MergeDecisionCommand command) {
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-        neo4jClient.query(MERGE_RELATIONSHIPS_QUERY)
+        Map<String, Object> result = neo4jClient.query(MERGE_RELATIONSHIPS_QUERY)
                 .bindAll(Map.of(
                         "decisionId", command.decision_id(),
                         "sourceNodeId", command.source_node_id().toString(),
@@ -160,7 +163,15 @@ public class DecisionService {
                         "reason", command.reason(),
                         "contributorNodeIds", command.synthesized_from().stream().map(UUID::toString).toList()
                 ))
-                .run();
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to create MERGED_INTO relationship"));
+        long synthesizedCount = ((Number) result.get("synthesizedCount")).longValue();
+        if (synthesizedCount != command.synthesized_from().size()) {
+            throw new IllegalStateException(
+                    "Expected " + command.synthesized_from().size()
+                    + " SYNTHESIZED_FROM relationships but created " + synthesizedCount);
+        }
     }
 
     private UpsertResult upsertBranchNode(BranchDecisionCommand command) {
@@ -191,7 +202,9 @@ public class DecisionService {
                         "createdAt", relationshipCreatedAt,
                         "reason", command.reason()
                 ))
-                .run();
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
     }
 
     private void validateSourceNodeExists(UUID sourceNodeId) {
@@ -203,15 +216,18 @@ public class DecisionService {
     }
 
     private void validateSynthesizedFromNodes(List<UUID> synthesizedFrom) {
-        Set<UUID> missingNodeIds = new LinkedHashSet<>();
-        for (UUID sourceNodeId : synthesizedFrom) {
-            if (humanPostRepository.findByNodeId(sourceNodeId).isEmpty()) {
-                missingNodeIds.add(sourceNodeId);
-            }
+        Set<UUID> uniqueIds = new LinkedHashSet<>(synthesizedFrom);
+        List<HumanPost> found = humanPostRepository.findAllByNodeIdIn(uniqueIds);
+        if (found.size() == uniqueIds.size()) {
+            return;
         }
-        if (!missingNodeIds.isEmpty()) {
-            throw new NoSuchElementException("synthesized_from node_id not found: " + missingNodeIds);
+        Set<UUID> foundIds = new LinkedHashSet<>();
+        for (HumanPost post : found) {
+            foundIds.add(post.getNodeId());
         }
+        Set<UUID> missing = new LinkedHashSet<>(uniqueIds);
+        missing.removeAll(foundIds);
+        throw new NoSuchElementException("synthesized_from node_id not found: " + missing);
     }
 
     private static UpsertResult toUpsertResult(Map<String, Object> result) {
