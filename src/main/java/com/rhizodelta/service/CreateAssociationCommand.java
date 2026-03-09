@@ -6,7 +6,6 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import java.util.Objects;
 import java.util.UUID;
 
 public record CreateAssociationCommand(
@@ -33,7 +32,9 @@ public record CreateAssociationCommand(
     public CreateAssociationCommand {
         source_node_id = DecisionCommandValidation.requireUuid(source_node_id, "source_node_id");
         target_node_id = DecisionCommandValidation.requireUuid(target_node_id, "target_node_id");
-        type = Objects.requireNonNull(type, "type must not be null");
+        if (type == null) {
+            throw new IllegalArgumentException("type must not be null");
+        }
         creator_id = DecisionCommandValidation.requireText(creator_id, "creator_id");
         reason = DecisionCommandValidation.requireText(reason, "reason");
         validateConfidence(confidence);
