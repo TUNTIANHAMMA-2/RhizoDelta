@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,6 +91,66 @@ class AuditServiceUnitTest {
         assertThatThrownBy(() -> auditService.listDecisions("INVALID", null, null, null, null, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Allowed values: MERGE, BRANCH");
+    }
+
+    @Test
+    void getDecisionDetailShouldReturnMergeDetailWithSynthesizedFrom() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        UUID contributorA = UUID.randomUUID();
+        UUID contributorB = UUID.randomUUID();
+        when(neo4jClient.query(anyString()).bind(anyString()).to(anyString()).fetch().one())
+                .thenReturn(Optional.of(Map.of(
+                        "decisionId", "decision-merge",
+                        "decisionType", "MERGE",
+                        "nodeId", UUID.randomUUID().toString(),
+                        "sourceNodeId", UUID.randomUUID().toString(),
+                        "operatorType", "AGENT",
+                        "operatorId", "agent-42",
+                        "reason", "merge",
+                        "createdAt", Instant.parse("2026-02-01T00:00:00Z"),
+                        "synthesizedFrom", List.of(contributorA.toString(), contributorB.toString())
+                )));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditDetail detail = auditService.getDecisionDetail("decision-merge");
+
+        assertThat(detail.decision_type()).isEqualTo(DecisionType.MERGE);
+        assertThat(detail.synthesized_from()).containsExactly(contributorA, contributorB);
+    }
+
+    @Test
+    void getDecisionDetailShouldReturnBranchDetailWithEmptySynthesizedFrom() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).bind(anyString()).to(anyString()).fetch().one())
+                .thenReturn(Optional.of(Map.of(
+                        "decisionId", "decision-branch",
+                        "decisionType", "BRANCH",
+                        "nodeId", UUID.randomUUID(),
+                        "sourceNodeId", UUID.randomUUID(),
+                        "operatorType", "HUMAN",
+                        "operatorId", "human-11",
+                        "reason", "branch",
+                        "createdAt", Instant.parse("2026-02-01T00:00:00Z"),
+                        "synthesizedFrom", List.of()
+                )));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditDetail detail = auditService.getDecisionDetail("decision-branch");
+
+        assertThat(detail.decision_type()).isEqualTo(DecisionType.BRANCH);
+        assertThat(detail.synthesized_from()).isEmpty();
+    }
+
+    @Test
+    void getDecisionDetailShouldThrowWhenDecisionNotFound() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).bind(anyString()).to(anyString()).fetch().one())
+                .thenReturn(Optional.empty());
+        AuditService auditService = new AuditService(neo4jClient);
+
+        assertThatThrownBy(() -> auditService.getDecisionDetail("missing-decision"))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("decision not found");
     }
 
     private static List<Map<String, Object>> buildRecords(int count) {

@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -48,6 +49,21 @@ public class AuditService {
                    createdAt AS createdAt
             ORDER BY createdAt DESC, decisionId DESC
             LIMIT $fetchSize
+            """;
+
+    private static final String GET_DECISION_DETAIL_QUERY = """
+            MATCH (decision:GraphNode {decision_id: $decisionId})-[rel:MERGED_INTO|BRANCHED_FROM]->(source:GraphNode)
+            OPTIONAL MATCH (decision)-[:SYNTHESIZED_FROM]->(contributor:Human_Post)
+            WITH decision, source, rel, [id IN collect(DISTINCT contributor.node_id) WHERE id IS NOT NULL] AS synthesizedFrom
+            RETURN coalesce(rel.decision_id, decision.decision_id) AS decisionId,
+                   CASE WHEN type(rel) = 'MERGED_INTO' THEN 'MERGE' ELSE 'BRANCH' END AS decisionType,
+                   decision.node_id AS nodeId,
+                   source.node_id AS sourceNodeId,
+                   rel.operator_type AS operatorType,
+                   rel.operator_id AS operatorId,
+                   rel.reason AS reason,
+                   rel.created_at AS createdAt,
+                   synthesizedFrom AS synthesizedFrom
             """;
 
     private static final String CURSOR_DELIMITER = "|";
@@ -85,6 +101,18 @@ public class AuditService {
         return toPagedResponse(records, pageSize);
     }
 
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public AuditDetail getDecisionDetail(String decisionId) {
+        String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
+        Map<String, Object> record = neo4jClient.query(GET_DECISION_DETAIL_QUERY)
+                .bind(validatedDecisionId)
+                .to("decisionId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new NoSuchElementException("decision not found: " + validatedDecisionId));
+        return toAuditDetail(record);
+    }
+
     private static Map<String, Object> buildListParams(
             DecisionType decisionType,
             String operatorId,
@@ -114,6 +142,20 @@ public class AuditService {
                 requireText(row, "operatorId"),
                 requireText(row, "reason"),
                 toInstant(row.get("createdAt"))
+        );
+    }
+
+    private static AuditDetail toAuditDetail(Map<String, Object> row) {
+        return new AuditDetail(
+                requireText(row, "decisionId"),
+                parseDecisionType(requireText(row, "decisionType")),
+                toUuid(row.get("nodeId"), "nodeId"),
+                toUuid(row.get("sourceNodeId"), "sourceNodeId"),
+                parseOperatorType(row.get("operatorType")),
+                requireText(row, "operatorId"),
+                requireText(row, "reason"),
+                toInstant(row.get("createdAt")),
+                toUuidList(row.get("synthesizedFrom"), "synthesizedFrom")
         );
     }
 
@@ -215,6 +257,17 @@ public class AuditService {
             return zonedDateTime.toInstant();
         }
         throw new IllegalArgumentException("createdAt must be an instant-compatible value");
+    }
+
+    private static List<UUID> toUuidList(Object value, String fieldName) {
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalArgumentException(fieldName + " must be a list");
+        }
+        List<UUID> result = new ArrayList<>(list.size());
+        for (Object entry : list) {
+            result.add(toUuid(entry, fieldName));
+        }
+        return List.copyOf(result);
     }
 
     record Cursor(Instant createdAt, String decisionId) {
