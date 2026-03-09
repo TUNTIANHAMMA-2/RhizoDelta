@@ -1,5 +1,7 @@
 package com.rhizodelta.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,11 +10,14 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
 @Service
 public class AssociationService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AssociationService.class);
+
     private static final String NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $nodeId})
             RETURN count(node) > 0 AS exists
@@ -52,6 +57,17 @@ public class AssociationService {
                    association.created_at AS createdAt
             """;
 
+    private static final String DELETE_ASSOCIATION_QUERY = """
+            MATCH (source:GraphNode)-[association]->(target:GraphNode)
+            WHERE association.association_id = $associationId
+              AND type(association) IN ['CONCEPTUAL_OVERLAP', 'RELATES_TO']
+            WITH source, target, association, type(association) AS associationType
+            DELETE association
+            RETURN source.node_id AS sourceNodeId,
+                   target.node_id AS targetNodeId,
+                   associationType AS associationType
+            """;
+
     private final Neo4jClient neo4jClient;
 
     public AssociationService(Neo4jClient neo4jClient) {
@@ -81,6 +97,22 @@ public class AssociationService {
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create association"));
         return toCreateOutcome(result, command.type());
+    }
+
+    @Transactional(transactionManager = "transactionManager")
+    public DeleteAssociationOutcome deleteAssociation(UUID associationId) {
+        UUID validatedAssociationId = DecisionCommandValidation.requireUuid(associationId, "association_id");
+        Map<String, Object> result = neo4jClient.query(DELETE_ASSOCIATION_QUERY)
+                .bind(validatedAssociationId.toString()).to("associationId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new NoSuchElementException("association_id not found: " + validatedAssociationId));
+        String sourceNodeId = (String) result.get("sourceNodeId");
+        String targetNodeId = (String) result.get("targetNodeId");
+        String associationType = (String) result.get("associationType");
+        LOGGER.info("Deleted association association_id={}, source_node_id={}, target_node_id={}, type={}",
+                validatedAssociationId, sourceNodeId, targetNodeId, associationType);
+        return new DeleteAssociationOutcome(validatedAssociationId, true);
     }
 
     private void validateAssociationNodes(UUID sourceNodeId, UUID targetNodeId) {
@@ -139,5 +171,8 @@ public class AssociationService {
     }
 
     public record CreateAssociationOutcome(AssociationResult association, boolean created) {
+    }
+
+    public record DeleteAssociationOutcome(UUID association_id, boolean deleted) {
     }
 }
