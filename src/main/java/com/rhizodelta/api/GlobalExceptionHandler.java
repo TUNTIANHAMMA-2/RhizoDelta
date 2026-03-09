@@ -1,6 +1,7 @@
 package com.rhizodelta.api;
 
 import com.rhizodelta.service.DagIntegrityViolationException;
+import com.rhizodelta.service.AssociationType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -47,6 +48,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        if (AssociationType.class.equals(exception.getRequiredType())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest("Invalid association type. Allowed values: CONCEPTUAL_OVERLAP, RELATES_TO"));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.badRequest("Invalid parameter type: " + exception.getName()));
     }

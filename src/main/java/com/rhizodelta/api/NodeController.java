@@ -3,6 +3,9 @@ package com.rhizodelta.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.domain.node.AIConsensus;
 import com.rhizodelta.domain.node.HumanPost;
+import com.rhizodelta.service.AssociationInfo;
+import com.rhizodelta.service.AssociationService;
+import com.rhizodelta.service.AssociationType;
 import com.rhizodelta.service.NodeQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,9 +24,11 @@ public class NodeController {
     private static final String AI_CONSENSUS_LABEL = "AI_Consensus";
 
     private final NodeQueryService nodeQueryService;
+    private final AssociationService associationService;
 
-    public NodeController(NodeQueryService nodeQueryService) {
+    public NodeController(NodeQueryService nodeQueryService, AssociationService associationService) {
         this.nodeQueryService = nodeQueryService;
+        this.associationService = associationService;
     }
 
     @GetMapping("/{id}")
@@ -54,6 +59,16 @@ public class NodeController {
                 .map(this::fromHumanPost)
                 .toList();
         return ApiResponse.ok(provenance);
+    }
+
+    @GetMapping("/{id}/associations")
+    public ApiResponse<List<AssociationInfo>> getAssociations(
+            @PathVariable("id") String id,
+            @RequestParam(value = "type", required = false) AssociationType type
+    ) {
+        UUID nodeId = parseUuid(id);
+        List<AssociationInfo> associations = associationService.findAssociationsByNodeId(nodeId, type);
+        return ApiResponse.ok(associations);
     }
 
     private NodePayload toPayload(NodeQueryService.NodeResult result) {
