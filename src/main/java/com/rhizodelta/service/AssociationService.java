@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -68,6 +70,24 @@ public class AssociationService {
                    associationType AS associationType
             """;
 
+    private static final String FIND_ASSOCIATIONS_QUERY = """
+            MATCH (node:GraphNode {node_id: $nodeId})
+            MATCH (node)-[association:CONCEPTUAL_OVERLAP|RELATES_TO]-(related:GraphNode)
+            WHERE $associationType IS NULL OR type(association) = $associationType
+            RETURN association.association_id AS associationId,
+                   type(association) AS associationType,
+                   CASE WHEN startNode(association) = node THEN 'OUTGOING' ELSE 'INCOMING' END AS direction,
+                   related.node_id AS relatedNodeId,
+                   CASE WHEN 'Human_Post' IN labels(related) THEN 'Human_Post' ELSE 'AI_Consensus' END AS relatedLabel,
+                   related.content AS relatedContent,
+                   related.summary_content AS relatedSummaryContent,
+                   association.confidence AS confidence,
+                   association.reason AS reason,
+                   association.creator_id AS creatorId,
+                   association.created_at AS createdAt
+            ORDER BY createdAt DESC
+            """;
+
     private final Neo4jClient neo4jClient;
 
     public AssociationService(Neo4jClient neo4jClient) {
@@ -115,6 +135,21 @@ public class AssociationService {
         return new DeleteAssociationOutcome(validatedAssociationId, true);
     }
 
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public List<AssociationInfo> findAssociationsByNodeId(UUID nodeId, AssociationType type) {
+        UUID validatedNodeId = DecisionCommandValidation.requireUuid(nodeId, "node_id");
+        if (!nodeExists(validatedNodeId)) {
+            throw new NoSuchElementException("node_id not found: " + validatedNodeId);
+        }
+        String associationType = type == null ? null : type.name();
+        Collection<Map<String, Object>> records = neo4jClient.query(FIND_ASSOCIATIONS_QUERY)
+                .bind(validatedNodeId.toString()).to("nodeId")
+                .bind(associationType).to("associationType")
+                .fetch()
+                .all();
+        return records.stream().map(AssociationService::toAssociationInfo).toList();
+    }
+
     private void validateAssociationNodes(UUID sourceNodeId, UUID targetNodeId) {
         if (sourceNodeId.equals(targetNodeId)) {
             throw new IllegalArgumentException("source_node_id and target_node_id must be different");
@@ -155,6 +190,25 @@ public class AssociationService {
         return new CreateAssociationOutcome(associationResult, created);
     }
 
+    private static AssociationInfo toAssociationInfo(Map<String, Object> record) {
+        AssociationInfo.RelatedNode relatedNode = new AssociationInfo.RelatedNode(
+                UUID.fromString((String) record.get("relatedNodeId")),
+                (String) record.get("relatedLabel"),
+                (String) record.get("relatedContent"),
+                (String) record.get("relatedSummaryContent")
+        );
+        return new AssociationInfo(
+                UUID.fromString((String) record.get("associationId")),
+                AssociationType.valueOf((String) record.get("associationType")),
+                AssociationInfo.Direction.valueOf((String) record.get("direction")),
+                relatedNode,
+                toFloat(record.get("confidence")),
+                (String) record.get("reason"),
+                (String) record.get("creatorId"),
+                toInstant(record.get("createdAt"))
+        );
+    }
+
     private static Instant toInstant(Object value) {
         if (value instanceof Instant instant) return instant;
         if (value instanceof OffsetDateTime odt) return odt.toInstant();
@@ -168,6 +222,16 @@ public class AssociationService {
         if (confidence < 0.0f || confidence > 1.0f) {
             throw new IllegalArgumentException("confidence must be within [0.0,1.0]");
         }
+    }
+
+    private static Float toFloat(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.floatValue();
+        }
+        throw new IllegalArgumentException("Unsupported confidence type: " + value.getClass().getName());
     }
 
     public record CreateAssociationOutcome(AssociationResult association, boolean created) {
