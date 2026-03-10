@@ -2,6 +2,7 @@ package com.rhizodelta.service;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
+import org.neo4j.driver.summary.ResultSummary;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
 import java.util.List;
@@ -14,9 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RollbackServiceUnitTest {
@@ -29,16 +28,13 @@ class RollbackServiceUnitTest {
                 .to(anyString())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("dependentNodeId")))
+        ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
+        when(summary.counters().nodesDeleted()).thenReturn(1);
+        when(summary.counters().relationshipsDeleted()).thenReturn(3);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
                 .bind(anyString())
                 .to(anyString())
-                .fetch()
-                .all()).thenReturn(List.of());
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE decision")))
-                .bind(anyString())
-                .to(anyString())
-                .fetch()
-                .one()).thenReturn(Optional.of(Map.of("relationshipsRemoved", 3L)));
+                .run()).thenReturn(summary);
         RollbackService rollbackService = new RollbackService(neo4jClient);
 
         RollbackResult result = rollbackService.rollbackDecision("decision-merge");
@@ -57,16 +53,13 @@ class RollbackServiceUnitTest {
                 .to(anyString())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId)));
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("dependentNodeId")))
+        ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
+        when(summary.counters().nodesDeleted()).thenReturn(1);
+        when(summary.counters().relationshipsDeleted()).thenReturn(1);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
                 .bind(anyString())
                 .to(anyString())
-                .fetch()
-                .all()).thenReturn(List.of());
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE decision")))
-                .bind(anyString())
-                .to(anyString())
-                .fetch()
-                .one()).thenReturn(Optional.of(Map.of("relationshipsRemoved", 1L)));
+                .run()).thenReturn(summary);
         RollbackService rollbackService = new RollbackService(neo4jClient);
 
         RollbackResult result = rollbackService.rollbackDecision("decision-branch");
@@ -87,6 +80,12 @@ class RollbackServiceUnitTest {
                 .to(anyString())
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
+        ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
+        when(summary.counters().nodesDeleted()).thenReturn(0);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
+                .bind(anyString())
+                .to(anyString())
+                .run()).thenReturn(summary);
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("dependentNodeId")))
                 .bind(anyString())
                 .to(anyString())
@@ -104,7 +103,6 @@ class RollbackServiceUnitTest {
                     assertThat(rollbackBlockedException.dependent_node_ids())
                             .containsExactly(dependentA, dependentB);
                 });
-        verify(neo4jClient, never()).query(argThat((String query) -> query != null && query.contains("DETACH DELETE decision")));
     }
 
     @Test

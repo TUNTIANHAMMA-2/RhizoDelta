@@ -243,7 +243,7 @@ public class AuditService {
         if (value instanceof String text) {
             return UUID.fromString(text);
         }
-        throw new IllegalArgumentException(fieldName + " must be uuid");
+        throw new IllegalStateException(fieldName + " must be uuid");
     }
 
     private static Instant toInstant(Object value) {
@@ -256,12 +256,12 @@ public class AuditService {
         if (value instanceof ZonedDateTime zonedDateTime) {
             return zonedDateTime.toInstant();
         }
-        throw new IllegalArgumentException("createdAt must be an instant-compatible value");
+        throw new IllegalStateException("createdAt must be an instant-compatible value");
     }
 
     private static List<UUID> toUuidList(Object value, String fieldName) {
         if (!(value instanceof List<?> list)) {
-            throw new IllegalArgumentException(fieldName + " must be a list");
+            throw new IllegalStateException(fieldName + " must be a list");
         }
         List<UUID> result = new ArrayList<>(list.size());
         for (Object entry : list) {
