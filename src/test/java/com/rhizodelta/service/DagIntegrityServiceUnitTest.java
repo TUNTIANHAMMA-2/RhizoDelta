@@ -16,11 +16,13 @@ import com.rhizodelta.exception.RollbackBlockedException;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -73,6 +75,25 @@ class DagIntegrityServiceUnitTest {
 
         assertThatCode(() -> service.assertNoVersionEvolutionCycle(sourceNodeId, targetNodeId))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldNotWriteDagCheckTimestamp() {
+        Neo4jClient client = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        DagIntegrityService service = new DagIntegrityService(client);
+        UUID sourceNodeId = UUID.randomUUID();
+        UUID targetNodeId = UUID.randomUUID();
+        ArgumentCaptor<String> queryCaptor = ArgumentCaptor.forClass(String.class);
+
+        when(client.query(queryCaptor.capture())
+                .bind(eq(targetNodeId.toString())).to(eq("targetNodeId"))
+                .bind(eq(sourceNodeId.toString())).to(eq("sourceNodeId"))
+                .fetchAs(Boolean.class)
+                .one()).thenReturn(Optional.of(Boolean.FALSE));
+
+        service.assertNoVersionEvolutionCycle(sourceNodeId, targetNodeId);
+
+        assertThat(queryCaptor.getValue()).doesNotContain("_dag_check_ts");
     }
 
     @Test

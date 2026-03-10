@@ -13,13 +13,11 @@ public class DagIntegrityService {
 
     private static final String CYCLE_CHECK_QUERY = """
             MATCH (target:GraphNode {node_id: $targetNodeId})
-            SET target._dag_check_ts = timestamp()
-            WITH target
             OPTIONAL MATCH path = shortestPath(
-                (target)-[:BRANCHED_FROM|MERGED_INTO*1..50]->(source:GraphNode {node_id: $sourceNodeId})
+                (target)-[:BRANCHED_FROM|MERGED_INTO*1..%d]->(source:GraphNode {node_id: $sourceNodeId})
             )
             RETURN path IS NOT NULL AS hasCycle
-            """;
+            """.formatted(MAX_ALLOWED_DEPTH);
 
     private final Neo4jClient neo4jClient;
 
