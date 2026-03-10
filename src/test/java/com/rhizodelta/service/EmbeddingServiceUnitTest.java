@@ -7,6 +7,8 @@ import org.mockito.Answers;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -139,6 +141,37 @@ class EmbeddingServiceUnitTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expected 3")
                 .hasMessageContaining("actual 2");
+    }
+
+    @Test
+    void writeEmbeddingShouldRejectNullVectorElement() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        EmbeddingService service = new EmbeddingService(neo4jClient, EMBEDDING_DIMENSION);
+        List<Float> vectorWithNull = new ArrayList<>(Arrays.asList(0.1f, null, 0.3f));
+
+        assertThatThrownBy(() -> service.writeEmbedding(UUID.randomUUID().toString(), vectorWithNull))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("vector must not contain null elements");
+    }
+
+    @Test
+    void writeEmbeddingShouldRejectNaNVectorElement() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        EmbeddingService service = new EmbeddingService(neo4jClient, EMBEDDING_DIMENSION);
+
+        assertThatThrownBy(() -> service.writeEmbedding(UUID.randomUUID().toString(), List.of(0.1f, Float.NaN, 0.3f)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("vector must not contain NaN or infinite values");
+    }
+
+    @Test
+    void writeEmbeddingShouldRejectInfiniteVectorElement() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        EmbeddingService service = new EmbeddingService(neo4jClient, EMBEDDING_DIMENSION);
+
+        assertThatThrownBy(() -> service.writeEmbedding(UUID.randomUUID().toString(), List.of(0.1f, Float.POSITIVE_INFINITY, 0.3f)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("vector must not contain NaN or infinite values");
     }
 
     private static Map<String, Object> buildSearchRecord(UUID nodeId, UUID neighborId) {

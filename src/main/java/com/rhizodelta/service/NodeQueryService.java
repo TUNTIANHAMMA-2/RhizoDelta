@@ -38,6 +38,38 @@ public class NodeQueryService {
             ORDER BY createdAt DESC
             """;
 
+    private static final String NODE_SUMMARY_QUERY = """
+            MATCH (n:GraphNode {node_id: $nodeId})
+            WITH n, labels(n) AS nodeLabels
+            RETURN n.node_id AS nodeId,
+                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' ELSE 'AI_Consensus' END AS label,
+                   n.content AS content,
+                   n.summary_content AS summaryContent,
+                   n.author_id AS authorId,
+                   n.agent_version AS agentVersion,
+                   n.created_at AS createdAt,
+                   n.embedding IS NOT NULL AS hasEmbedding
+            """;
+
+    private static final String NODE_TYPE_QUERY = """
+            MATCH (n:GraphNode {node_id: $nodeId})
+            RETURN CASE WHEN 'Human_Post' IN labels(n) THEN 'Human_Post' ELSE 'AI_Consensus' END AS label
+            """;
+
+    private static final String PROVENANCE_SUMMARY_QUERY = """
+            MATCH (:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WITH source
+            RETURN source.node_id AS nodeId,
+                   'Human_Post' AS label,
+                   source.content AS content,
+                   source.summary_content AS summaryContent,
+                   source.author_id AS authorId,
+                   source.agent_version AS agentVersion,
+                   source.created_at AS createdAt,
+                   source.embedding IS NOT NULL AS hasEmbedding
+            ORDER BY createdAt DESC
+            """;
+
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
     private final Neo4jClient neo4jClient;
@@ -88,6 +120,36 @@ public class NodeQueryService {
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
 
         return humanPostRepository.findProvenance(nodeId);
+    }
+
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public LineageNode getNodeSummaryById(UUID nodeId) {
+        Objects.requireNonNull(nodeId, "nodeId must not be null");
+        return neo4jClient.query(NODE_SUMMARY_QUERY)
+                .bind(nodeId.toString()).to("nodeId")
+                .fetch()
+                .one()
+                .map(NodeQueryService::toLineageNode)
+                .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
+    }
+
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public List<LineageNode> getProvenanceSummaries(UUID nodeId) {
+        Objects.requireNonNull(nodeId, "nodeId must not be null");
+        Map<String, Object> nodeInfo = neo4jClient.query(NODE_TYPE_QUERY)
+                .bind(nodeId.toString()).to("nodeId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
+        if ("Human_Post".equals(nodeInfo.get("label"))) {
+            return List.of();
+        }
+        return neo4jClient.query(PROVENANCE_SUMMARY_QUERY)
+                .bind(nodeId.toString()).to("nodeId")
+                .fetch().all()
+                .stream()
+                .map(NodeQueryService::toLineageNode)
+                .toList();
     }
 
     private int resolveMaxDepth(Integer maxDepth) {

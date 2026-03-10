@@ -31,7 +31,7 @@ class EmbeddingIntegrationTest {
     private static final int EMBEDDING_DIMENSION = 3;
 
     @Container
-    static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5")
+    static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5.26")
             .withAdminPassword("testpassword");
 
     @DynamicPropertySource
@@ -82,6 +82,7 @@ class EmbeddingIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void searchSimilarShouldReturnOrderedResultsAndNeighbors() {
         UUID nodeA = UUID.randomUUID();
         UUID nodeB = UUID.randomUUID();
@@ -160,6 +161,7 @@ class EmbeddingIntegrationTest {
                 .run();
     }
 
+    // test-only: relationship types cannot be parameterized in Cypher
     private void createVersionRelation(UUID sourceNodeId, UUID targetNodeId, String type) {
         neo4jClient.query("""
                 MATCH (source:GraphNode {node_id: $sourceNodeId}), (target:GraphNode {node_id: $targetNodeId})
@@ -172,6 +174,7 @@ class EmbeddingIntegrationTest {
                 .fetch().all();
     }
 
+    // test-only: relationship types cannot be parameterized in Cypher
     private void createSemanticRelation(UUID sourceNodeId, UUID targetNodeId, String type) {
         neo4jClient.query("""
                 MATCH (source:GraphNode {node_id: $sourceNodeId}), (target:GraphNode {node_id: $targetNodeId})
@@ -199,11 +202,13 @@ class EmbeddingIntegrationTest {
         return request;
     }
 
+    @SuppressWarnings("unchecked")
     private static Map<String, Object> bodyData(ResponseEntity<Map> response) {
         assertThat(response.getBody()).isNotNull();
         return (Map<String, Object>) response.getBody().get("data");
     }
 
+    @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> bodyList(ResponseEntity<Map> response) {
         assertThat(response.getBody()).isNotNull();
         return (List<Map<String, Object>>) response.getBody().get("data");

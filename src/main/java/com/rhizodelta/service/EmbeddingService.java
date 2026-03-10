@@ -128,6 +128,15 @@ public class EmbeddingService {
         if (vector == null || vector.isEmpty()) {
             throw new IllegalArgumentException("vector must not be empty");
         }
+        for (int i = 0; i < vector.size(); i++) {
+            Float element = vector.get(i);
+            if (element == null) {
+                throw new IllegalArgumentException("vector must not contain null elements");
+            }
+            if (Float.isNaN(element) || Float.isInfinite(element)) {
+                throw new IllegalArgumentException("vector must not contain NaN or infinite values");
+            }
+        }
         return List.copyOf(vector);
     }
 
