@@ -1,5 +1,7 @@
 package com.rhizodelta.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rhizodelta.api.ApiResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -13,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -31,9 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final SecretKey signingKey;
+    private final ObjectMapper objectMapper;
 
-    public JwtAuthenticationFilter(@Value("${rhizodelta.jwt.secret}") String jwtSecret) {
+    public JwtAuthenticationFilter(@Value("${rhizodelta.jwt.secret}") String jwtSecret,
+                                   ObjectMapper objectMapper) {
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -54,6 +60,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .getPayload();
 
             String sub = claims.getSubject();
+            if (sub == null || sub.isBlank()) {
+                throw new BadCredentialsException("invalid token");
+            }
             List<String> roles = extractRoles(claims);
             AuthenticatedUser user = new AuthenticatedUser(sub, roles);
 
@@ -90,8 +99,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void writeErrorResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write(
-                "{\"code\":40101,\"message\":\"" + message + "\",\"data\":null}"
-        );
+        objectMapper.writeValue(response.getOutputStream(), ApiResponse.unauthorized(message));
     }
 }
