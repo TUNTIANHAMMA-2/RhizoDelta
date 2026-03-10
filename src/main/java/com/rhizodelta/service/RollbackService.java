@@ -23,16 +23,20 @@ public class RollbackService {
             LIMIT 1
             """;
 
-    private static final String ATOMIC_DELETE_QUERY = """
+    private static final int MIN_PROPERTIES_UPDATED = 1;
+    private static final String ATOMIC_SOFT_DELETE_QUERY = """
             MATCH (target:GraphNode {node_id: $nodeId})
             OPTIONAL MATCH (target)<-[:BRANCHED_FROM|MERGED_INTO]-(dep:GraphNode)
+            WHERE NOT coalesce(dep._deleted, false)
             WITH target, collect(DISTINCT dep.node_id) AS deps
             WHERE size(deps) = 0
-            DETACH DELETE target
+            SET target._deleted = true,
+                target._deleted_at = datetime()
             """;
 
     private static final String FIND_DEPENDENTS_QUERY = """
             MATCH (target:GraphNode {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO]-(dependent:GraphNode)
+            WHERE NOT coalesce(dependent._deleted, false)
             RETURN DISTINCT dependent.node_id AS dependentNodeId
             ORDER BY dependentNodeId
             """;
@@ -48,18 +52,18 @@ public class RollbackService {
         String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
         UUID decisionNodeId = resolveDecisionNodeId(validatedDecisionId);
 
-        ResultSummary summary = neo4jClient.query(ATOMIC_DELETE_QUERY)
+        ResultSummary summary = neo4jClient.query(ATOMIC_SOFT_DELETE_QUERY)
                 .bind(decisionNodeId.toString())
                 .to("nodeId")
                 .run();
 
-        if (summary.counters().nodesDeleted() == 0) {
+        if (summary.counters().propertiesSet() < MIN_PROPERTIES_UPDATED) {
             List<UUID> dependentNodeIds = findDependentNodeIds(decisionNodeId);
             throw new RollbackBlockedException(dependentNodeIds);
         }
 
         long relationshipsRemoved = summary.counters().relationshipsDeleted();
-        return new RollbackResult(validatedDecisionId, decisionNodeId, relationshipsRemoved);
+        return new RollbackResult(validatedDecisionId, decisionNodeId, relationshipsRemoved, true);
     }
 
     private UUID resolveDecisionNodeId(String decisionId) {

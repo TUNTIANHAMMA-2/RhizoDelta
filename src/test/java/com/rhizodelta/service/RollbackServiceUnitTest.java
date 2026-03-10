@@ -43,9 +43,9 @@ class RollbackServiceUnitTest {
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().nodesDeleted()).thenReturn(1);
-        when(summary.counters().relationshipsDeleted()).thenReturn(3);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
+        when(summary.counters().propertiesSet()).thenReturn(2);
+        when(summary.counters().relationshipsDeleted()).thenReturn(0);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))
                 .bind(anyString())
                 .to(anyString())
                 .run()).thenReturn(summary);
@@ -55,7 +55,8 @@ class RollbackServiceUnitTest {
 
         assertThat(result.decision_id()).isEqualTo("decision-merge");
         assertThat(result.rolled_back_node_id()).isEqualTo(decisionNodeId);
-        assertThat(result.relationships_removed()).isEqualTo(3L);
+        assertThat(result.relationships_removed()).isEqualTo(0L);
+        assertThat(result.soft_deleted()).isTrue();
     }
 
     @Test
@@ -68,9 +69,9 @@ class RollbackServiceUnitTest {
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId)));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().nodesDeleted()).thenReturn(1);
-        when(summary.counters().relationshipsDeleted()).thenReturn(1);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
+        when(summary.counters().propertiesSet()).thenReturn(2);
+        when(summary.counters().relationshipsDeleted()).thenReturn(0);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))
                 .bind(anyString())
                 .to(anyString())
                 .run()).thenReturn(summary);
@@ -80,7 +81,8 @@ class RollbackServiceUnitTest {
 
         assertThat(result.decision_id()).isEqualTo("decision-branch");
         assertThat(result.rolled_back_node_id()).isEqualTo(decisionNodeId);
-        assertThat(result.relationships_removed()).isEqualTo(1L);
+        assertThat(result.relationships_removed()).isEqualTo(0L);
+        assertThat(result.soft_deleted()).isTrue();
     }
 
     @Test
@@ -95,12 +97,14 @@ class RollbackServiceUnitTest {
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().nodesDeleted()).thenReturn(0);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
+        when(summary.counters().propertiesSet()).thenReturn(0);
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))
                 .bind(anyString())
                 .to(anyString())
                 .run()).thenReturn(summary);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("dependentNodeId")))
+        when(neo4jClient.query(argThat((String query) -> query != null
+                && query.contains("dependentNodeId")
+                && query.contains("NOT coalesce(dependent._deleted, false)")))
                 .bind(anyString())
                 .to(anyString())
                 .fetch()
