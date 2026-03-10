@@ -28,7 +28,8 @@ public class PostController {
         PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
                 request.requestId(),
                 request.authorId(),
-                request.content()
+                request.content(),
+                request.targetNodeId()
         );
 
         HumanPost createdPost = postService.createHumanPost(command);
