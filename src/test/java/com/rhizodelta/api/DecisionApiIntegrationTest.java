@@ -228,12 +228,13 @@ class DecisionApiIntegrationTest {
         ResponseEntity<Map> lineage = restTemplate.getForEntity("/api/nodes/" + branchNodeId + "/lineage?max_depth=10", Map.class);
 
         List<Map<String, Object>> provenanceData = (List<Map<String, Object>>) provenance.getBody().get("data");
-        List<Map<String, Object>> lineageData = (List<Map<String, Object>>) lineage.getBody().get("data");
+        Map<String, Object> lineageTopology = (Map<String, Object>) lineage.getBody().get("data");
+        List<Map<String, Object>> lineageNodes = (List<Map<String, Object>>) lineageTopology.get("nodes");
 
         assertThat(provenance.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(provenanceData).extracting(item -> item.get("node_id")).contains(synthesizedNodeId.toString());
         assertThat(lineage.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(lineageData).extracting(item -> item.get("node_id"))
+        assertThat(lineageNodes).extracting(item -> item.get("node_id"))
                 .contains(mergeNodeId, sourceNodeId.toString());
     }
 

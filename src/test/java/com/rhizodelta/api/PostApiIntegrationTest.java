@@ -187,8 +187,9 @@ class PostApiIntegrationTest {
         ResponseEntity<Map> response = restTemplate.getForEntity("/api/nodes/" + childId + "/lineage?max_depth=10", Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-        assertThat(data).extracting(item -> item.get("node_id")).contains(ancestorId.toString());
+        Map<String, Object> topology = (Map<String, Object>) response.getBody().get("data");
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) topology.get("nodes");
+        assertThat(nodes).extracting(item -> item.get("node_id")).contains(ancestorId.toString());
     }
 
     @Test

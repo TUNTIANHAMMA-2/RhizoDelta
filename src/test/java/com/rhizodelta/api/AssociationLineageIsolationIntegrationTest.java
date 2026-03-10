@@ -65,9 +65,10 @@ class AssociationLineageIsolationIntegrationTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-        assertThat(data).extracting(item -> item.get("node_id")).contains(ancestorId.toString());
-        assertThat(data).extracting(item -> item.get("node_id")).doesNotContain(semanticNodeId.toString());
+        Map<String, Object> topology = (Map<String, Object>) response.getBody().get("data");
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) topology.get("nodes");
+        assertThat(nodes).extracting(item -> item.get("node_id")).contains(ancestorId.toString());
+        assertThat(nodes).extracting(item -> item.get("node_id")).doesNotContain(semanticNodeId.toString());
     }
 
     @Test
