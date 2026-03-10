@@ -3,6 +3,7 @@ package com.rhizodelta.config;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ import java.util.Map;
 @Component
 public class DatabaseInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseInitializer.class);
+    private static final String VECTOR_INDEX_NAME = "rhizodelta_graph_node_embedding_idx";
 
     private static final List<String> SCHEMA_QUERIES = List.of(
             "CREATE CONSTRAINT rhizodelta_graph_node_node_id_unique IF NOT EXISTS FOR (n:GraphNode) REQUIRE n.node_id IS UNIQUE",
@@ -27,9 +29,14 @@ public class DatabaseInitializer {
     );
 
     private final Neo4jClient neo4jClient;
+    private final int embeddingDimension;
 
-    public DatabaseInitializer(Neo4jClient neo4jClient) {
+    public DatabaseInitializer(
+            Neo4jClient neo4jClient,
+            @Value("${rhizodelta.embedding.dimension}") int embeddingDimension
+    ) {
         this.neo4jClient = neo4jClient;
+        this.embeddingDimension = embeddingDimension;
     }
 
     @PostConstruct
@@ -37,6 +44,7 @@ public class DatabaseInitializer {
         for (String query : SCHEMA_QUERIES) {
             executeSchemaQuery(query);
         }
+        executeSchemaQuery(buildVectorIndexQuery());
         logConstraintStatus();
     }
 
@@ -59,5 +67,17 @@ public class DatabaseInitializer {
                 ORDER BY name
                 """).fetch().all();
         LOGGER.info("Neo4j constraints/indexes verified: {}", constraints);
+    }
+
+    private String buildVectorIndexQuery() {
+        return """
+                CREATE VECTOR INDEX %s IF NOT EXISTS
+                FOR (n:GraphNode)
+                ON n.embedding
+                OPTIONS { indexConfig: {
+                  `vector.dimensions`: %d,
+                  `vector.similarity_function`: 'cosine'
+                }}
+                """.formatted(VECTOR_INDEX_NAME, embeddingDimension).trim();
     }
 }

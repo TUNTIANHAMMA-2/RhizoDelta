@@ -10,3 +10,7 @@ spring:
       max-connection-pool-size: 50
       connection-acquisition-timeout: 30s
       max-connection-lifetime: 1h
+
+rhizodelta:
+  embedding:
+    dimension: 1024
