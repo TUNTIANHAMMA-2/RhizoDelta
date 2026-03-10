@@ -4,13 +4,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.domain.node.AIConsensus;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.association.AssociationInfo;
+import com.rhizodelta.domain.embedding.EmbeddingWriteRequest;
+import com.rhizodelta.domain.embedding.EmbeddingWriteResult;
 import com.rhizodelta.service.AssociationService;
 import com.rhizodelta.domain.association.AssociationType;
+import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.NodeQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -25,10 +30,16 @@ public class NodeController {
 
     private final NodeQueryService nodeQueryService;
     private final AssociationService associationService;
+    private final EmbeddingService embeddingService;
 
-    public NodeController(NodeQueryService nodeQueryService, AssociationService associationService) {
+    public NodeController(
+            NodeQueryService nodeQueryService,
+            AssociationService associationService,
+            EmbeddingService embeddingService
+    ) {
         this.nodeQueryService = nodeQueryService;
         this.associationService = associationService;
+        this.embeddingService = embeddingService;
     }
 
     @GetMapping("/{id}")
@@ -36,6 +47,15 @@ public class NodeController {
         UUID nodeId = parseUuid(id);
         NodeQueryService.NodeResult result = nodeQueryService.getNodeById(nodeId);
         return ApiResponse.ok(toPayload(result));
+    }
+
+    @PutMapping("/{id}/embedding")
+    public ApiResponse<EmbeddingWriteResult> putEmbedding(
+            @PathVariable("id") String id,
+            @RequestBody EmbeddingWriteRequest request
+    ) {
+        EmbeddingWriteResult result = embeddingService.writeEmbedding(id, request.vector());
+        return ApiResponse.ok(result);
     }
 
     @GetMapping("/{id}/lineage")
