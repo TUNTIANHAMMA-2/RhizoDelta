@@ -121,7 +121,8 @@ public class NodeController {
                 null,
                 node.getAuthorId(),
                 null,
-                node.getCreatedAt()
+                node.getCreatedAt(),
+                node.getEmbedding() != null
         );
     }
 
@@ -133,7 +134,8 @@ public class NodeController {
                 node.getSummaryContent(),
                 null,
                 node.getAgentVersion(),
-                node.getCreatedAt()
+                node.getCreatedAt(),
+                node.getEmbedding() != null
         );
     }
 
@@ -145,7 +147,8 @@ public class NodeController {
                 node.summaryContent(),
                 node.authorId(),
                 node.agentVersion(),
-                node.createdAt()
+                node.createdAt(),
+                node.hasEmbedding()
         );
     }
 
@@ -164,7 +167,8 @@ public class NodeController {
             @JsonProperty("summary_content") String summaryContent,
             @JsonProperty("author_id") String authorId,
             @JsonProperty("agent_version") String agentVersion,
-            @JsonProperty("created_at") Instant createdAt
+            @JsonProperty("created_at") Instant createdAt,
+            @JsonProperty("has_embedding") boolean hasEmbedding
     ) {
     }
 }

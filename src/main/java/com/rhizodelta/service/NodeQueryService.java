@@ -33,7 +33,8 @@ public class NodeQueryService {
                    ancestor.summary_content AS summaryContent,
                    ancestor.author_id AS authorId,
                    ancestor.agent_version AS agentVersion,
-                   ancestor.created_at AS createdAt
+                   ancestor.created_at AS createdAt,
+                   ancestor.embedding IS NOT NULL AS hasEmbedding
             ORDER BY createdAt DESC
             """;
 
@@ -107,8 +108,13 @@ public class NodeQueryService {
                 (String) record.get("summaryContent"),
                 (String) record.get("authorId"),
                 (String) record.get("agentVersion"),
-                toInstant(record.get("createdAt"))
+                toInstant(record.get("createdAt")),
+                toBoolean(record.get("hasEmbedding"))
         );
+    }
+
+    private static boolean toBoolean(Object value) {
+        return Boolean.TRUE.equals(value);
     }
 
     private static Instant toInstant(Object value) {
@@ -134,6 +140,7 @@ public class NodeQueryService {
             String summaryContent,
             String authorId,
             String agentVersion,
-            Instant createdAt) {
+            Instant createdAt,
+            boolean hasEmbedding) {
     }
 }
