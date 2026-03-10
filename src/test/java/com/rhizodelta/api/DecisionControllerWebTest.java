@@ -1,9 +1,10 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.service.DagIntegrityViolationException;
-import com.rhizodelta.service.DecisionResult;
+import com.rhizodelta.exception.DagIntegrityViolationException;
+import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.service.DecisionService;
-import com.rhizodelta.service.MergeDecisionCommand;
+import com.rhizodelta.service.RollbackService;
+import com.rhizodelta.domain.decision.MergeDecisionCommand;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -27,6 +28,9 @@ class DecisionControllerWebTest {
 
     @MockBean
     private DecisionService decisionService;
+
+    @MockBean
+    private RollbackService rollbackService;
 
     @Test
     void shouldAcceptMergeDecisionRequest() throws Exception {

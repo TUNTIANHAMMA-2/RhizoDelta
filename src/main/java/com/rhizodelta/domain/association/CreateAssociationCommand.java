@@ -1,6 +1,7 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.association;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rhizodelta.domain.DecisionCommandValidation;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;

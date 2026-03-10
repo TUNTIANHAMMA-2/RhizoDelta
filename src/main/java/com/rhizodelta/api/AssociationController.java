@@ -1,8 +1,8 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.service.AssociationResult;
+import com.rhizodelta.domain.association.AssociationResult;
 import com.rhizodelta.service.AssociationService;
-import com.rhizodelta.service.CreateAssociationCommand;
+import com.rhizodelta.domain.association.CreateAssociationCommand;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

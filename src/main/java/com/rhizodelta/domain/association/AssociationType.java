@@ -1,4 +1,4 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.association;
 
 public enum AssociationType {
     CONCEPTUAL_OVERLAP,

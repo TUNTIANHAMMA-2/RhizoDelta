@@ -1,4 +1,4 @@
-package com.rhizodelta.service;
+package com.rhizodelta.exception;
 
 public class DagIntegrityViolationException extends RuntimeException {
     public DagIntegrityViolationException(String message) {

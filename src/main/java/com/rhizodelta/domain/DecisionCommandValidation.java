@@ -1,35 +1,37 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain;
+
+import com.rhizodelta.domain.decision.DecisionOperatorType;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-final class DecisionCommandValidation {
+public final class DecisionCommandValidation {
     private DecisionCommandValidation() {
     }
 
-    static String requireText(String value, String fieldName) {
+    public static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " must not be blank");
         }
         return value;
     }
 
-    static UUID requireUuid(UUID value, String fieldName) {
+    public static UUID requireUuid(UUID value, String fieldName) {
         if (value == null) {
             throw new IllegalArgumentException(fieldName + " must not be null");
         }
         return value;
     }
 
-    static DecisionOperatorType requireOperatorType(DecisionOperatorType value) {
+    public static DecisionOperatorType requireOperatorType(DecisionOperatorType value) {
         if (value == null) {
             throw new IllegalArgumentException("operator_type must not be null");
         }
         return value;
     }
 
-    static void validateConfidence(Float confidence) {
+    public static void validateConfidence(Float confidence) {
         if (confidence == null) {
             return;
         }
@@ -38,7 +40,7 @@ final class DecisionCommandValidation {
         }
     }
 
-    static List<UUID> requireUuidList(List<UUID> values) {
+    public static List<UUID> requireUuidList(List<UUID> values) {
         if (values == null || values.isEmpty()) {
             throw new IllegalArgumentException("synthesized_from must not be empty");
         }

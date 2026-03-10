@@ -1,4 +1,4 @@
-package com.rhizodelta.service;
+package com.rhizodelta.exception;
 
 import java.util.List;
 import java.util.Objects;

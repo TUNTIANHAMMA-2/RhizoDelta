@@ -1,5 +1,6 @@
 package com.rhizodelta.service;
 
+import com.rhizodelta.exception.DagIntegrityViolationException;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 

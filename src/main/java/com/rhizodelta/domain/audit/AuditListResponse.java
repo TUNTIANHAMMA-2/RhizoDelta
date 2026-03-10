@@ -1,4 +1,4 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.audit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

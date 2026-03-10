@@ -1,10 +1,10 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.service.BranchDecisionCommand;
-import com.rhizodelta.service.DecisionResult;
+import com.rhizodelta.domain.decision.BranchDecisionCommand;
+import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.service.DecisionService;
-import com.rhizodelta.service.MergeDecisionCommand;
-import com.rhizodelta.service.RollbackResult;
+import com.rhizodelta.domain.decision.MergeDecisionCommand;
+import com.rhizodelta.domain.decision.RollbackResult;
 import com.rhizodelta.service.RollbackService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

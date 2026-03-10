@@ -1,4 +1,4 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.decision;
 
 public enum DecisionType {
     MERGE,

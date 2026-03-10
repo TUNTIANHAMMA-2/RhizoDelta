@@ -1,8 +1,8 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.service.DagIntegrityViolationException;
-import com.rhizodelta.service.AssociationType;
-import com.rhizodelta.service.RollbackBlockedException;
+import com.rhizodelta.exception.DagIntegrityViolationException;
+import com.rhizodelta.domain.association.AssociationType;
+import com.rhizodelta.exception.RollbackBlockedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

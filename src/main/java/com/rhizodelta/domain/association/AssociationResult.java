@@ -1,6 +1,7 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.association;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rhizodelta.domain.DecisionCommandValidation;
 
 import java.time.Instant;
 import java.util.Objects;

@@ -1,6 +1,7 @@
-package com.rhizodelta.service;
+package com.rhizodelta.domain.decision;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rhizodelta.domain.DecisionCommandValidation;
 
 import java.util.UUID;
 

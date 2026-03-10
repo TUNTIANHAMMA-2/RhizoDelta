@@ -1,7 +1,7 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.service.AuditDetail;
-import com.rhizodelta.service.AuditListResponse;
+import com.rhizodelta.domain.audit.AuditDetail;
+import com.rhizodelta.domain.audit.AuditListResponse;
 import com.rhizodelta.service.AuditService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
