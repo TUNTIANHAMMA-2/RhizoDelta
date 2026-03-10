@@ -1,0 +1,12 @@
+spring:
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: test
+
+rhizodelta:
+  embedding:
+    dimension: 1024
+  jwt:
+    secret: test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing
