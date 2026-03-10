@@ -82,6 +82,23 @@ public class NodeController {
         return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
     }
 
+    @GetMapping("/{id}/children")
+    public ApiResponse<GraphTopologyResponse> getChildren(
+            @PathVariable("id") String id,
+            @RequestParam(value = "max_depth", required = false) Integer maxDepth,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        UUID nodeId = parseUuid(id);
+        NodeQueryService.GraphTopology topology = nodeQueryService.getChildrenTopology(nodeId, maxDepth, limit);
+        List<NodePayload> nodes = topology.nodes().stream()
+                .map(this::fromLineageNode)
+                .toList();
+        List<EdgePayload> edges = topology.edges().stream()
+                .map(this::fromLineageEdge)
+                .toList();
+        return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
+    }
+
     @GetMapping("/{id}/provenance")
     public ApiResponse<List<NodePayload>> getProvenance(@PathVariable("id") String id) {
         UUID nodeId = parseUuid(id);

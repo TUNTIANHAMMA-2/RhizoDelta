@@ -13,19 +13,52 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class NodeQueryService {
     private static final int DEFAULT_MAX_DEPTH = 10;
+    private static final int DEFAULT_CHILDREN_DEPTH = 3;
     private static final int MAX_ALLOWED_DEPTH = 50;
+    private static final int NO_LIMIT = Integer.MAX_VALUE;
 
     private static final String LINEAGE_QUERY = """
             MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*0..50]->(ancestor)
+            WHERE length(path) <= $maxDepth
+            WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
+            UNWIND nodeLists AS nodeList
+            UNWIND nodeList AS node
+            WITH collect(DISTINCT node) AS uniqueNodes, relLists
+            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+                 reduce(all = [], rels IN relLists | all + rels) AS allRels
+            WITH [node IN filteredNodes | {
+                  nodeId: toString(node.node_id),
+                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
+                  content: node.content,
+                  summaryContent: node.summary_content,
+                  authorId: node.author_id,
+                  agentVersion: node.agent_version,
+                  createdAt: node.created_at,
+                  hasEmbedding: node.embedding IS NOT NULL
+            }] AS nodes,
+                 [rel IN allRels WHERE NOT coalesce(startNode(rel)._deleted, false)
+                                  AND NOT coalesce(endNode(rel)._deleted, false) | {
+                  source: toString(startNode(rel).node_id),
+                  target: toString(endNode(rel).node_id),
+                  type: type(rel),
+                  createdAt: rel.created_at
+            }] AS edges
+            RETURN nodes, edges
+            """;
+
+    private static final String CHILDREN_QUERY = """
+            MATCH path = (start {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO*0..50]-(descendant)
             WHERE length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
@@ -117,16 +150,18 @@ public class NodeQueryService {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
         int resolvedMaxDepth = resolveMaxDepth(maxDepth);
 
-        Collection<Map<String, Object>> records = neo4jClient.query(LINEAGE_QUERY)
-                .bind(nodeId.toString()).to("nodeId")
-                .bind(resolvedMaxDepth).to("maxDepth")
-                .fetch().all();
+        return executeGraphTopologyQuery(LINEAGE_QUERY, nodeId, resolvedMaxDepth);
+    }
 
-        if (records.isEmpty()) {
-            return new GraphTopology(List.of(), List.of());
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public GraphTopology getChildrenTopology(UUID nodeId, Integer maxDepth, Integer limit) {
+        Objects.requireNonNull(nodeId, "nodeId must not be null");
+        int resolvedMaxDepth = resolveChildrenDepth(maxDepth);
+        GraphTopology topology = executeGraphTopologyQuery(CHILDREN_QUERY, nodeId, resolvedMaxDepth);
+        if (topology.nodes().isEmpty()) {
+            throw new NoSuchElementException("Node not found: " + nodeId);
         }
-
-        return toGraphTopology(records.iterator().next());
+        return applyChildrenLimit(nodeId, topology, limit);
     }
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
@@ -184,6 +219,26 @@ public class NodeQueryService {
         return Math.min(maxDepth, MAX_ALLOWED_DEPTH);
     }
 
+    private int resolveChildrenDepth(Integer maxDepth) {
+        if (maxDepth == null) {
+            return DEFAULT_CHILDREN_DEPTH;
+        }
+        if (maxDepth <= 0) {
+            throw new IllegalArgumentException("maxDepth must be greater than 0");
+        }
+        return Math.min(maxDepth, MAX_ALLOWED_DEPTH);
+    }
+
+    private int resolveChildrenLimit(Integer limit) {
+        if (limit == null) {
+            return NO_LIMIT;
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        return limit;
+    }
+
     private static LineageNode toLineageNode(Map<String, Object> record) {
         return new LineageNode(
                 (String) record.get("nodeId"),
@@ -201,6 +256,85 @@ public class NodeQueryService {
         List<LineageNode> nodes = toLineageNodes(record.get("nodes"));
         List<LineageEdge> edges = toLineageEdges(record.get("edges"));
         return new GraphTopology(nodes, edges);
+    }
+
+    private GraphTopology executeGraphTopologyQuery(String query, UUID nodeId, int maxDepth) {
+        Collection<Map<String, Object>> records = neo4jClient.query(query)
+                .bind(nodeId.toString()).to("nodeId")
+                .bind(maxDepth).to("maxDepth")
+                .fetch().all();
+
+        if (records.isEmpty()) {
+            return new GraphTopology(List.of(), List.of());
+        }
+
+        return toGraphTopology(records.iterator().next());
+    }
+
+    private GraphTopology applyChildrenLimit(UUID nodeId, GraphTopology topology, Integer limit) {
+        int resolvedLimit = resolveChildrenLimit(limit);
+        if (resolvedLimit == NO_LIMIT) {
+            return topology;
+        }
+        return limitTopology(nodeId, topology, resolvedLimit);
+    }
+
+    private GraphTopology limitTopology(UUID nodeId, GraphTopology topology, int limit) {
+        String rootId = nodeId.toString();
+        LineageNode rootNode = findRootNode(topology.nodes(), rootId);
+        if (rootNode == null) {
+            return topology;
+        }
+        List<LineageNode> descendants = sortDescendants(topology.nodes(), rootId);
+        List<LineageNode> limitedDescendants = descendants.stream()
+                .limit(limit)
+                .toList();
+        List<LineageNode> limitedNodes = new ArrayList<>(1 + limitedDescendants.size());
+        limitedNodes.add(rootNode);
+        limitedNodes.addAll(limitedDescendants);
+        List<LineageEdge> edges = filterEdges(topology.edges(), limitedNodes);
+        return new GraphTopology(List.copyOf(limitedNodes), List.copyOf(edges));
+    }
+
+    private LineageNode findRootNode(List<LineageNode> nodes, String rootId) {
+        for (LineageNode node : nodes) {
+            if (rootId.equals(node.nodeId())) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private List<LineageNode> sortDescendants(List<LineageNode> nodes, String rootId) {
+        return nodes.stream()
+                .filter(node -> !rootId.equals(node.nodeId()))
+                .sorted((left, right) -> {
+                    Instant leftCreatedAt = left.createdAt();
+                    Instant rightCreatedAt = right.createdAt();
+                    if (leftCreatedAt == null && rightCreatedAt == null) {
+                        return 0;
+                    }
+                    if (leftCreatedAt == null) {
+                        return 1;
+                    }
+                    if (rightCreatedAt == null) {
+                        return -1;
+                    }
+                    return rightCreatedAt.compareTo(leftCreatedAt);
+                })
+                .toList();
+    }
+
+    private List<LineageEdge> filterEdges(List<LineageEdge> edges, List<LineageNode> nodes) {
+        Set<String> allowedNodeIds = new HashSet<>();
+        for (LineageNode node : nodes) {
+            if (node.nodeId() != null) {
+                allowedNodeIds.add(node.nodeId());
+            }
+        }
+        return edges.stream()
+                .filter(edge -> allowedNodeIds.contains(edge.source()) && allowedNodeIds.contains(edge.target()))
+                .toList();
     }
 
     private static List<LineageNode> toLineageNodes(Object value) {
