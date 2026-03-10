@@ -6,11 +6,14 @@ import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.association.AssociationInfo;
 import com.rhizodelta.domain.embedding.EmbeddingWriteRequest;
 import com.rhizodelta.domain.embedding.EmbeddingWriteResult;
+import com.rhizodelta.domain.embedding.SimilaritySearchRequest;
+import com.rhizodelta.domain.embedding.SimilaritySearchResult;
 import com.rhizodelta.service.AssociationService;
 import com.rhizodelta.domain.association.AssociationType;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.NodeQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,6 +59,14 @@ public class NodeController {
     ) {
         EmbeddingWriteResult result = embeddingService.writeEmbedding(id, request.vector());
         return ApiResponse.ok(result);
+    }
+
+    @PostMapping("/search/similar")
+    public ApiResponse<List<SimilaritySearchResult>> searchSimilar(
+            @RequestBody SimilaritySearchRequest request
+    ) {
+        List<SimilaritySearchResult> results = embeddingService.searchSimilar(request.vector(), request.top_k());
+        return ApiResponse.ok(results);
     }
 
     @GetMapping("/{id}/lineage")
