@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -26,16 +27,30 @@ public class NodeQueryService {
     private static final String LINEAGE_QUERY = """
             MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*0..50]->(ancestor)
             WHERE length(path) <= $maxDepth
-            WITH DISTINCT ancestor, labels(ancestor) AS nodeLabels
-            RETURN ancestor.node_id AS nodeId,
-                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' ELSE 'AI_Consensus' END AS label,
-                   ancestor.content AS content,
-                   ancestor.summary_content AS summaryContent,
-                   ancestor.author_id AS authorId,
-                   ancestor.agent_version AS agentVersion,
-                   ancestor.created_at AS createdAt,
-                   ancestor.embedding IS NOT NULL AS hasEmbedding
-            ORDER BY createdAt DESC
+            WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
+            UNWIND nodeLists AS nodeList
+            UNWIND nodeList AS node
+            WITH collect(DISTINCT node) AS uniqueNodes, relLists
+            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+                 reduce(all = [], rels IN relLists | all + rels) AS allRels
+            WITH [node IN filteredNodes | {
+                  nodeId: toString(node.node_id),
+                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
+                  content: node.content,
+                  summaryContent: node.summary_content,
+                  authorId: node.author_id,
+                  agentVersion: node.agent_version,
+                  createdAt: node.created_at,
+                  hasEmbedding: node.embedding IS NOT NULL
+            }] AS nodes,
+                 [rel IN allRels WHERE NOT coalesce(startNode(rel)._deleted, false)
+                                  AND NOT coalesce(endNode(rel)._deleted, false) | {
+                  source: toString(startNode(rel).node_id),
+                  target: toString(endNode(rel).node_id),
+                  type: type(rel),
+                  createdAt: rel.created_at
+            }] AS edges
+            RETURN nodes, edges
             """;
 
     private static final String NODE_SUMMARY_QUERY = """
@@ -94,6 +109,11 @@ public class NodeQueryService {
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getLineage(UUID nodeId, Integer maxDepth) {
+        return getLineageTopology(nodeId, maxDepth).nodes();
+    }
+
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public GraphTopology getLineageTopology(UUID nodeId, Integer maxDepth) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
         int resolvedMaxDepth = resolveMaxDepth(maxDepth);
 
@@ -102,9 +122,11 @@ public class NodeQueryService {
                 .bind(resolvedMaxDepth).to("maxDepth")
                 .fetch().all();
 
-        return records.stream()
-                .map(NodeQueryService::toLineageNode)
-                .toList();
+        if (records.isEmpty()) {
+            return new GraphTopology(List.of(), List.of());
+        }
+
+        return toGraphTopology(records.iterator().next());
     }
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
@@ -175,6 +197,81 @@ public class NodeQueryService {
         );
     }
 
+    private static GraphTopology toGraphTopology(Map<String, Object> record) {
+        List<LineageNode> nodes = toLineageNodes(record.get("nodes"));
+        List<LineageEdge> edges = toLineageEdges(record.get("edges"));
+        return new GraphTopology(nodes, edges);
+    }
+
+    private static List<LineageNode> toLineageNodes(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalStateException("nodes must be a list");
+        }
+        List<LineageNode> nodes = new ArrayList<>(list.size());
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                throw new IllegalStateException("node entry must be a map");
+            }
+            nodes.add(toLineageNodeMap(map));
+        }
+        return List.copyOf(nodes);
+    }
+
+    private static List<LineageEdge> toLineageEdges(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalStateException("edges must be a list");
+        }
+        List<LineageEdge> edges = new ArrayList<>(list.size());
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                throw new IllegalStateException("edge entry must be a map");
+            }
+            edges.add(toLineageEdgeMap(map));
+        }
+        return List.copyOf(edges);
+    }
+
+    private static LineageNode toLineageNodeMap(Map<?, ?> entry) {
+        return new LineageNode(
+                toStringValue(entry.get("nodeId"), "nodeId"),
+                (String) entry.get("label"),
+                (String) entry.get("content"),
+                (String) entry.get("summaryContent"),
+                (String) entry.get("authorId"),
+                (String) entry.get("agentVersion"),
+                toInstant(entry.get("createdAt")),
+                toBoolean(entry.get("hasEmbedding"))
+        );
+    }
+
+    private static LineageEdge toLineageEdgeMap(Map<?, ?> entry) {
+        return new LineageEdge(
+                toStringValue(entry.get("source"), "source"),
+                toStringValue(entry.get("target"), "target"),
+                (String) entry.get("type"),
+                toInstant(entry.get("createdAt"))
+        );
+    }
+
+    private static String toStringValue(Object value, String fieldName) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String text) {
+            return text;
+        }
+        if (value instanceof UUID uuid) {
+            return uuid.toString();
+        }
+        throw new IllegalStateException(fieldName + " must be a string");
+    }
+
     private static boolean toBoolean(Object value) {
         return Boolean.TRUE.equals(value);
     }
@@ -193,6 +290,18 @@ public class NodeQueryService {
     }
 
     public record AIConsensusNode(AIConsensus node) implements NodeResult {
+    }
+
+    public record GraphTopology(
+            List<LineageNode> nodes,
+            List<LineageEdge> edges) {
+    }
+
+    public record LineageEdge(
+            String source,
+            String target,
+            String type,
+            Instant createdAt) {
     }
 
     public record LineageNode(

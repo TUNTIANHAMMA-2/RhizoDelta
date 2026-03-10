@@ -67,16 +67,19 @@ public class NodeController {
     }
 
     @GetMapping("/{id}/lineage")
-    public ApiResponse<List<NodePayload>> getLineage(
+    public ApiResponse<GraphTopologyResponse> getLineage(
             @PathVariable("id") String id,
             @RequestParam(value = "max_depth", required = false) Integer maxDepth
     ) {
         UUID nodeId = parseUuid(id);
-        List<NodePayload> lineage = nodeQueryService.getLineage(nodeId, maxDepth)
-                .stream()
+        NodeQueryService.GraphTopology topology = nodeQueryService.getLineageTopology(nodeId, maxDepth);
+        List<NodePayload> nodes = topology.nodes().stream()
                 .map(this::fromLineageNode)
                 .toList();
-        return ApiResponse.ok(lineage);
+        List<EdgePayload> edges = topology.edges().stream()
+                .map(this::fromLineageEdge)
+                .toList();
+        return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
     }
 
     @GetMapping("/{id}/provenance")
@@ -113,12 +116,35 @@ public class NodeController {
         );
     }
 
+    private EdgePayload fromLineageEdge(NodeQueryService.LineageEdge edge) {
+        return new EdgePayload(
+                edge.source(),
+                edge.target(),
+                edge.type(),
+                edge.createdAt()
+        );
+    }
+
     private static UUID parseUuid(String rawId) {
         try {
             return UUID.fromString(rawId);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("id must be a valid UUID", exception);
         }
+    }
+
+    public record GraphTopologyResponse(
+            @JsonProperty("nodes") List<NodePayload> nodes,
+            @JsonProperty("edges") List<EdgePayload> edges
+    ) {
+    }
+
+    public record EdgePayload(
+            @JsonProperty("source") String source,
+            @JsonProperty("target") String target,
+            @JsonProperty("type") String type,
+            @JsonProperty("created_at") Instant createdAt
+    ) {
     }
 
     public record NodePayload(
