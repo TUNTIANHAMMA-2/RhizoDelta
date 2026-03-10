@@ -27,6 +27,7 @@ import org.springframework.data.neo4j.core.Neo4jClient;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,7 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -70,23 +73,89 @@ class ServiceLayerUnitTest {
         Neo4jClient deepStubClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         PostService postService = new PostService(deepStubClient, humanPostRepository);
 
+        String requestId = "req-001";
         UUID persistedNodeId = UUID.randomUUID();
-        HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", "req-001");
+        HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
 
+        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+                .bind(eq(requestId)).to(eq("requestId"))
+                .fetchAs(String.class)
+                .one()).thenReturn(Optional.empty());
         when(deepStubClient.query(anyString())
-                .bind(eq("req-001")).to(eq("requestId"))
+                .bind(eq(requestId)).to(eq("requestId"))
                 .bind(any()).to(eq("nodeId"))
                 .bind(eq("content")).to(eq("content"))
                 .bind(eq("author")).to(eq("authorId"))
+                .bind(isNull()).to(eq("targetNodeId"))
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
 
-        HumanPost result = postService.createHumanPost(new PostService.CreateHumanPostCommand("req-001", "author", "content"));
+        HumanPost result = postService.createHumanPost(new PostService.CreateHumanPostCommand(requestId, "author", "content"));
 
         assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
-        assertThat(result.getRequestId()).isEqualTo("req-001");
+        assertThat(result.getRequestId()).isEqualTo(requestId);
+    }
+
+    @Test
+    void postServiceShouldStoreTargetNodeIdWhenValid() {
+        Neo4jClient deepStubClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        PostService postService = new PostService(deepStubClient, humanPostRepository);
+
+        String requestId = "req-002";
+        String targetNodeId = UUID.randomUUID().toString();
+        UUID persistedNodeId = UUID.randomUUID();
+        HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
+
+        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+                .bind(eq(requestId)).to(eq("requestId"))
+                .fetchAs(String.class)
+                .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (node:GraphNode")) )
+                .bind(eq(targetNodeId)).to(eq("targetNodeId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
+        when(deepStubClient.query(anyString())
+                .bind(eq(requestId)).to(eq("requestId"))
+                .bind(any()).to(eq("nodeId"))
+                .bind(eq("content")).to(eq("content"))
+                .bind(eq("author")).to(eq("authorId"))
+                .bind(eq(targetNodeId)).to(eq("targetNodeId"))
+                .bind(any()).to(eq("createdAt"))
+                .fetchAs(String.class)
+                .one()).thenReturn(Optional.of(persistedNodeId.toString()));
+        when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
+
+        HumanPost result = postService.createHumanPost(
+                new PostService.CreateHumanPostCommand(requestId, "author", "content", targetNodeId)
+        );
+
+        assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
+    }
+
+    @Test
+    void postServiceShouldRejectWhenTargetNodeIdNotFound() {
+        Neo4jClient deepStubClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        PostService postService = new PostService(deepStubClient, humanPostRepository);
+
+        String requestId = "req-003";
+        String targetNodeId = "missing-target";
+
+        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+                .bind(eq(requestId)).to(eq("requestId"))
+                .fetchAs(String.class)
+                .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (node:GraphNode")) )
+                .bind(eq(targetNodeId)).to(eq("targetNodeId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", false)));
+
+        assertThatThrownBy(() -> postService.createHumanPost(
+                new PostService.CreateHumanPostCommand(requestId, "author", "content", targetNodeId)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("target_node_id not found");
     }
 
     @Test
