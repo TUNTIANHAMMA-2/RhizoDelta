@@ -293,13 +293,12 @@ public class NodeQueryService {
         if (rootNode == null) {
             return topology;
         }
-        List<LineageNode> descendants = sortDescendants(topology.nodes(), rootId);
-        List<LineageNode> limitedDescendants = descendants.stream()
-                .limit(limit)
-                .toList();
-        List<LineageNode> limitedNodes = new ArrayList<>(1 + limitedDescendants.size());
-        limitedNodes.add(rootNode);
-        limitedNodes.addAll(limitedDescendants);
+        Map<String, LineageNode> nodeIndex = indexNodes(topology.nodes());
+        List<String> orderedNodeIds = collectConnectedNodeIds(rootId, topology.edges(), limit);
+        List<LineageNode> limitedNodes = toLimitedNodes(orderedNodeIds, nodeIndex);
+        if (limitedNodes.isEmpty()) {
+            return topology;
+        }
         List<LineageEdge> edges = filterEdges(topology.edges(), limitedNodes);
         return new GraphTopology(List.copyOf(limitedNodes), List.copyOf(edges));
     }
@@ -313,24 +312,66 @@ public class NodeQueryService {
         return null;
     }
 
-    private List<LineageNode> sortDescendants(List<LineageNode> nodes, String rootId) {
-        return nodes.stream()
-                .filter(node -> !rootId.equals(node.nodeId()))
-                .sorted((left, right) -> {
-                    Instant leftCreatedAt = left.createdAt();
-                    Instant rightCreatedAt = right.createdAt();
-                    if (leftCreatedAt == null && rightCreatedAt == null) {
-                        return 0;
-                    }
-                    if (leftCreatedAt == null) {
-                        return 1;
-                    }
-                    if (rightCreatedAt == null) {
-                        return -1;
-                    }
-                    return rightCreatedAt.compareTo(leftCreatedAt);
-                })
-                .toList();
+    private Map<String, LineageNode> indexNodes(List<LineageNode> nodes) {
+        Map<String, LineageNode> index = new java.util.HashMap<>();
+        for (LineageNode node : nodes) {
+            if (node.nodeId() != null) {
+                index.put(node.nodeId(), node);
+            }
+        }
+        return index;
+    }
+
+    private List<String> collectConnectedNodeIds(String rootId, List<LineageEdge> edges, int limit) {
+        Map<String, Set<String>> adjacency = buildAdjacency(edges);
+        Set<String> visited = new HashSet<>();
+        List<String> ordered = new ArrayList<>();
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>();
+        visited.add(rootId);
+        ordered.add(rootId);
+        queue.add(rootId);
+        int maxNodes = limit + 1;
+        while (!queue.isEmpty() && ordered.size() < maxNodes) {
+            String current = queue.removeFirst();
+            for (String neighbor : adjacency.getOrDefault(current, Set.of())) {
+                if (!visited.add(neighbor)) {
+                    continue;
+                }
+                ordered.add(neighbor);
+                if (ordered.size() >= maxNodes) {
+                    break;
+                }
+                queue.addLast(neighbor);
+            }
+        }
+        return ordered;
+    }
+
+    private Map<String, Set<String>> buildAdjacency(List<LineageEdge> edges) {
+        Map<String, Set<String>> adjacency = new java.util.HashMap<>();
+        for (LineageEdge edge : edges) {
+            appendNeighbor(adjacency, edge.source(), edge.target());
+            appendNeighbor(adjacency, edge.target(), edge.source());
+        }
+        return adjacency;
+    }
+
+    private void appendNeighbor(Map<String, Set<String>> adjacency, String from, String to) {
+        if (from == null || to == null) {
+            return;
+        }
+        adjacency.computeIfAbsent(from, key -> new java.util.LinkedHashSet<>()).add(to);
+    }
+
+    private List<LineageNode> toLimitedNodes(List<String> nodeIds, Map<String, LineageNode> nodeIndex) {
+        List<LineageNode> limitedNodes = new ArrayList<>(nodeIds.size());
+        for (String nodeId : nodeIds) {
+            LineageNode node = nodeIndex.get(nodeId);
+            if (node != null) {
+                limitedNodes.add(node);
+            }
+        }
+        return limitedNodes;
     }
 
     private List<LineageEdge> filterEdges(List<LineageEdge> edges, List<LineageNode> nodes) {
