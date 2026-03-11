@@ -3,6 +3,9 @@ package com.rhizodelta.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.config.RabbitMqConfig;
 import com.rhizodelta.domain.post.PostEventMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
@@ -20,10 +23,12 @@ import java.util.UUID;
 @RequestMapping("/api/posts")
 public class PostController {
     private static final String QUEUED_STATUS = "QUEUED";
+    private static final int SERVICE_UNAVAILABLE_CODE = 50301;
     private static final String TARGET_NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $targetNodeId})
             RETURN count(node) > 0 AS exists
             """;
+    private static final Logger LOGGER = LoggerFactory.getLogger(PostController.class);
 
     private final RabbitTemplate rabbitTemplate;
     private final Neo4jClient neo4jClient;
@@ -46,7 +51,17 @@ public class PostController {
                 request.targetNodeId(),
                 eventId
         );
-        rabbitTemplate.convertAndSend(RabbitMqConfig.POSTS_EXCHANGE, RabbitMqConfig.POSTS_ROUTING_KEY, message);
+        try {
+            rabbitTemplate.convertAndSend(RabbitMqConfig.POSTS_EXCHANGE, RabbitMqConfig.POSTS_ROUTING_KEY, message);
+        } catch (AmqpException exception) {
+            LOGGER.error("RabbitMQ unavailable for post submission", exception);
+            ApiResponse<PostAcceptedResponse> response = new ApiResponse<>(
+                    SERVICE_UNAVAILABLE_CODE,
+                    "message broker unavailable",
+                    null
+            );
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
 
         PostAcceptedResponse response = new PostAcceptedResponse(eventId, QUEUED_STATUS);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(response));
