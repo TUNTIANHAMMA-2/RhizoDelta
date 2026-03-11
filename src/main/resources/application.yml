@@ -16,3 +16,10 @@ rhizodelta:
     dimension: 1024
   jwt:
     secret: ${JWT_SECRET}
+
+langchain4j:
+  open-ai:
+    embedding-model:
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen3-Embedding-0.6B
+      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
