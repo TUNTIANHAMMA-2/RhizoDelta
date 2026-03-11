@@ -6,6 +6,8 @@ import com.rhizodelta.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +21,11 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class DecisionService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
     private static final String QUEUED_STATUS = "QUEUED";
 
     private record UpsertResult(UUID nodeId, boolean created) {}
@@ -93,17 +97,23 @@ public class DecisionService {
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
     private final DagIntegrityService dagIntegrityService;
+    private final EmbeddingModelService embeddingModelService;
+    private final EmbeddingService embeddingService;
 
     public DecisionService(
             Neo4jClient neo4jClient,
             HumanPostRepository humanPostRepository,
             AIConsensusRepository aiConsensusRepository,
-            DagIntegrityService dagIntegrityService
+            DagIntegrityService dagIntegrityService,
+            EmbeddingModelService embeddingModelService,
+            EmbeddingService embeddingService
     ) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
         this.aiConsensusRepository = aiConsensusRepository;
         this.dagIntegrityService = dagIntegrityService;
+        this.embeddingModelService = embeddingModelService;
+        this.embeddingService = embeddingService;
     }
 
     @Transactional(transactionManager = "transactionManager")
@@ -118,6 +128,7 @@ public class DecisionService {
         }
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         createMergeRelationships(command);
+        triggerEmbeddingForConsensus(upsertResult.nodeId(), command.summary_content(), command.decision_id());
 
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
@@ -208,6 +219,23 @@ public class DecisionService {
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
+    }
+
+    private void triggerEmbeddingForConsensus(UUID nodeId, String summaryContent, String decisionId) {
+        CompletableFuture.runAsync(() -> writeConsensusEmbedding(nodeId, summaryContent, decisionId));
+    }
+
+    private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
+        try {
+            List<Float> vector = embeddingModelService.embed(summaryContent);
+            embeddingService.writeEmbedding(nodeId.toString(), vector);
+        } catch (Exception exception) {
+            LOGGER.error("Failed to generate embedding for AI_Consensus node_id={}, decision_id={}",
+                    nodeId,
+                    decisionId,
+                    exception
+            );
+        }
     }
 
     private void validateSourceNodeExists(UUID sourceNodeId) {
