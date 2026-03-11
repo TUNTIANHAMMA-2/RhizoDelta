@@ -6,6 +6,7 @@ import com.rhizodelta.domain.post.PostEventMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
@@ -18,12 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
     private static final String QUEUED_STATUS = "QUEUED";
     private static final int SERVICE_UNAVAILABLE_CODE = 50301;
+    private static final long PUBLISH_CONFIRM_TIMEOUT_SECONDS = 5L;
     private static final String TARGET_NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $targetNodeId})
             RETURN count(node) > 0 AS exists
@@ -52,7 +57,7 @@ public class PostController {
                 eventId
         );
         try {
-            rabbitTemplate.convertAndSend(RabbitMqConfig.POSTS_EXCHANGE, RabbitMqConfig.POSTS_ROUTING_KEY, message);
+            publishPostMessage(message, eventId);
         } catch (AmqpException exception) {
             LOGGER.error("RabbitMQ unavailable for post submission", exception);
             ApiResponse<PostAcceptedResponse> response = new ApiResponse<>(
@@ -65,6 +70,41 @@ public class PostController {
 
         PostAcceptedResponse response = new PostAcceptedResponse(eventId, QUEUED_STATUS);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(response));
+    }
+
+    private void publishPostMessage(PostEventMessage message, String eventId) {
+        CorrelationData correlationData = new CorrelationData(eventId);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.POSTS_EXCHANGE, RabbitMqConfig.POSTS_ROUTING_KEY, message, correlationData);
+        awaitPublishConfirm(correlationData);
+    }
+
+    private void awaitPublishConfirm(CorrelationData correlationData) {
+        try {
+            CorrelationData.Confirm confirm = correlationData.getFuture()
+                    .get(PUBLISH_CONFIRM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (confirm == null || !confirm.isAck()) {
+                throw new AmqpException(confirmFailureMessage(confirm));
+            }
+            if (correlationData.getReturned() != null) {
+                throw new AmqpException("message returned by broker");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AmqpException("publisher confirm interrupted", exception);
+        } catch (ExecutionException | TimeoutException exception) {
+            throw new AmqpException("publisher confirm failed", exception);
+        }
+    }
+
+    private String confirmFailureMessage(CorrelationData.Confirm confirm) {
+        if (confirm == null) {
+            return "publisher confirm missing";
+        }
+        String reason = confirm.getReason();
+        if (reason == null || reason.isBlank()) {
+            return "publisher confirm not acknowledged";
+        }
+        return "publisher confirm not acknowledged: " + reason;
     }
 
     private void validateRequest(CreatePostRequest request) {

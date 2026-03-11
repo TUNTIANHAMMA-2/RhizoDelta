@@ -15,9 +15,12 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
 public class RabbitMqConfig {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RabbitMqConfig.class);
     public static final String POSTS_EXCHANGE = "rhizodelta.posts";
     public static final String POSTS_QUEUE = "rhizodelta.posts.queue";
     public static final String POSTS_DLQ = "rhizodelta.posts.dlq";
@@ -81,6 +84,19 @@ public class RabbitMqConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(messageConverter);
         template.setMandatory(true);
+        template.setConfirmCallback((correlationData, ack, cause) -> {
+            if (!ack) {
+                String correlationId = correlationData == null ? "unknown" : correlationData.getId();
+                LOGGER.error("RabbitMQ publish not acknowledged. correlationId={}, cause={}", correlationId, cause);
+            }
+        });
+        template.setReturnsCallback(returned -> LOGGER.error(
+                "RabbitMQ message returned. replyCode={}, replyText={}, exchange={}, routingKey={}",
+                returned.getReplyCode(),
+                returned.getReplyText(),
+                returned.getExchange(),
+                returned.getRoutingKey()
+        ));
         return template;
     }
 
