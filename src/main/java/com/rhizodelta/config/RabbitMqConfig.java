@@ -1,7 +1,9 @@
 package com.rhizodelta.config;
 
+import org.springframework.amqp.core.AnonymousQueue;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
@@ -33,6 +35,8 @@ public class RabbitMqConfig {
     public static final String POSTS_ROUTING_KEY = "posts.created";
     public static final String POSTS_DLQ_EXCHANGE = "rhizodelta.posts.dlx";
     public static final String POSTS_DLQ_ROUTING_KEY = "posts.dlq";
+    public static final String SSE_EVENTS_EXCHANGE = "rhizodelta.sse.events";
+    public static final String SSE_EVENTS_ROUTING_KEY = "";
 
     @Bean
     public TopicExchange postsExchange() {
@@ -65,6 +69,21 @@ public class RabbitMqConfig {
     @Bean
     public Binding postsDeadLetterBinding(Queue postsDeadLetterQueue, TopicExchange postsDeadLetterExchange) {
         return BindingBuilder.bind(postsDeadLetterQueue).to(postsDeadLetterExchange).with(POSTS_DLQ_ROUTING_KEY);
+    }
+
+    @Bean
+    public FanoutExchange sseEventsExchange() {
+        return new FanoutExchange(SSE_EVENTS_EXCHANGE);
+    }
+
+    @Bean
+    public AnonymousQueue sseEventsQueue() {
+        return new AnonymousQueue();
+    }
+
+    @Bean
+    public Binding sseEventsBinding(AnonymousQueue sseEventsQueue, FanoutExchange sseEventsExchange) {
+        return BindingBuilder.bind(sseEventsQueue).to(sseEventsExchange);
     }
 
     @Bean

@@ -12,6 +12,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -21,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class PostConsumerEmbeddingUnitTest {
     private static final int EMBEDDING_DIMENSION = 3;
@@ -42,7 +44,7 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 embeddingModelService,
                 embeddingService,
-                new SseEventService()
+                new SseEventService(mock(RabbitTemplate.class))
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-1", "author-1", "content-1", null, "evt-1"));
@@ -66,7 +68,7 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 embeddingModelService,
                 embeddingService,
-                new SseEventService()
+                new SseEventService(mock(RabbitTemplate.class))
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-2", "author-2", "content-2", null, "evt-2"));
