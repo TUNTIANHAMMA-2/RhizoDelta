@@ -35,11 +35,13 @@ public class EmbeddingService {
     private static final String SIMILARITY_SEARCH_QUERY = """
             CALL db.index.vector.queryNodes('%s', $topK, $vector)
             YIELD node, score
+            WHERE NOT coalesce(node._deleted, false)
             WITH node, score, labels(node) AS nodeLabels
             CALL {
               WITH node
               OPTIONAL MATCH (node)-[rel:MERGED_INTO|BRANCHED_FROM|SYNTHESIZED_FROM]-(neighbor:GraphNode)
               WHERE neighbor IS NOT NULL
+                AND NOT coalesce(neighbor._deleted, false)
               RETURN collect(DISTINCT {
                 nodeId: neighbor.node_id,
                 label: CASE WHEN 'Human_Post' IN labels(neighbor) THEN 'Human_Post' ELSE 'AI_Consensus' END,
