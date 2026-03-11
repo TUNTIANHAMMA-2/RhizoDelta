@@ -6,6 +6,7 @@ import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.service.EmbeddingModelService;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.PostService;
+import com.rhizodelta.service.SseEventService;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -41,7 +42,8 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 null,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                new SseEventService()
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-1", "author-1", "content-1", null, "evt-1"));
@@ -65,7 +67,8 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 null,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                new SseEventService()
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-2", "author-2", "content-2", null, "evt-2"));

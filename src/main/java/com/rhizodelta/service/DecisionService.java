@@ -2,10 +2,12 @@ package com.rhizodelta.service;
 
 import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionResult;
+import com.rhizodelta.domain.decision.DecisionType;
 import com.rhizodelta.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
+import com.rhizodelta.service.SseEventService.SseEventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
@@ -99,6 +101,7 @@ public class DecisionService {
     private final DagIntegrityService dagIntegrityService;
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
+    private final SseEventService sseEventService;
 
     public DecisionService(
             Neo4jClient neo4jClient,
@@ -106,7 +109,8 @@ public class DecisionService {
             AIConsensusRepository aiConsensusRepository,
             DagIntegrityService dagIntegrityService,
             EmbeddingModelService embeddingModelService,
-            EmbeddingService embeddingService
+            EmbeddingService embeddingService,
+            SseEventService sseEventService
     ) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
@@ -114,6 +118,7 @@ public class DecisionService {
         this.dagIntegrityService = dagIntegrityService;
         this.embeddingModelService = embeddingModelService;
         this.embeddingService = embeddingService;
+        this.sseEventService = sseEventService;
     }
 
     @Transactional(transactionManager = "transactionManager")
@@ -127,7 +132,9 @@ public class DecisionService {
             return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
         }
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
-        createMergeRelationships(command);
+        OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        createMergeRelationships(command, relationshipCreatedAt);
+        publishMergeEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
         triggerEmbeddingForConsensus(upsertResult.nodeId(), command.summary_content(), command.decision_id());
 
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
@@ -143,7 +150,9 @@ public class DecisionService {
             return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
         }
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
-        createBranchRelationship(command);
+        OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        createBranchRelationship(command, relationshipCreatedAt);
+        publishBranchEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
 
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
@@ -165,8 +174,7 @@ public class DecisionService {
         return toUpsertResult(result);
     }
 
-    private void createMergeRelationships(MergeDecisionCommand command) {
-        OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    private void createMergeRelationships(MergeDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         Map<String, Object> result = neo4jClient.query(MERGE_RELATIONSHIPS_QUERY)
                 .bindAll(Map.of(
                         "decisionId", command.decision_id(),
@@ -205,8 +213,7 @@ public class DecisionService {
         return toUpsertResult(result);
     }
 
-    private void createBranchRelationship(BranchDecisionCommand command) {
-        OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    private void createBranchRelationship(BranchDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         neo4jClient.query(BRANCH_RELATIONSHIP_QUERY)
                 .bindAll(Map.of(
                         "decisionId", command.decision_id(),
@@ -236,6 +243,55 @@ public class DecisionService {
                     exception
             );
         }
+    }
+
+    private void publishMergeEvents(
+            MergeDecisionCommand command,
+            UUID decisionNodeId,
+            OffsetDateTime relationshipCreatedAt
+    ) {
+        CompletableFuture.runAsync(() -> {
+            publishEdgeCreated(decisionNodeId, command.source_node_id(), "MERGED_INTO", relationshipCreatedAt);
+            for (UUID contributorId : command.synthesized_from()) {
+                publishEdgeCreated(decisionNodeId, contributorId, "SYNTHESIZED_FROM", relationshipCreatedAt);
+            }
+            publishDecisionComplete(decisionNodeId, DecisionType.MERGE, command.decision_id());
+        });
+    }
+
+    private void publishBranchEvents(
+            BranchDecisionCommand command,
+            UUID decisionNodeId,
+            OffsetDateTime relationshipCreatedAt
+    ) {
+        CompletableFuture.runAsync(() -> {
+            publishEdgeCreated(decisionNodeId, command.source_node_id(), "BRANCHED_FROM", relationshipCreatedAt);
+            publishDecisionComplete(decisionNodeId, DecisionType.BRANCH, command.decision_id());
+        });
+    }
+
+    private void publishDecisionComplete(UUID nodeId, DecisionType decisionType, String decisionId) {
+        SseEventService.DecisionCompletePayload payload = new SseEventService.DecisionCompletePayload(
+                decisionId,
+                decisionType.name(),
+                nodeId.toString()
+        );
+        sseEventService.publish(SseEventType.DECISION_COMPLETE, payload);
+    }
+
+    private void publishEdgeCreated(
+            UUID sourceNodeId,
+            UUID targetNodeId,
+            String relationshipType,
+            OffsetDateTime createdAt
+    ) {
+        SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
+                sourceNodeId.toString(),
+                targetNodeId.toString(),
+                relationshipType,
+                createdAt.toInstant()
+        );
+        sseEventService.publish(SseEventType.EDGE_CREATED, payload);
     }
 
     private void validateSourceNodeExists(UUID sourceNodeId) {

@@ -7,6 +7,7 @@ import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.service.EmbeddingModelService;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.PostService;
+import com.rhizodelta.service.SseEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -31,17 +32,20 @@ public class PostConsumer {
     private final RabbitTemplate rabbitTemplate;
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
+    private final SseEventService sseEventService;
 
     public PostConsumer(
             PostService postService,
             RabbitTemplate rabbitTemplate,
             EmbeddingModelService embeddingModelService,
-            EmbeddingService embeddingService
+            EmbeddingService embeddingService,
+            SseEventService sseEventService
     ) {
         this.postService = postService;
         this.rabbitTemplate = rabbitTemplate;
         this.embeddingModelService = embeddingModelService;
         this.embeddingService = embeddingService;
+        this.sseEventService = sseEventService;
     }
 
     @RabbitListener(queues = RabbitMqConfig.POSTS_QUEUE)
@@ -64,6 +68,7 @@ public class PostConsumer {
         );
         HumanPost post = postService.createHumanPost(command);
         triggerEmbedding(post);
+        publishNodeCreated(post);
     }
 
     private void triggerEmbedding(HumanPost post) {
@@ -77,6 +82,17 @@ public class PostConsumer {
         } catch (Exception exception) {
             LOGGER.error("Failed to generate embedding for Human_Post node_id={}", post.getNodeId(), exception);
         }
+    }
+
+    private void publishNodeCreated(HumanPost post) {
+        CompletableFuture.runAsync(() -> {
+            SseEventService.NodeCreatedPayload payload = new SseEventService.NodeCreatedPayload(
+                    post.getNodeId().toString(),
+                    "Human_Post",
+                    post.getCreatedAt()
+            );
+            sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
+        });
     }
 
     private void handleFailure(

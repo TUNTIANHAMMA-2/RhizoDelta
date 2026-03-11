@@ -56,6 +56,9 @@ class DecisionServiceBranchUnitTest {
     @Mock
     private EmbeddingService embeddingService;
 
+    @Mock
+    private SseEventService sseEventService;
+
     @Test
     void executeBranchShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
@@ -65,7 +68,8 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         BranchDecisionCommand command = newBranchCommand(UUID.randomUUID());
 
@@ -86,7 +90,8 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID decisionNodeId = UUID.randomUUID();
@@ -120,7 +125,8 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);

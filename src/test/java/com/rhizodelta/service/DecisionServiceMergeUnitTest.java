@@ -57,6 +57,9 @@ class DecisionServiceMergeUnitTest {
     @Mock
     private EmbeddingService embeddingService;
 
+    @Mock
+    private SseEventService sseEventService;
+
     @Test
     void executeMergeShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
@@ -66,7 +69,8 @@ class DecisionServiceMergeUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         MergeDecisionCommand command = newMergeCommand(UUID.randomUUID(), UUID.randomUUID());
 
@@ -87,7 +91,8 @@ class DecisionServiceMergeUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID missingSynthesizedNodeId = UUID.randomUUID();
@@ -111,7 +116,8 @@ class DecisionServiceMergeUnitTest {
                 aiConsensusRepository,
                 dagIntegrityService,
                 embeddingModelService,
-                embeddingService
+                embeddingService,
+                sseEventService
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID synthesizedNodeId = UUID.randomUUID();
