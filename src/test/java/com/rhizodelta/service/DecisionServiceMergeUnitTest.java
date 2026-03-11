@@ -14,7 +14,6 @@ import com.rhizodelta.domain.decision.RollbackResult;
 import com.rhizodelta.exception.DagIntegrityViolationException;
 import com.rhizodelta.exception.RollbackBlockedException;
 
-import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import org.junit.jupiter.api.Test;
@@ -42,6 +41,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DecisionServiceMergeUnitTest {
+    private static final String ACTIVE_SOURCE_QUERY_FRAGMENT = "RETURN count(node) > 0 AS exists";
+    private static final String ACTIVE_HUMAN_POST_IDS_QUERY_FRAGMENT = "RETURN toString(post.node_id) AS nodeId";
+
     @Mock
     private HumanPostRepository humanPostRepository;
 
@@ -74,8 +76,10 @@ class DecisionServiceMergeUnitTest {
         );
         MergeDecisionCommand command = newMergeCommand(UUID.randomUUID(), UUID.randomUUID());
 
-        when(humanPostRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", false)));
 
         assertThatThrownBy(() -> decisionService.executeMerge(command))
                 .isInstanceOf(NoSuchElementException.class)
@@ -98,9 +102,14 @@ class DecisionServiceMergeUnitTest {
         UUID missingSynthesizedNodeId = UUID.randomUUID();
         MergeDecisionCommand command = newMergeCommand(sourceNodeId, missingSynthesizedNodeId);
 
-        when(humanPostRepository.findByNodeId(sourceNodeId))
-                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(humanPostRepository.findAllByNodeIdIn(any())).thenReturn(List.of());
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_HUMAN_POST_IDS_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeIds")
+                .fetch()
+                .all()).thenReturn(List.of());
 
         assertThatThrownBy(() -> decisionService.executeMerge(command))
                 .isInstanceOf(NoSuchElementException.class)
@@ -124,11 +133,14 @@ class DecisionServiceMergeUnitTest {
         UUID decisionNodeId = UUID.randomUUID();
         MergeDecisionCommand command = newMergeCommand(sourceNodeId, synthesizedNodeId);
 
-        HumanPost synthesizedPost = HumanPost.create(synthesizedNodeId, "synth", "author", "req-synth");
-        when(humanPostRepository.findByNodeId(sourceNodeId))
-                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
-        when(humanPostRepository.findAllByNodeIdIn(any()))
-                .thenReturn(List.of(synthesizedPost));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_HUMAN_POST_IDS_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeIds")
+                .fetch()
+                .all()).thenReturn(List.of(Map.of("nodeId", synthesizedNodeId.toString())));
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:AI_Consensus")))
                 .bindAll(anyMap())
                 .fetch()

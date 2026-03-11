@@ -3,7 +3,6 @@ import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.domain.decision.DecisionType;
 import com.rhizodelta.domain.decision.MergeDecisionCommand;
-import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import com.rhizodelta.service.SseEventService.SseEventType;
@@ -88,6 +87,18 @@ public class DecisionService {
               branched.reason = $reason
             RETURN type(branched) AS relType
             """;
+    private static final String ACTIVE_SOURCE_EXISTS_QUERY = """
+            MATCH (node:GraphNode {node_id: $nodeId})
+            WHERE (node:Human_Post OR node:AI_Consensus)
+              AND NOT coalesce(node._deleted, false)
+            RETURN count(node) > 0 AS exists
+            """;
+    private static final String ACTIVE_HUMAN_POST_IDS_QUERY = """
+            MATCH (post:Human_Post:GraphNode)
+            WHERE post.node_id IN $nodeIds
+              AND NOT coalesce(post._deleted, false)
+            RETURN toString(post.node_id) AS nodeId
+            """;
     private final Neo4jClient neo4jClient;
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
@@ -95,15 +106,7 @@ public class DecisionService {
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
-    public DecisionService(
-            Neo4jClient neo4jClient,
-            HumanPostRepository humanPostRepository,
-            AIConsensusRepository aiConsensusRepository,
-            DagIntegrityService dagIntegrityService,
-            EmbeddingModelService embeddingModelService,
-            EmbeddingService embeddingService,
-            SseEventService sseEventService
-    ) {
+    public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, DagIntegrityService dagIntegrityService, EmbeddingModelService embeddingModelService, EmbeddingService embeddingService, SseEventService sseEventService) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
         this.aiConsensusRepository = aiConsensusRepository;
@@ -145,14 +148,9 @@ public class DecisionService {
     private UpsertResult upsertMergeNode(MergeDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         Map<String, Object> result = neo4jClient.query(UPSERT_MERGE_NODE_QUERY)
-                .bindAll(Map.of(
-                        "decisionId", command.decision_id(),
-                        "nodeId", UUID.randomUUID().toString(),
-                        "summaryContent", command.summary_content(),
-                        "agentVersion", command.agent_version(),
-                        "requestId", command.request_id(),
-                        "createdAt", createdAt
-                ))
+                .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
+                        "summaryContent", command.summary_content(), "agentVersion", command.agent_version(),
+                        "requestId", command.request_id(), "createdAt", createdAt))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve AI_Consensus node_id from upsert query"));
@@ -160,15 +158,10 @@ public class DecisionService {
     }
     private void createMergeRelationships(MergeDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         Map<String, Object> result = neo4jClient.query(MERGE_RELATIONSHIPS_QUERY)
-                .bindAll(Map.of(
-                        "decisionId", command.decision_id(),
-                        "sourceNodeId", command.source_node_id().toString(),
-                        "operatorType", command.operator_type().name(),
-                        "operatorId", command.operator_id(),
-                        "createdAt", relationshipCreatedAt,
-                        "reason", command.reason(),
-                        "contributorNodeIds", command.synthesized_from().stream().map(UUID::toString).toList()
-                ))
+                .bindAll(Map.of("decisionId", command.decision_id(), "sourceNodeId", command.source_node_id().toString(),
+                        "operatorType", command.operator_type().name(), "operatorId", command.operator_id(),
+                        "createdAt", relationshipCreatedAt, "reason", command.reason(),
+                        "contributorNodeIds", command.synthesized_from().stream().map(UUID::toString).toList()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create MERGED_INTO relationship"));
@@ -182,14 +175,9 @@ public class DecisionService {
     private UpsertResult upsertBranchNode(BranchDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         Map<String, Object> result = neo4jClient.query(UPSERT_BRANCH_NODE_QUERY)
-                .bindAll(Map.of(
-                        "decisionId", command.decision_id(),
-                        "nodeId", UUID.randomUUID().toString(),
-                        "requestId", command.request_id(),
-                        "content", command.content(),
-                        "authorId", command.author_id(),
-                        "createdAt", createdAt
-                ))
+                .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
+                        "requestId", command.request_id(), "content", command.content(),
+                        "authorId", command.author_id(), "createdAt", createdAt))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve Human_Post node_id from upsert query"));
@@ -197,14 +185,9 @@ public class DecisionService {
     }
     private void createBranchRelationship(BranchDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         neo4jClient.query(BRANCH_RELATIONSHIP_QUERY)
-                .bindAll(Map.of(
-                        "decisionId", command.decision_id(),
-                        "sourceNodeId", command.source_node_id().toString(),
-                        "operatorType", command.operator_type().name(),
-                        "operatorId", command.operator_id(),
-                        "createdAt", relationshipCreatedAt,
-                        "reason", command.reason()
-                ))
+                .bindAll(Map.of("decisionId", command.decision_id(), "sourceNodeId", command.source_node_id().toString(),
+                        "operatorType", command.operator_type().name(), "operatorId", command.operator_id(),
+                        "createdAt", relationshipCreatedAt, "reason", command.reason()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
@@ -269,21 +252,30 @@ public class DecisionService {
         task.run();
     }
     private void validateSourceNodeExists(UUID sourceNodeId) {
-        boolean sourceExists = humanPostRepository.findByNodeId(sourceNodeId).isPresent()
-                || aiConsensusRepository.findByNodeId(sourceNodeId).isPresent();
-        if (!sourceExists) {
+        Map<String, Object> result = neo4jClient.query(ACTIVE_SOURCE_EXISTS_QUERY)
+                .bind(sourceNodeId.toString()).to("nodeId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to validate source_node_id"));
+        if (!Boolean.TRUE.equals(result.get("exists"))) {
             throw new NoSuchElementException("source_node_id not found: " + sourceNodeId);
         }
     }
     private void validateSynthesizedFromNodes(List<UUID> synthesizedFrom) {
         Set<UUID> uniqueIds = new LinkedHashSet<>(synthesizedFrom);
-        List<HumanPost> found = humanPostRepository.findAllByNodeIdIn(uniqueIds);
+        List<Map<String, Object>> found = List.copyOf(neo4jClient.query(ACTIVE_HUMAN_POST_IDS_QUERY)
+                .bind(uniqueIds.stream().map(UUID::toString).toList()).to("nodeIds")
+                .fetch()
+                .all());
         if (found.size() == uniqueIds.size()) {
             return;
         }
         Set<UUID> foundIds = new LinkedHashSet<>();
-        for (HumanPost post : found) {
-            foundIds.add(post.getNodeId());
+        for (Map<String, Object> row : found) {
+            Object value = row.get("nodeId");
+            if (value instanceof String nodeId) {
+                foundIds.add(UUID.fromString(nodeId));
+            }
         }
         Set<UUID> missing = new LinkedHashSet<>(uniqueIds);
         missing.removeAll(foundIds);

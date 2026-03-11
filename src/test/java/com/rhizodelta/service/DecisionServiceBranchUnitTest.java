@@ -14,7 +14,6 @@ import com.rhizodelta.domain.decision.RollbackResult;
 import com.rhizodelta.exception.DagIntegrityViolationException;
 import com.rhizodelta.exception.RollbackBlockedException;
 
-import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import org.junit.jupiter.api.Test;
@@ -32,6 +31,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
@@ -41,6 +41,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DecisionServiceBranchUnitTest {
+    private static final String ACTIVE_SOURCE_QUERY_FRAGMENT = "RETURN count(node) > 0 AS exists";
+
     @Mock
     private HumanPostRepository humanPostRepository;
 
@@ -73,8 +75,10 @@ class DecisionServiceBranchUnitTest {
         );
         BranchDecisionCommand command = newBranchCommand(UUID.randomUUID());
 
-        when(humanPostRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(command.source_node_id())).thenReturn(Optional.empty());
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", false)));
 
         assertThatThrownBy(() -> decisionService.executeBranch(command))
                 .isInstanceOf(NoSuchElementException.class)
@@ -97,8 +101,10 @@ class DecisionServiceBranchUnitTest {
         UUID decisionNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
 
-        when(humanPostRepository.findByNodeId(sourceNodeId))
-                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()
@@ -131,8 +137,10 @@ class DecisionServiceBranchUnitTest {
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
 
-        when(humanPostRepository.findByNodeId(sourceNodeId))
-                .thenReturn(Optional.of(HumanPost.create(sourceNodeId, "source", "author", "req-source")));
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
+                .bind(any()).to("nodeId")
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()
