@@ -1,8 +1,10 @@
 package com.rhizodelta.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.rhizodelta.domain.node.HumanPost;
-import com.rhizodelta.service.PostService;
+import com.rhizodelta.config.RabbitMqConfig;
+import com.rhizodelta.domain.post.PostEventMessage;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,30 +12,43 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
     private static final String QUEUED_STATUS = "QUEUED";
+    private static final String TARGET_NODE_EXISTS_QUERY = """
+            MATCH (node:GraphNode {node_id: $targetNodeId})
+            RETURN count(node) > 0 AS exists
+            """;
 
-    private final PostService postService;
+    private final RabbitTemplate rabbitTemplate;
+    private final Neo4jClient neo4jClient;
 
-    public PostController(PostService postService) {
-        this.postService = postService;
+    public PostController(RabbitTemplate rabbitTemplate, Neo4jClient neo4jClient) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.neo4jClient = neo4jClient;
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<PostAcceptedResponse>> createPost(@RequestBody CreatePostRequest request) {
         validateRequest(request);
+        validateTargetNodeExists(request.targetNodeId());
 
-        PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
+        String eventId = generateEventId(request.requestId());
+        PostEventMessage message = new PostEventMessage(
                 request.requestId(),
                 request.authorId(),
                 request.content(),
-                request.targetNodeId()
+                request.targetNodeId(),
+                eventId
         );
+        rabbitTemplate.convertAndSend(RabbitMqConfig.POSTS_EXCHANGE, RabbitMqConfig.POSTS_ROUTING_KEY, message);
 
-        HumanPost createdPost = postService.createHumanPost(command);
-        PostAcceptedResponse response = new PostAcceptedResponse(createdPost.getNodeId().toString(), QUEUED_STATUS);
+        PostAcceptedResponse response = new PostAcceptedResponse(eventId, QUEUED_STATUS);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(response));
     }
 
@@ -44,6 +59,24 @@ public class PostController {
         requireText(request.requestId(), "request_id");
         requireText(request.authorId(), "author_id");
         requireText(request.content(), "content");
+    }
+
+    private void validateTargetNodeExists(String targetNodeId) {
+        if (targetNodeId == null || targetNodeId.isBlank()) {
+            return;
+        }
+        Map<String, Object> result = neo4jClient.query(TARGET_NODE_EXISTS_QUERY)
+                .bind(targetNodeId).to("targetNodeId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to validate target_node_id"));
+        if (!Boolean.TRUE.equals(result.get("exists"))) {
+            throw new IllegalArgumentException("target_node_id not found");
+        }
+    }
+
+    private static String generateEventId(String requestId) {
+        return UUID.nameUUIDFromBytes(requestId.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private static void requireText(String value, String fieldName) {
