@@ -1,5 +1,4 @@
 package com.rhizodelta.service;
-
 import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.domain.decision.DecisionType;
@@ -13,7 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -24,14 +24,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
 @Service
 public class DecisionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
     private static final String QUEUED_STATUS = "QUEUED";
-
     private record UpsertResult(UUID nodeId, boolean created) {}
-
     private static final String UPSERT_MERGE_NODE_QUERY = """
             MERGE (decision:AI_Consensus {decision_id: $decisionId})
             ON CREATE SET
@@ -45,7 +42,6 @@ public class DecisionService {
             RETURN toString(decision.node_id) AS nodeId,
                    decision.node_id = $nodeId AS created
             """;
-
     private static final String MERGE_RELATIONSHIPS_QUERY = """
             MATCH (decision:AI_Consensus {decision_id: $decisionId})
             MATCH (source:GraphNode {node_id: $sourceNodeId})
@@ -68,7 +64,6 @@ public class DecisionService {
               synthesized.reason = reason
             RETURN count(synthesized) AS synthesizedCount
             """;
-
     private static final String UPSERT_BRANCH_NODE_QUERY = """
             MERGE (decision:Human_Post {decision_id: $decisionId})
             ON CREATE SET
@@ -82,7 +77,6 @@ public class DecisionService {
             RETURN toString(decision.node_id) AS nodeId,
                    decision.node_id = $nodeId AS created
             """;
-
     private static final String BRANCH_RELATIONSHIP_QUERY = """
             MATCH (decision:Human_Post {decision_id: $decisionId})
             MATCH (source:GraphNode {node_id: $sourceNodeId})
@@ -94,7 +88,6 @@ public class DecisionService {
               branched.reason = $reason
             RETURN type(branched) AS relType
             """;
-
     private final Neo4jClient neo4jClient;
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
@@ -102,7 +95,6 @@ public class DecisionService {
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
-
     public DecisionService(
             Neo4jClient neo4jClient,
             HumanPostRepository humanPostRepository,
@@ -120,13 +112,11 @@ public class DecisionService {
         this.embeddingService = embeddingService;
         this.sseEventService = sseEventService;
     }
-
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeMerge(MergeDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         validateSourceNodeExists(command.source_node_id());
         validateSynthesizedFromNodes(command.synthesized_from());
-
         UpsertResult upsertResult = upsertMergeNode(command);
         if (!upsertResult.created()) {
             return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
@@ -136,15 +126,12 @@ public class DecisionService {
         createMergeRelationships(command, relationshipCreatedAt);
         publishMergeEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
         triggerEmbeddingForConsensus(upsertResult.nodeId(), command.summary_content(), command.decision_id());
-
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
-
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeBranch(BranchDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         validateSourceNodeExists(command.source_node_id());
-
         UpsertResult upsertResult = upsertBranchNode(command);
         if (!upsertResult.created()) {
             return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
@@ -153,10 +140,8 @@ public class DecisionService {
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createBranchRelationship(command, relationshipCreatedAt);
         publishBranchEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
-
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
-
     private UpsertResult upsertMergeNode(MergeDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         Map<String, Object> result = neo4jClient.query(UPSERT_MERGE_NODE_QUERY)
@@ -173,7 +158,6 @@ public class DecisionService {
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve AI_Consensus node_id from upsert query"));
         return toUpsertResult(result);
     }
-
     private void createMergeRelationships(MergeDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         Map<String, Object> result = neo4jClient.query(MERGE_RELATIONSHIPS_QUERY)
                 .bindAll(Map.of(
@@ -195,7 +179,6 @@ public class DecisionService {
                     + " SYNTHESIZED_FROM relationships but created " + synthesizedCount);
         }
     }
-
     private UpsertResult upsertBranchNode(BranchDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         Map<String, Object> result = neo4jClient.query(UPSERT_BRANCH_NODE_QUERY)
@@ -212,7 +195,6 @@ public class DecisionService {
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve Human_Post node_id from upsert query"));
         return toUpsertResult(result);
     }
-
     private void createBranchRelationship(BranchDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         neo4jClient.query(BRANCH_RELATIONSHIP_QUERY)
                 .bindAll(Map.of(
@@ -227,11 +209,9 @@ public class DecisionService {
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
     }
-
     private void triggerEmbeddingForConsensus(UUID nodeId, String summaryContent, String decisionId) {
-        CompletableFuture.runAsync(() -> writeConsensusEmbedding(nodeId, summaryContent, decisionId));
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeConsensusEmbedding(nodeId, summaryContent, decisionId)));
     }
-
     private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
         try {
             List<Float> vector = embeddingModelService.embed(summaryContent);
@@ -244,32 +224,21 @@ public class DecisionService {
             );
         }
     }
-
-    private void publishMergeEvents(
-            MergeDecisionCommand command,
-            UUID decisionNodeId,
-            OffsetDateTime relationshipCreatedAt
-    ) {
-        CompletableFuture.runAsync(() -> {
+    private void publishMergeEvents(MergeDecisionCommand command, UUID decisionNodeId, OffsetDateTime relationshipCreatedAt) {
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
             publishEdgeCreated(decisionNodeId, command.source_node_id(), "MERGED_INTO", relationshipCreatedAt);
             for (UUID contributorId : command.synthesized_from()) {
                 publishEdgeCreated(decisionNodeId, contributorId, "SYNTHESIZED_FROM", relationshipCreatedAt);
             }
             publishDecisionComplete(decisionNodeId, DecisionType.MERGE, command.decision_id());
-        });
+        }));
     }
-
-    private void publishBranchEvents(
-            BranchDecisionCommand command,
-            UUID decisionNodeId,
-            OffsetDateTime relationshipCreatedAt
-    ) {
-        CompletableFuture.runAsync(() -> {
+    private void publishBranchEvents(BranchDecisionCommand command, UUID decisionNodeId, OffsetDateTime relationshipCreatedAt) {
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
             publishEdgeCreated(decisionNodeId, command.source_node_id(), "BRANCHED_FROM", relationshipCreatedAt);
             publishDecisionComplete(decisionNodeId, DecisionType.BRANCH, command.decision_id());
-        });
+        }));
     }
-
     private void publishDecisionComplete(UUID nodeId, DecisionType decisionType, String decisionId) {
         SseEventService.DecisionCompletePayload payload = new SseEventService.DecisionCompletePayload(
                 decisionId,
@@ -278,13 +247,7 @@ public class DecisionService {
         );
         sseEventService.publish(SseEventType.DECISION_COMPLETE, payload);
     }
-
-    private void publishEdgeCreated(
-            UUID sourceNodeId,
-            UUID targetNodeId,
-            String relationshipType,
-            OffsetDateTime createdAt
-    ) {
+    private void publishEdgeCreated(UUID sourceNodeId, UUID targetNodeId, String relationshipType, OffsetDateTime createdAt) {
         SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
                 sourceNodeId.toString(),
                 targetNodeId.toString(),
@@ -293,7 +256,18 @@ public class DecisionService {
         );
         sseEventService.publish(SseEventType.EDGE_CREATED, payload);
     }
-
+    private void runAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+            return;
+        }
+        task.run();
+    }
     private void validateSourceNodeExists(UUID sourceNodeId) {
         boolean sourceExists = humanPostRepository.findByNodeId(sourceNodeId).isPresent()
                 || aiConsensusRepository.findByNodeId(sourceNodeId).isPresent();
@@ -301,7 +275,6 @@ public class DecisionService {
             throw new NoSuchElementException("source_node_id not found: " + sourceNodeId);
         }
     }
-
     private void validateSynthesizedFromNodes(List<UUID> synthesizedFrom) {
         Set<UUID> uniqueIds = new LinkedHashSet<>(synthesizedFrom);
         List<HumanPost> found = humanPostRepository.findAllByNodeIdIn(uniqueIds);
@@ -316,7 +289,6 @@ public class DecisionService {
         missing.removeAll(foundIds);
         throw new NoSuchElementException("synthesized_from node_id not found: " + missing);
     }
-
     private static UpsertResult toUpsertResult(Map<String, Object> result) {
         UUID nodeId = UUID.fromString((String) result.get("nodeId"));
         boolean created = Boolean.TRUE.equals(result.get("created"));

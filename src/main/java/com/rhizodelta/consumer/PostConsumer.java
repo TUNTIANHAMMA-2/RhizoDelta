@@ -16,6 +16,8 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.util.List;
@@ -72,7 +74,7 @@ public class PostConsumer {
     }
 
     private void triggerEmbedding(HumanPost post) {
-        CompletableFuture.runAsync(() -> writeEmbedding(post));
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeEmbedding(post)));
     }
 
     private void writeEmbedding(HumanPost post) {
@@ -85,14 +87,27 @@ public class PostConsumer {
     }
 
     private void publishNodeCreated(HumanPost post) {
-        CompletableFuture.runAsync(() -> {
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
             SseEventService.NodeCreatedPayload payload = new SseEventService.NodeCreatedPayload(
                     post.getNodeId().toString(),
                     "Human_Post",
                     post.getCreatedAt()
             );
             sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
-        });
+        }));
+    }
+
+    private void runAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+            return;
+        }
+        task.run();
     }
 
     private void handleFailure(
