@@ -77,11 +77,11 @@ class ServiceLayerUnitTest {
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
 
-        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
-        when(deepStubClient.query(anyString())
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .bind(any()).to(eq("nodeId"))
                 .bind(eq("content")).to(eq("content"))
@@ -108,15 +108,15 @@ class ServiceLayerUnitTest {
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
 
-        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
-        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (node:GraphNode")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (node:GraphNode")) )
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("exists", true)));
-        when(deepStubClient.query(anyString())
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .bind(any()).to(eq("nodeId"))
                 .bind(eq("content")).to(eq("content"))
@@ -142,11 +142,11 @@ class ServiceLayerUnitTest {
         String requestId = "req-003";
         String targetNodeId = "missing-target";
 
-        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
-        when(deepStubClient.query(argThat((String query) -> query.contains("MATCH (node:GraphNode")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (node:GraphNode")) )
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .fetch()
                 .one()).thenReturn(Optional.of(Map.of("exists", false)));
@@ -164,7 +164,7 @@ class ServiceLayerUnitTest {
         UUID nodeId = UUID.randomUUID();
         HumanPost humanPost = HumanPost.create(nodeId, "hello", "author", "req-hello");
 
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.of(humanPost));
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.of(humanPost));
 
         NodeQueryService.NodeResult result = service.getNodeById(nodeId);
 
@@ -176,8 +176,8 @@ class ServiceLayerUnitTest {
         NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
 
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getNodeById(nodeId))
                 .isInstanceOf(NoSuchElementException.class)
@@ -190,8 +190,8 @@ class ServiceLayerUnitTest {
         UUID nodeId = UUID.randomUUID();
         AIConsensus aiConsensus = AIConsensus.create(nodeId, "summary", "v1");
 
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.of(aiConsensus));
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.of(aiConsensus));
 
         NodeQueryService.NodeResult result = service.getNodeById(nodeId);
 
@@ -227,8 +227,8 @@ class ServiceLayerUnitTest {
     void getProvenanceShouldThrowWhenNodeNotFound() {
         NodeQueryService service = new NodeQueryService(humanPostRepository, aiConsensusRepository, neo4jClient);
         UUID nodeId = UUID.randomUUID();
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getProvenance(nodeId))
                 .isInstanceOf(NoSuchElementException.class)
@@ -241,7 +241,7 @@ class ServiceLayerUnitTest {
         UUID nodeId = UUID.randomUUID();
         HumanPost humanPost = HumanPost.create(nodeId, "hello", "author", "req-hello");
 
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.of(humanPost));
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.of(humanPost));
 
         List<HumanPost> provenance = service.getProvenance(nodeId);
 
@@ -254,8 +254,8 @@ class ServiceLayerUnitTest {
         UUID nodeId = UUID.randomUUID();
         HumanPost source = HumanPost.create(UUID.randomUUID(), "source", "author", "req-src");
 
-        when(humanPostRepository.findByNodeId(nodeId)).thenReturn(Optional.empty());
-        when(aiConsensusRepository.findByNodeId(nodeId)).thenReturn(Optional.of(AIConsensus.create(nodeId, "summary", "v1")));
+        when(humanPostRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepository.findActiveByNodeId(nodeId)).thenReturn(Optional.of(AIConsensus.create(nodeId, "summary", "v1")));
         when(humanPostRepository.findProvenance(nodeId)).thenReturn(List.of(source));
 
         List<HumanPost> provenance = service.getProvenance(nodeId);

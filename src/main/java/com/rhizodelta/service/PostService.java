@@ -35,6 +35,7 @@ public class PostService {
 
     private static final String TARGET_NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $targetNodeId})
+            WHERE NOT coalesce(node._deleted, false)
             RETURN count(node) > 0 AS exists
             """;
 
