@@ -27,6 +27,7 @@ public class AssociationService {
 
     private static final String NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(node._deleted, false)
             RETURN count(node) > 0 AS exists
             """;
 
@@ -63,8 +64,10 @@ public class AssociationService {
 
     private static final String FIND_ASSOCIATIONS_QUERY = """
             MATCH (node:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(node._deleted, false)
             MATCH (node)-[association:CONCEPTUAL_OVERLAP|RELATES_TO]-(related:GraphNode)
-            WHERE $associationType IS NULL OR type(association) = $associationType
+            WHERE NOT coalesce(related._deleted, false)
+              AND ($associationType IS NULL OR type(association) = $associationType)
             RETURN association.association_id AS associationId,
                    type(association) AS associationType,
                    CASE WHEN startNode(association) = node THEN 'OUTGOING' ELSE 'INCOMING' END AS direction,
