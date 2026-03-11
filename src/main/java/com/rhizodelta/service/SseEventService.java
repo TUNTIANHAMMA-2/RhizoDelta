@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
@@ -22,7 +22,7 @@ public class SseEventService {
     private static final long STREAM_TIMEOUT_MILLIS = TimeUnit.MINUTES.toMillis(30);
     private static final long HEARTBEAT_INTERVAL_MILLIS = 30_000L;
 
-    private final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final RabbitTemplate rabbitTemplate;
     private final String instanceId = UUID.randomUUID().toString();
 
@@ -32,8 +32,9 @@ public class SseEventService {
 
     public SseEmitter register() {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
-        emitters.add(emitter);
-        registerCallbacks(emitter);
+        String emitterId = UUID.randomUUID().toString();
+        emitters.put(emitterId, emitter);
+        registerCallbacks(emitterId, emitter);
         return emitter;
     }
 
@@ -55,31 +56,31 @@ public class SseEventService {
 
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL_MILLIS)
     public void sendHeartbeat() {
-        for (SseEmitter emitter : emitters) {
+        emitters.forEach((emitterId, emitter) -> {
             try {
                 emitter.send(SseEmitter.event().comment("heartbeat"));
             } catch (Exception exception) {
                 LOGGER.warn("Failed to send SSE heartbeat", exception);
-                removeEmitter(emitter);
+                removeEmitter(emitterId, emitter);
             }
-        }
+        });
     }
 
-    private void registerCallbacks(SseEmitter emitter) {
-        emitter.onCompletion(() -> removeEmitter(emitter));
-        emitter.onTimeout(() -> removeEmitter(emitter));
-        emitter.onError(error -> removeEmitter(emitter));
+    private void registerCallbacks(String emitterId, SseEmitter emitter) {
+        emitter.onCompletion(() -> removeEmitter(emitterId, emitter));
+        emitter.onTimeout(() -> removeEmitter(emitterId, emitter));
+        emitter.onError(error -> removeEmitter(emitterId, emitter));
     }
 
     private void publishLocal(SseEventType type, Object payload) {
-        for (SseEmitter emitter : emitters) {
+        emitters.forEach((emitterId, emitter) -> {
             try {
                 emitter.send(SseEmitter.event().name(type.name()).data(payload));
             } catch (Exception exception) {
                 LOGGER.warn("Failed to publish SSE event type={}", type, exception);
-                removeEmitter(emitter);
+                removeEmitter(emitterId, emitter);
             }
-        }
+        });
     }
 
     private void publishToBroker(SseEventType type, Object payload) {
@@ -95,8 +96,8 @@ public class SseEventService {
         }
     }
 
-    private void removeEmitter(SseEmitter emitter) {
-        emitters.remove(emitter);
+    private void removeEmitter(String emitterId, SseEmitter emitter) {
+        emitters.remove(emitterId, emitter);
     }
 
     public enum SseEventType {
