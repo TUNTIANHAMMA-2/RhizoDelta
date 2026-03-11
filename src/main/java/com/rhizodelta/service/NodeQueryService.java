@@ -34,9 +34,11 @@ public class NodeQueryService {
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
             UNWIND nodeList AS node
-            WITH collect(DISTINCT node) AS uniqueNodes, relLists
-            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+            WITH collect(DISTINCT node) AS uniqueNodes,
                  reduce(all = [], rels IN relLists | all + rels) AS allRels
+            UNWIND (CASE WHEN allRels = [] THEN [NULL] ELSE allRels END) AS rel
+            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+                 [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
             WITH [node IN filteredNodes | {
                   nodeId: toString(node.node_id),
                   label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
@@ -47,7 +49,7 @@ public class NodeQueryService {
                   createdAt: node.created_at,
                   hasEmbedding: node.embedding IS NOT NULL
             }] AS nodes,
-                 [rel IN allRels WHERE NOT coalesce(startNode(rel)._deleted, false)
+                 [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
                                   AND NOT coalesce(endNode(rel)._deleted, false) | {
                   source: toString(startNode(rel).node_id),
                   target: toString(endNode(rel).node_id),
@@ -63,9 +65,11 @@ public class NodeQueryService {
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
             UNWIND nodeList AS node
-            WITH collect(DISTINCT node) AS uniqueNodes, relLists
-            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+            WITH collect(DISTINCT node) AS uniqueNodes,
                  reduce(all = [], rels IN relLists | all + rels) AS allRels
+            UNWIND (CASE WHEN allRels = [] THEN [NULL] ELSE allRels END) AS rel
+            WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
+                 [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
             WITH [node IN filteredNodes | {
                   nodeId: toString(node.node_id),
                   label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
@@ -76,7 +80,7 @@ public class NodeQueryService {
                   createdAt: node.created_at,
                   hasEmbedding: node.embedding IS NOT NULL
             }] AS nodes,
-                 [rel IN allRels WHERE NOT coalesce(startNode(rel)._deleted, false)
+                 [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
                                   AND NOT coalesce(endNode(rel)._deleted, false) | {
                   source: toString(startNode(rel).node_id),
                   target: toString(endNode(rel).node_id),
