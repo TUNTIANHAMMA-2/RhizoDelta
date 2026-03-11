@@ -50,6 +50,12 @@ class DecisionServiceBranchUnitTest {
     @Mock
     private DagIntegrityService dagIntegrityService;
 
+    @Mock
+    private EmbeddingModelService embeddingModelService;
+
+    @Mock
+    private EmbeddingService embeddingService;
+
     @Test
     void executeBranchShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
@@ -57,7 +63,9 @@ class DecisionServiceBranchUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
-                dagIntegrityService
+                dagIntegrityService,
+                embeddingModelService,
+                embeddingService
         );
         BranchDecisionCommand command = newBranchCommand(UUID.randomUUID());
 
@@ -76,7 +84,9 @@ class DecisionServiceBranchUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
-                dagIntegrityService
+                dagIntegrityService,
+                embeddingModelService,
+                embeddingService
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID decisionNodeId = UUID.randomUUID();
@@ -108,7 +118,9 @@ class DecisionServiceBranchUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
-                dagIntegrityService
+                dagIntegrityService,
+                embeddingModelService,
+                embeddingService
         );
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
