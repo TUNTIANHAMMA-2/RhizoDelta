@@ -36,6 +36,8 @@ public class AuditService {
                  coalesce(rel.decision_id, decision.decision_id) AS decisionId,
                  rel.created_at AS createdAt
             WHERE decisionId IS NOT NULL
+              AND NOT coalesce(decision._deleted, false)
+              AND NOT coalesce(source._deleted, false)
               AND ($decisionType IS NULL OR decisionType = $decisionType)
               AND ($operatorId IS NULL OR rel.operator_id = $operatorId)
               AND ($since IS NULL OR createdAt >= $since)
@@ -59,6 +61,8 @@ public class AuditService {
 
     private static final String GET_DECISION_DETAIL_QUERY = """
             MATCH (decision:GraphNode {decision_id: $decisionId})-[rel:MERGED_INTO|BRANCHED_FROM]->(source:GraphNode)
+            WHERE NOT coalesce(decision._deleted, false)
+              AND NOT coalesce(source._deleted, false)
             OPTIONAL MATCH (decision)-[:SYNTHESIZED_FROM]->(contributor:Human_Post)
             WITH decision, source, rel, [id IN collect(DISTINCT contributor.node_id) WHERE id IS NOT NULL] AS synthesizedFrom
             RETURN coalesce(rel.decision_id, decision.decision_id) AS decisionId,
