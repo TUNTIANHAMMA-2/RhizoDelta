@@ -8,6 +8,8 @@ import com.rhizodelta.repository.HumanPostRepository;
 import com.rhizodelta.service.SseEventService.SseEventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 @Service
 public class DecisionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
@@ -106,6 +109,7 @@ public class DecisionService {
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
+    private Executor embeddingTaskExecutor = Runnable::run;
     public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, DagIntegrityService dagIntegrityService, EmbeddingModelService embeddingModelService, EmbeddingService embeddingService, SseEventService sseEventService) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
@@ -114,6 +118,10 @@ public class DecisionService {
         this.embeddingModelService = embeddingModelService;
         this.embeddingService = embeddingService;
         this.sseEventService = sseEventService;
+    }
+    @Autowired
+    public void setEmbeddingTaskExecutor(@Qualifier("embeddingTaskExecutor") Executor embeddingTaskExecutor) {
+        this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
     }
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeMerge(MergeDecisionCommand command) {
@@ -193,7 +201,10 @@ public class DecisionService {
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
     }
     private void triggerEmbeddingForConsensus(UUID nodeId, String summaryContent, String decisionId) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeConsensusEmbedding(nodeId, summaryContent, decisionId)));
+        runAfterCommit(() -> CompletableFuture.runAsync(
+                () -> writeConsensusEmbedding(nodeId, summaryContent, decisionId),
+                embeddingTaskExecutor
+        ));
     }
     private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
         try {
@@ -214,13 +225,13 @@ public class DecisionService {
                 publishEdgeCreated(decisionNodeId, contributorId, "SYNTHESIZED_FROM", relationshipCreatedAt);
             }
             publishDecisionComplete(decisionNodeId, DecisionType.MERGE, command.decision_id());
-        }));
+        }, embeddingTaskExecutor));
     }
     private void publishBranchEvents(BranchDecisionCommand command, UUID decisionNodeId, OffsetDateTime relationshipCreatedAt) {
         runAfterCommit(() -> CompletableFuture.runAsync(() -> {
             publishEdgeCreated(decisionNodeId, command.source_node_id(), "BRANCHED_FROM", relationshipCreatedAt);
             publishDecisionComplete(decisionNodeId, DecisionType.BRANCH, command.decision_id());
-        }));
+        }, embeddingTaskExecutor));
     }
     private void publishDecisionComplete(UUID nodeId, DecisionType decisionType, String decisionId) {
         SseEventService.DecisionCompletePayload payload = new SseEventService.DecisionCompletePayload(

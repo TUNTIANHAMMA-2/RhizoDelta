@@ -10,12 +10,16 @@ import com.rhizodelta.service.SseEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Component
 public class PostConsumer {
@@ -25,6 +29,7 @@ public class PostConsumer {
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
+    private Executor embeddingTaskExecutor = Runnable::run;
 
     public PostConsumer(
             PostService postService,
@@ -43,6 +48,11 @@ public class PostConsumer {
         processMessage(message);
     }
 
+    @Autowired
+    public void setEmbeddingTaskExecutor(@Qualifier("embeddingTaskExecutor") Executor embeddingTaskExecutor) {
+        this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
+    }
+
     private void processMessage(PostEventMessage message) {
         PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
                 message.requestId(),
@@ -56,7 +66,7 @@ public class PostConsumer {
     }
 
     private void triggerEmbedding(HumanPost post) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeEmbedding(post)));
+        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeEmbedding(post), embeddingTaskExecutor));
     }
 
     private void writeEmbedding(HumanPost post) {
@@ -76,7 +86,7 @@ public class PostConsumer {
                     post.getCreatedAt()
             );
             sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
-        }));
+        }, embeddingTaskExecutor));
     }
 
     private void runAfterCommit(Runnable task) {
