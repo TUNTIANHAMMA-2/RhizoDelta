@@ -88,6 +88,7 @@ public class NodeQueryService {
 
     private static final String NODE_SUMMARY_QUERY = """
             MATCH (n:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(n._deleted, false)
             WITH n, labels(n) AS nodeLabels
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' ELSE 'AI_Consensus' END AS label,
@@ -101,11 +102,14 @@ public class NodeQueryService {
 
     private static final String NODE_TYPE_QUERY = """
             MATCH (n:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(n._deleted, false)
             RETURN CASE WHEN 'Human_Post' IN labels(n) THEN 'Human_Post' ELSE 'AI_Consensus' END AS label
             """;
 
     private static final String PROVENANCE_SUMMARY_QUERY = """
-            MATCH (:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(source._deleted, false)
             WITH source
             RETURN source.node_id AS nodeId,
                    'Human_Post' AS label,
@@ -134,9 +138,9 @@ public class NodeQueryService {
     public NodeResult getNodeById(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
 
-        return humanPostRepository.findByNodeId(nodeId)
+        return humanPostRepository.findActiveByNodeId(nodeId)
                 .<NodeResult>map(HumanPostNode::new)
-                .or(() -> aiConsensusRepository.findByNodeId(nodeId).map(AIConsensusNode::new))
+                .or(() -> aiConsensusRepository.findActiveByNodeId(nodeId).map(AIConsensusNode::new))
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
@@ -168,12 +172,12 @@ public class NodeQueryService {
     public List<HumanPost> getProvenance(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
 
-        boolean isHumanPost = humanPostRepository.findByNodeId(nodeId).isPresent();
+        boolean isHumanPost = humanPostRepository.findActiveByNodeId(nodeId).isPresent();
         if (isHumanPost) {
             return List.of();
         }
 
-        aiConsensusRepository.findByNodeId(nodeId)
+        aiConsensusRepository.findActiveByNodeId(nodeId)
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
 
         return humanPostRepository.findProvenance(nodeId);

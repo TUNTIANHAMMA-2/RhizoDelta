@@ -14,10 +14,19 @@ import java.util.UUID;
 public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost, UUID> {
     Optional<HumanPost> findByNodeId(UUID nodeId);
 
+    @Query("""
+            MATCH (node:Human_Post {node_id: $nodeId})
+            WHERE NOT coalesce(node._deleted, false)
+            RETURN node
+            """)
+    Optional<HumanPost> findActiveByNodeId(@Param("nodeId") UUID nodeId);
+
     List<HumanPost> findAllByNodeIdIn(Collection<UUID> nodeIds);
 
     @Query("""
-            MATCH (:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            MATCH (consensus:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(source._deleted, false)
             RETURN source
             ORDER BY source.created_at DESC
             """)
