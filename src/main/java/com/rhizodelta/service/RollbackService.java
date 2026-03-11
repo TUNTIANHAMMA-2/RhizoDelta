@@ -24,6 +24,10 @@ public class RollbackService {
             """;
 
     private static final int MIN_PROPERTIES_UPDATED = 1;
+    private static final String FIND_SOFT_DELETE_STATUS_QUERY = """
+            MATCH (target:GraphNode {node_id: $nodeId})
+            RETURN coalesce(target._deleted, false) AS deleted
+            """;
     private static final String ATOMIC_SOFT_DELETE_QUERY = """
             MATCH (target:GraphNode {node_id: $nodeId})
             OPTIONAL MATCH (target)<-[:BRANCHED_FROM|MERGED_INTO]-(dep:GraphNode)
@@ -52,6 +56,10 @@ public class RollbackService {
         String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
         UUID decisionNodeId = resolveDecisionNodeId(validatedDecisionId);
 
+        if (isSoftDeleted(decisionNodeId)) {
+            return new RollbackResult(validatedDecisionId, decisionNodeId, 0L, true);
+        }
+
         ResultSummary summary = neo4jClient.query(ATOMIC_SOFT_DELETE_QUERY)
                 .bind(decisionNodeId.toString())
                 .to("nodeId")
@@ -64,6 +72,16 @@ public class RollbackService {
 
         long relationshipsRemoved = summary.counters().relationshipsDeleted();
         return new RollbackResult(validatedDecisionId, decisionNodeId, relationshipsRemoved, true);
+    }
+
+    private boolean isSoftDeleted(UUID nodeId) {
+        Map<String, Object> row = neo4jClient.query(FIND_SOFT_DELETE_STATUS_QUERY)
+                .bind(nodeId.toString())
+                .to("nodeId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new NoSuchElementException("node not found: " + nodeId));
+        return Boolean.TRUE.equals(row.get("deleted"));
     }
 
     private UUID resolveDecisionNodeId(String decisionId) {
