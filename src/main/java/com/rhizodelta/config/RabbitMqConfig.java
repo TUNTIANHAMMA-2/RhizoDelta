@@ -1,6 +1,5 @@
 package com.rhizodelta.config;
 
-import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
@@ -8,8 +7,10 @@ import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
@@ -17,10 +18,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.aopalliance.intercept.MethodInterceptor;
 
 @Configuration
 public class RabbitMqConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(RabbitMqConfig.class);
+    private static final int RETRY_MAX_ATTEMPTS = 4;
+    private static final long RETRY_INITIAL_INTERVAL_MS = 1000L;
+    private static final double RETRY_MULTIPLIER = 2.0;
+    private static final long RETRY_MAX_INTERVAL_MS = 4000L;
     public static final String POSTS_EXCHANGE = "rhizodelta.posts";
     public static final String POSTS_QUEUE = "rhizodelta.posts.queue";
     public static final String POSTS_DLQ = "rhizodelta.posts.dlq";
@@ -101,14 +107,24 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public MethodInterceptor rabbitRetryInterceptor() {
+        return RetryInterceptorBuilder.stateless()
+                .maxAttempts(RETRY_MAX_ATTEMPTS)
+                .backOffOptions(RETRY_INITIAL_INTERVAL_MS, RETRY_MULTIPLIER, RETRY_MAX_INTERVAL_MS)
+                .recoverer(new RejectAndDontRequeueRecoverer())
+                .build();
+    }
+
+    @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter messageConverter
+            MessageConverter messageConverter,
+            MethodInterceptor rabbitRetryInterceptor
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
-        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        factory.setAdviceChain(rabbitRetryInterceptor);
         return factory;
     }
 }

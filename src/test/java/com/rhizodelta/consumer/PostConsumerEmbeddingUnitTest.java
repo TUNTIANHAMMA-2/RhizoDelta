@@ -40,7 +40,6 @@ class PostConsumerEmbeddingUnitTest {
         );
         PostConsumer consumer = new PostConsumer(
                 new StubPostService(post),
-                null,
                 embeddingModelService,
                 embeddingService,
                 new SseEventService()
@@ -65,7 +64,6 @@ class PostConsumerEmbeddingUnitTest {
         );
         PostConsumer consumer = new PostConsumer(
                 new StubPostService(post),
-                null,
                 embeddingModelService,
                 embeddingService,
                 new SseEventService()
