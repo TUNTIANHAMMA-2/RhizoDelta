@@ -41,11 +41,14 @@ class RollbackServiceUnitTest {
                 .bind(anyString())
                 .to(anyString())
                 .fetch()
-                .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
+                .one()).thenReturn(Optional.of(Map.of(
+                        "nodeId", decisionNodeId.toString(),
+                        "labels", List.of("AI_Consensus")
+                )));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().propertiesSet()).thenReturn(2);
+        when(summary.counters().nodesDeleted()).thenReturn(1);
         when(summary.counters().relationshipsDeleted()).thenReturn(0);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
                 .bind(anyString())
                 .to(anyString())
                 .run()).thenReturn(summary);
@@ -67,7 +70,16 @@ class RollbackServiceUnitTest {
                 .bind(anyString())
                 .to(anyString())
                 .fetch()
-                .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId)));
+                .one()).thenReturn(Optional.of(Map.of(
+                        "nodeId", decisionNodeId,
+                        "labels", List.of("Human_Post")
+                )));
+        when(neo4jClient.query(argThat((String query) -> query != null
+                && query.contains("coalesce(target._deleted")))
+                .bind(anyString())
+                .to(anyString())
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("deleted", false)));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
         when(summary.counters().propertiesSet()).thenReturn(2);
         when(summary.counters().relationshipsDeleted()).thenReturn(0);
@@ -95,7 +107,16 @@ class RollbackServiceUnitTest {
                 .bind(anyString())
                 .to(anyString())
                 .fetch()
-                .one()).thenReturn(Optional.of(Map.of("nodeId", decisionNodeId.toString())));
+                .one()).thenReturn(Optional.of(Map.of(
+                        "nodeId", decisionNodeId.toString(),
+                        "labels", List.of("Human_Post")
+                )));
+        when(neo4jClient.query(argThat((String query) -> query != null
+                && query.contains("coalesce(target._deleted")))
+                .bind(anyString())
+                .to(anyString())
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("deleted", false)));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
         when(summary.counters().propertiesSet()).thenReturn(0);
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))

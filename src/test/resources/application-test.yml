@@ -3,10 +3,27 @@ spring:
     uri: bolt://localhost:7687
     authentication:
       username: neo4j
-      password: test
+      password: 12345678
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+
 
 rhizodelta:
   embedding:
     dimension: 1024
   jwt:
     secret: test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing
+
+
+langchain4j:
+  open-ai:
+    embedding-model:
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen3-Embedding-0.6B
+      api-key: ${SILICON_FLOW_API_KEY:sk-bfmfmfxpdvrfimyjjmpenapnzdfqwoomgrvrjlgnzmdhjfep}

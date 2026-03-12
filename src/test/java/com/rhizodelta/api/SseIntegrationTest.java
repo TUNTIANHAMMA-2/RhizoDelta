@@ -42,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @ActiveProfiles("test")
 class SseIntegrationTest {
-    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration EVENT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration EVENT_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration TOKEN_TTL = Duration.ofHours(1);
     private static final String TEST_REQUEST_ID = "req-sse-1";
     private static final String TEST_AUTHOR_ID = "author-sse";

@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +108,7 @@ public class AssociationService {
         params.put("creatorId", command.creator_id());
         params.put("reason", command.reason());
         params.put("createdAt", createdAt);
-        params.put("confidence", command.confidence());
+        params.put("confidence", normalizeConfidence(command.confidence()));
 
         Map<String, Object> result = neo4jClient.query(resolveCreateQuery(command.type()))
                 .bindAll(params)
@@ -211,6 +213,7 @@ public class AssociationService {
     private static Instant toInstant(Object value) {
         if (value instanceof Instant instant) return instant;
         if (value instanceof OffsetDateTime odt) return odt.toInstant();
+        if (value instanceof ZonedDateTime zdt) return zdt.toInstant();
         return null;
     }
 
@@ -222,6 +225,13 @@ public class AssociationService {
             return number.floatValue();
         }
         throw new IllegalArgumentException("Unsupported confidence type: " + value.getClass().getName());
+    }
+
+    private static Double normalizeConfidence(Float confidence) {
+        if (confidence == null) {
+            return null;
+        }
+        return new BigDecimal(confidence.toString()).doubleValue();
     }
 
     public record CreateAssociationOutcome(AssociationResult association, boolean created) {

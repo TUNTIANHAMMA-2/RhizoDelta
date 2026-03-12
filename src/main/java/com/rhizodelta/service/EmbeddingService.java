@@ -36,11 +36,13 @@ public class EmbeddingService {
             CALL db.index.vector.queryNodes('%s', $topK, $vector)
             YIELD node, score
             WHERE NOT coalesce(node._deleted, false)
+              AND node.node_id IS NOT NULL
             WITH node, score, labels(node) AS nodeLabels
             CALL {
               WITH node
               OPTIONAL MATCH (node)-[rel:MERGED_INTO|BRANCHED_FROM|SYNTHESIZED_FROM]-(neighbor:GraphNode)
               WHERE neighbor IS NOT NULL
+                AND neighbor.node_id IS NOT NULL
                 AND NOT coalesce(neighbor._deleted, false)
               RETURN collect(DISTINCT {
                 nodeId: neighbor.node_id,
@@ -197,6 +199,7 @@ public class EmbeddingService {
         return entries.stream()
                 .filter(Objects::nonNull)
                 .map(EmbeddingService::toNeighborInfo)
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -205,6 +208,9 @@ public class EmbeddingService {
             throw new IllegalArgumentException("neighbor entry must be a map");
         }
         Object nodeId = row.get("nodeId");
+        if (nodeId == null) {
+            return null;
+        }
         String label = (String) row.get("label");
         String relationshipType = (String) row.get("relationshipType");
         return new NeighborInfo(parseRequiredUuid(nodeId, "node_id"), label, relationshipType);

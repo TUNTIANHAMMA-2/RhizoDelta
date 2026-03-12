@@ -1,17 +1,29 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.exception.DagIntegrityViolationException;
 import com.rhizodelta.domain.decision.DecisionResult;
+import com.rhizodelta.domain.decision.MergeDecisionCommand;
+import com.rhizodelta.config.JwtAuthenticationFilter;
+import com.rhizodelta.config.SecurityConfig;
+import com.rhizodelta.exception.DagIntegrityViolationException;
 import com.rhizodelta.service.DecisionService;
 import com.rhizodelta.service.RollbackService;
-import com.rhizodelta.domain.decision.MergeDecisionCommand;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -21,7 +33,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = DecisionController.class)
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class})
+@TestPropertySource(properties = "rhizodelta.jwt.secret=test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing")
 class DecisionControllerWebTest {
+    private static final String TEST_SECRET =
+            "test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing";
+    private static final long TOKEN_TTL_MILLIS = 3_600_000L;
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
     @Autowired
     private MockMvc mockMvc;
@@ -38,9 +57,7 @@ class DecisionControllerWebTest {
         when(decisionService.executeMerge(any()))
                 .thenReturn(new DecisionResult("dec-merge-1", nodeId, "QUEUED"));
 
-        mockMvc.perform(post("/api/decisions/merge")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validMergeJson()))
+        authorizedPost("/api/decisions/merge", validMergeJson())
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-merge-1"))
@@ -54,9 +71,7 @@ class DecisionControllerWebTest {
         when(decisionService.executeBranch(any()))
                 .thenReturn(new DecisionResult("dec-branch-1", nodeId, "QUEUED"));
 
-        mockMvc.perform(post("/api/decisions/branch")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBranchJson()))
+        authorizedPost("/api/decisions/branch", validBranchJson())
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-branch-1"))
@@ -69,9 +84,7 @@ class DecisionControllerWebTest {
         when(decisionService.executeMerge(any(MergeDecisionCommand.class)))
                 .thenThrow(new DagIntegrityViolationException("cycle detected"));
 
-        mockMvc.perform(post("/api/decisions/merge")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validMergeJson()))
+        authorizedPost("/api/decisions/merge", validMergeJson())
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(40901))
                 .andExpect(jsonPath("$.message").value("cycle detected"));
@@ -79,11 +92,28 @@ class DecisionControllerWebTest {
 
     @Test
     void shouldReturnBadRequestForMalformedJson() throws Exception {
-        mockMvc.perform(post("/api/decisions/merge")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"decision_id\":\"broken\""))
+        authorizedPost("/api/decisions/merge", "{\"decision_id\":\"broken\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40001));
+    }
+
+    private ResultActions authorizedPost(String url, String body) throws Exception {
+        return mockMvc.perform(post(url)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + generateValidToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    private String generateValidToken() {
+        Instant now = Instant.now();
+        SecretKey key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts.builder()
+                .subject("user-1")
+                .claim("roles", List.of("USER"))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(TOKEN_TTL_MILLIS)))
+                .signWith(key)
+                .compact();
     }
 
     private static String validMergeJson() {
