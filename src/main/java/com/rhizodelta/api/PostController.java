@@ -86,8 +86,11 @@ public class PostController {
             if (confirm == null || !confirm.isAck()) {
                 throw new AmqpException(confirmFailureMessage(confirm));
             }
+            // RabbitMQ protocol guarantees basic.return arrives before basic.ack,
+            // so correlationData.returned is set by the time the confirm future completes.
             if (correlationData.getReturned() != null) {
-                throw new AmqpException("message returned by broker");
+                throw new AmqpException("message returned by broker: "
+                        + correlationData.getReturned().getReplyText());
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();

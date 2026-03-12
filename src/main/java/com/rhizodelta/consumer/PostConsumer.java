@@ -13,8 +13,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Objects;
@@ -61,12 +59,8 @@ public class PostConsumer {
                 message.targetNodeId()
         );
         HumanPost post = postService.createHumanPost(command);
-        triggerEmbedding(post);
+        CompletableFuture.runAsync(() -> writeEmbedding(post), embeddingTaskExecutor);
         publishNodeCreated(post);
-    }
-
-    private void triggerEmbedding(HumanPost post) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> writeEmbedding(post), embeddingTaskExecutor));
     }
 
     private void writeEmbedding(HumanPost post) {
@@ -79,26 +73,11 @@ public class PostConsumer {
     }
 
     private void publishNodeCreated(HumanPost post) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
-            SseEventService.NodeCreatedPayload payload = new SseEventService.NodeCreatedPayload(
-                    post.getNodeId().toString(),
-                    "Human_Post",
-                    post.getCreatedAt()
-            );
-            sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
-        }, embeddingTaskExecutor));
-    }
-
-    private void runAfterCommit(Runnable task) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    task.run();
-                }
-            });
-            return;
-        }
-        task.run();
+        SseEventService.NodeCreatedPayload payload = new SseEventService.NodeCreatedPayload(
+                post.getNodeId().toString(),
+                "Human_Post",
+                post.getCreatedAt()
+        );
+        sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
     }
 }

@@ -29,8 +29,8 @@ public class NodeQueryService {
     private static final int NO_LIMIT = Integer.MAX_VALUE;
 
     private static final String LINEAGE_QUERY = """
-            MATCH path = (start {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*0..50]->(ancestor)
-            WHERE length(path) <= $maxDepth
+            MATCH path = (start:GraphNode {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*0..50]->(ancestor)
+            WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
             UNWIND nodeList AS node
@@ -60,8 +60,8 @@ public class NodeQueryService {
             """;
 
     private static final String CHILDREN_QUERY = """
-            MATCH path = (start {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO*0..50]-(descendant)
-            WHERE length(path) <= $maxDepth
+            MATCH path = (start:GraphNode {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO*0..50]-(descendant)
+            WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
             UNWIND nodeList AS node

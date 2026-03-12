@@ -1,18 +1,9 @@
 package com.rhizodelta.service;
 
-import com.rhizodelta.domain.association.AssociationInfo;
-import com.rhizodelta.domain.association.AssociationType;
-import com.rhizodelta.domain.association.CreateAssociationCommand;
-import com.rhizodelta.domain.audit.AuditDetail;
-import com.rhizodelta.domain.audit.AuditListResponse;
 import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionOperatorType;
 import com.rhizodelta.domain.decision.DecisionResult;
-import com.rhizodelta.domain.decision.DecisionType;
-import com.rhizodelta.domain.decision.MergeDecisionCommand;
-import com.rhizodelta.domain.decision.RollbackResult;
 import com.rhizodelta.exception.DagIntegrityViolationException;
-import com.rhizodelta.exception.RollbackBlockedException;
 
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
@@ -21,13 +12,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.neo4j.core.Neo4jClient;
 
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,7 +32,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DecisionServiceBranchUnitTest {
-    private static final String ACTIVE_SOURCE_QUERY_FRAGMENT = "RETURN count(node) > 0 AS exists";
 
     @Mock
     private HumanPostRepository humanPostRepository;
@@ -53,13 +43,7 @@ class DecisionServiceBranchUnitTest {
     private DagIntegrityService dagIntegrityService;
 
     @Mock
-    private EmbeddingModelService embeddingModelService;
-
-    @Mock
-    private EmbeddingService embeddingService;
-
-    @Mock
-    private SseEventService sseEventService;
+    private ApplicationEventPublisher eventPublisher;
 
     @Test
     void executeBranchShouldRejectMissingSourceNode() {
@@ -69,16 +53,13 @@ class DecisionServiceBranchUnitTest {
                 humanPostRepository,
                 aiConsensusRepository,
                 dagIntegrityService,
-                embeddingModelService,
-                embeddingService,
-                sseEventService
+                eventPublisher
         );
-        BranchDecisionCommand command = newBranchCommand(UUID.randomUUID());
+        UUID sourceNodeId = UUID.randomUUID();
+        BranchDecisionCommand command = newBranchCommand(sourceNodeId);
 
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
-                .bind(any()).to("nodeId")
-                .fetch()
-                .one()).thenReturn(Optional.of(Map.of("exists", false)));
+        when(humanPostRepository.existsActiveByNodeId(sourceNodeId)).thenReturn(false);
+        when(aiConsensusRepository.existsActiveByNodeId(sourceNodeId)).thenReturn(false);
 
         assertThatThrownBy(() -> decisionService.executeBranch(command))
                 .isInstanceOf(NoSuchElementException.class)
@@ -93,18 +74,13 @@ class DecisionServiceBranchUnitTest {
                 humanPostRepository,
                 aiConsensusRepository,
                 dagIntegrityService,
-                embeddingModelService,
-                embeddingService,
-                sseEventService
+                eventPublisher
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID decisionNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
 
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
-                .bind(any()).to("nodeId")
-                .fetch()
-                .one()).thenReturn(Optional.of(Map.of("exists", true)));
+        when(humanPostRepository.existsActiveByNodeId(sourceNodeId)).thenReturn(true);
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()
@@ -130,17 +106,12 @@ class DecisionServiceBranchUnitTest {
                 humanPostRepository,
                 aiConsensusRepository,
                 dagIntegrityService,
-                embeddingModelService,
-                embeddingService,
-                sseEventService
+                eventPublisher
         );
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
 
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains(ACTIVE_SOURCE_QUERY_FRAGMENT)))
-                .bind(any()).to("nodeId")
-                .fetch()
-                .one()).thenReturn(Optional.of(Map.of("exists", true)));
+        when(humanPostRepository.existsActiveByNodeId(sourceNodeId)).thenReturn(true);
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("MERGE (decision:Human_Post")))
                 .bindAll(anyMap())
                 .fetch()

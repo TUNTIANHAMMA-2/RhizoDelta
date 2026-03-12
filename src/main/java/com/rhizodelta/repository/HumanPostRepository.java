@@ -21,6 +21,21 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
             """)
     Optional<HumanPost> findActiveByNodeId(@Param("nodeId") UUID nodeId);
 
+    @Query("""
+            MATCH (node:Human_Post:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(node._deleted, false)
+            RETURN count(node) > 0
+            """)
+    boolean existsActiveByNodeId(@Param("nodeId") UUID nodeId);
+
+    @Query("""
+            MATCH (post:Human_Post:GraphNode)
+            WHERE post.node_id IN $nodeIds
+              AND NOT coalesce(post._deleted, false)
+            RETURN toString(post.node_id)
+            """)
+    List<String> findActiveNodeIdStrings(@Param("nodeIds") List<String> nodeIds);
+
     List<HumanPost> findAllByNodeIdIn(Collection<UUID> nodeIds);
 
     @Query("""

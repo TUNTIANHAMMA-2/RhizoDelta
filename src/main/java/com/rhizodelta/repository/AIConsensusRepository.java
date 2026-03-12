@@ -20,6 +20,13 @@ public interface AIConsensusRepository extends ImmutableNeo4jRepository<AIConsen
     Optional<AIConsensus> findActiveByNodeId(@Param("nodeId") UUID nodeId);
 
     @Query("""
+            MATCH (node:AI_Consensus:GraphNode {node_id: $nodeId})
+            WHERE NOT coalesce(node._deleted, false)
+            RETURN count(node) > 0
+            """)
+    boolean existsActiveByNodeId(@Param("nodeId") UUID nodeId);
+
+    @Query("""
             MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
             RETURN source
             ORDER BY source.created_at DESC

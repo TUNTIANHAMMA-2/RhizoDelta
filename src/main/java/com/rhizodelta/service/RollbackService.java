@@ -39,8 +39,6 @@ public class RollbackService {
             WHERE NOT coalesce(dep._deleted, false)
             WITH target, collect(DISTINCT dep.node_id) AS deps
             WHERE size(deps) = 0
-            OPTIONAL MATCH (target)-[rel]-()
-            DELETE rel
             SET target._deleted = true,
                 target._deleted_at = datetime()
             """;
@@ -92,7 +90,11 @@ public class RollbackService {
     private RollbackResult rollbackMerge(String decisionId, UUID nodeId) {
         ResultSummary summary = runRollbackQuery(ATOMIC_MERGE_ROLLBACK_QUERY, nodeId);
         if (summary.counters().nodesDeleted() < MIN_NODES_DELETED) {
-            throw new RollbackBlockedException(findDependentNodeIds(nodeId));
+            List<UUID> dependents = findDependentNodeIds(nodeId);
+            if (dependents.isEmpty()) {
+                return new RollbackResult(decisionId, nodeId, NO_RELATIONSHIPS_REMOVED, true);
+            }
+            throw new RollbackBlockedException(dependents);
         }
         return new RollbackResult(decisionId, nodeId, summary.counters().relationshipsDeleted(), true);
     }

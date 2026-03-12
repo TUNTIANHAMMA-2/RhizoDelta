@@ -19,9 +19,9 @@ public class EmbeddingTaskExecutorConfig {
 
     @Bean(name = "embeddingTaskExecutor")
     public Executor embeddingTaskExecutor(Environment environment) {
-        int corePoolSize = resolveIntProperty(environment, CORE_POOL_SIZE_PROPERTY, DEFAULT_CORE_POOL_SIZE);
-        int maxPoolSize = resolveIntProperty(environment, MAX_POOL_SIZE_PROPERTY, DEFAULT_MAX_POOL_SIZE);
-        int queueCapacity = resolveIntProperty(environment, QUEUE_CAPACITY_PROPERTY, DEFAULT_QUEUE_CAPACITY);
+        int corePoolSize = resolvePositiveInt(environment, CORE_POOL_SIZE_PROPERTY, DEFAULT_CORE_POOL_SIZE);
+        int maxPoolSize = resolvePositiveInt(environment, MAX_POOL_SIZE_PROPERTY, DEFAULT_MAX_POOL_SIZE);
+        int queueCapacity = resolvePositiveInt(environment, QUEUE_CAPACITY_PROPERTY, DEFAULT_QUEUE_CAPACITY);
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setThreadNamePrefix(THREAD_NAME_PREFIX);
@@ -32,15 +32,20 @@ public class EmbeddingTaskExecutorConfig {
         return executor;
     }
 
-    private static int resolveIntProperty(Environment environment, String key, int defaultValue) {
+    private static int resolvePositiveInt(Environment environment, String key, int defaultValue) {
         String value = environment.getProperty(key);
         if (value == null || value.isBlank()) {
             return defaultValue;
         }
+        int parsed;
         try {
-            return Integer.parseInt(value);
+            parsed = Integer.parseInt(value);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Invalid integer for " + key + ": " + value, exception);
         }
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(key + " must be positive, got: " + parsed);
+        }
+        return parsed;
     }
 }

@@ -51,7 +51,14 @@ public class SseEventService {
         if (instanceId.equals(message.origin())) {
             return;
         }
-        publishLocal(SseEventType.valueOf(message.type()), message.payload());
+        SseEventType eventType;
+        try {
+            eventType = SseEventType.valueOf(message.type());
+        } catch (IllegalArgumentException exception) {
+            LOGGER.warn("Ignoring unknown SSE event type: {}", message.type());
+            return;
+        }
+        publishLocal(eventType, message.payload());
     }
 
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL_MILLIS)
@@ -59,6 +66,10 @@ public class SseEventService {
         emitters.forEach((emitterId, emitter) -> {
             try {
                 emitter.send(SseEmitter.event().comment("heartbeat"));
+            } catch (java.io.IOException ioException) {
+                LOGGER.debug("SSE heartbeat detected dead connection, removing emitter", ioException);
+                emitter.completeWithError(ioException);
+                removeEmitter(emitterId, emitter);
             } catch (Exception exception) {
                 LOGGER.warn("Failed to send SSE heartbeat", exception);
                 removeEmitter(emitterId, emitter);

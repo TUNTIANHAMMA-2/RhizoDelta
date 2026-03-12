@@ -1,20 +1,16 @@
 package com.rhizodelta.service;
 import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionResult;
-import com.rhizodelta.domain.decision.DecisionType;
 import com.rhizodelta.domain.decision.MergeDecisionCommand;
+import com.rhizodelta.event.DecisionCommittedEvent;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
-import com.rhizodelta.service.SseEventService.SseEventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -24,8 +20,6 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 @Service
 public class DecisionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
@@ -90,38 +84,17 @@ public class DecisionService {
               branched.reason = $reason
             RETURN type(branched) AS relType
             """;
-    private static final String ACTIVE_SOURCE_EXISTS_QUERY = """
-            MATCH (node:GraphNode {node_id: $nodeId})
-            WHERE (node:Human_Post OR node:AI_Consensus)
-              AND NOT coalesce(node._deleted, false)
-            RETURN count(node) > 0 AS exists
-            """;
-    private static final String ACTIVE_HUMAN_POST_IDS_QUERY = """
-            MATCH (post:Human_Post:GraphNode)
-            WHERE post.node_id IN $nodeIds
-              AND NOT coalesce(post._deleted, false)
-            RETURN toString(post.node_id) AS nodeId
-            """;
     private final Neo4jClient neo4jClient;
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
     private final DagIntegrityService dagIntegrityService;
-    private final EmbeddingModelService embeddingModelService;
-    private final EmbeddingService embeddingService;
-    private final SseEventService sseEventService;
-    private Executor embeddingTaskExecutor = Runnable::run;
-    public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, DagIntegrityService dagIntegrityService, EmbeddingModelService embeddingModelService, EmbeddingService embeddingService, SseEventService sseEventService) {
+    private final ApplicationEventPublisher eventPublisher;
+    public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, DagIntegrityService dagIntegrityService, ApplicationEventPublisher eventPublisher) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
         this.aiConsensusRepository = aiConsensusRepository;
         this.dagIntegrityService = dagIntegrityService;
-        this.embeddingModelService = embeddingModelService;
-        this.embeddingService = embeddingService;
-        this.sseEventService = sseEventService;
-    }
-    @Autowired
-    public void setEmbeddingTaskExecutor(@Qualifier("embeddingTaskExecutor") Executor embeddingTaskExecutor) {
-        this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
+        this.eventPublisher = eventPublisher;
     }
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeMerge(MergeDecisionCommand command) {
@@ -135,8 +108,9 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createMergeRelationships(command, relationshipCreatedAt);
-        publishMergeEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
-        triggerEmbeddingForConsensus(upsertResult.nodeId(), command.summary_content(), command.decision_id());
+        eventPublisher.publishEvent(new DecisionCommittedEvent.MergeCompleted(
+                command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
+                command.synthesized_from(), command.summary_content(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
     @Transactional(transactionManager = "transactionManager")
@@ -150,7 +124,8 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createBranchRelationship(command, relationshipCreatedAt);
-        publishBranchEvents(command, upsertResult.nodeId(), relationshipCreatedAt);
+        eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
+                command.decision_id(), upsertResult.nodeId(), command.source_node_id(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
     private UpsertResult upsertMergeNode(MergeDecisionCommand command) {
@@ -200,93 +175,23 @@ public class DecisionService {
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
     }
-    private void triggerEmbeddingForConsensus(UUID nodeId, String summaryContent, String decisionId) {
-        runAfterCommit(() -> CompletableFuture.runAsync(
-                () -> writeConsensusEmbedding(nodeId, summaryContent, decisionId),
-                embeddingTaskExecutor
-        ));
-    }
-    private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
-        try {
-            List<Float> vector = embeddingModelService.embed(summaryContent);
-            embeddingService.writeEmbedding(nodeId.toString(), vector);
-        } catch (Exception exception) {
-            LOGGER.error("Failed to generate embedding for AI_Consensus node_id={}, decision_id={}",
-                    nodeId,
-                    decisionId,
-                    exception
-            );
-        }
-    }
-    private void publishMergeEvents(MergeDecisionCommand command, UUID decisionNodeId, OffsetDateTime relationshipCreatedAt) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
-            publishEdgeCreated(decisionNodeId, command.source_node_id(), "MERGED_INTO", relationshipCreatedAt);
-            for (UUID contributorId : command.synthesized_from()) {
-                publishEdgeCreated(decisionNodeId, contributorId, "SYNTHESIZED_FROM", relationshipCreatedAt);
-            }
-            publishDecisionComplete(decisionNodeId, DecisionType.MERGE, command.decision_id());
-        }, embeddingTaskExecutor));
-    }
-    private void publishBranchEvents(BranchDecisionCommand command, UUID decisionNodeId, OffsetDateTime relationshipCreatedAt) {
-        runAfterCommit(() -> CompletableFuture.runAsync(() -> {
-            publishEdgeCreated(decisionNodeId, command.source_node_id(), "BRANCHED_FROM", relationshipCreatedAt);
-            publishDecisionComplete(decisionNodeId, DecisionType.BRANCH, command.decision_id());
-        }, embeddingTaskExecutor));
-    }
-    private void publishDecisionComplete(UUID nodeId, DecisionType decisionType, String decisionId) {
-        SseEventService.DecisionCompletePayload payload = new SseEventService.DecisionCompletePayload(
-                decisionId,
-                decisionType.name(),
-                nodeId.toString()
-        );
-        sseEventService.publish(SseEventType.DECISION_COMPLETE, payload);
-    }
-    private void publishEdgeCreated(UUID sourceNodeId, UUID targetNodeId, String relationshipType, OffsetDateTime createdAt) {
-        SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
-                sourceNodeId.toString(),
-                targetNodeId.toString(),
-                relationshipType,
-                createdAt.toInstant()
-        );
-        sseEventService.publish(SseEventType.EDGE_CREATED, payload);
-    }
-    private void runAfterCommit(Runnable task) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    task.run();
-                }
-            });
-            return;
-        }
-        task.run();
-    }
     private void validateSourceNodeExists(UUID sourceNodeId) {
-        Map<String, Object> result = neo4jClient.query(ACTIVE_SOURCE_EXISTS_QUERY)
-                .bind(sourceNodeId.toString()).to("nodeId")
-                .fetch()
-                .one()
-                .orElseThrow(() -> new IllegalStateException("Failed to validate source_node_id"));
-        if (!Boolean.TRUE.equals(result.get("exists"))) {
+        boolean exists = humanPostRepository.existsActiveByNodeId(sourceNodeId)
+                || aiConsensusRepository.existsActiveByNodeId(sourceNodeId);
+        if (!exists) {
             throw new NoSuchElementException("source_node_id not found: " + sourceNodeId);
         }
     }
     private void validateSynthesizedFromNodes(List<UUID> synthesizedFrom) {
         Set<UUID> uniqueIds = new LinkedHashSet<>(synthesizedFrom);
-        List<Map<String, Object>> found = List.copyOf(neo4jClient.query(ACTIVE_HUMAN_POST_IDS_QUERY)
-                .bind(uniqueIds.stream().map(UUID::toString).toList()).to("nodeIds")
-                .fetch()
-                .all());
-        if (found.size() == uniqueIds.size()) {
+        List<String> foundStrings = humanPostRepository.findActiveNodeIdStrings(
+                uniqueIds.stream().map(UUID::toString).toList());
+        if (foundStrings.size() == uniqueIds.size()) {
             return;
         }
         Set<UUID> foundIds = new LinkedHashSet<>();
-        for (Map<String, Object> row : found) {
-            Object value = row.get("nodeId");
-            if (value instanceof String nodeId) {
-                foundIds.add(UUID.fromString(nodeId));
-            }
+        for (String nodeId : foundStrings) {
+            foundIds.add(UUID.fromString(nodeId));
         }
         Set<UUID> missing = new LinkedHashSet<>(uniqueIds);
         missing.removeAll(foundIds);
