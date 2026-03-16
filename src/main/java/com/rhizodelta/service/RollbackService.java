@@ -41,6 +41,9 @@ public class RollbackService {
             WHERE size(deps) = 0
             SET target._deleted = true,
                 target._deleted_at = datetime()
+            WITH target
+            OPTIONAL MATCH (target)-[rel]-()
+            DELETE rel
             """;
     private static final String ATOMIC_MERGE_ROLLBACK_QUERY = """
             MATCH (target:GraphNode {node_id: $nodeId})
