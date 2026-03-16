@@ -19,7 +19,7 @@ import java.util.List;
 public class TestRestTemplateConfig {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String TEST_SUBJECT = "test-operator";
-    private static final List<String> TEST_ROLES = List.of("ROLE_TEST");
+    private static final List<String> TEST_ROLES = List.of("ADMIN");
     private static final Duration TOKEN_TTL = Duration.ofHours(1);
 
     @Bean

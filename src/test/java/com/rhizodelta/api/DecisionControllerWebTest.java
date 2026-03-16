@@ -97,6 +97,18 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.code").value(40001));
     }
 
+    @Test
+    void shouldReturn403WhenUserRoleCallsMerge() throws Exception {
+        String userToken = generateTokenWithRole("USER");
+        mockMvc.perform(post("/api/decisions/merge")
+                        .header(AUTHORIZATION_HEADER, BEARER_PREFIX + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMergeJson()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40301))
+                .andExpect(jsonPath("$.message").value("insufficient permissions"));
+    }
+
     private ResultActions authorizedPost(String url, String body) throws Exception {
         return mockMvc.perform(post(url)
                 .header(AUTHORIZATION_HEADER, BEARER_PREFIX + generateValidToken())
@@ -105,11 +117,15 @@ class DecisionControllerWebTest {
     }
 
     private String generateValidToken() {
+        return generateTokenWithRole("AGENT");
+    }
+
+    private String generateTokenWithRole(String role) {
         Instant now = Instant.now();
         SecretKey key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8));
         return Jwts.builder()
                 .subject("user-1")
-                .claim("roles", List.of("USER"))
+                .claim("roles", List.of(role))
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(TOKEN_TTL_MILLIS)))
                 .signWith(key)

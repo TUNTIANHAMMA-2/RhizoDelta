@@ -5,6 +5,7 @@ import com.rhizodelta.api.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -33,11 +34,18 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/associations/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/decisions/**").hasAnyRole("AGENT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/associations").hasAnyRole("AGENT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/nodes/*/embedding").hasAnyRole("AGENT", "ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->
                                 writeUnauthorizedResponse(response, "authentication required"))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeForbiddenResponse(response, "insufficient permissions"))
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
@@ -47,5 +55,11 @@ public class SecurityConfig {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), ApiResponse.unauthorized(message));
+    }
+
+    private void writeForbiddenResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), ApiResponse.forbidden(message));
     }
 }

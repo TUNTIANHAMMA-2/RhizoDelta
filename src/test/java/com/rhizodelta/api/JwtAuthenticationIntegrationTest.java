@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -78,6 +80,31 @@ class JwtAuthenticationIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(40101))
                 .andExpect(jsonPath("$.message").value("token expired"));
+    }
+
+    @Test
+    void userRoleCanAccessGetNodes() throws Exception {
+        when(nodeQueryService.getNodeSummaryById(TEST_NODE_ID))
+                .thenReturn(new NodeQueryService.LineageNode(
+                        TEST_NODE_ID.toString(), "Human_Post", "test content", null,
+                        "author-1", null, Instant.now(), false
+                ));
+
+        mockMvc.perform(get("/api/nodes/" + TEST_NODE_ID)
+                        .header("Authorization", "Bearer " + generateValidToken("user-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.node_id").value(TEST_NODE_ID.toString()));
+    }
+
+    @Test
+    void userRoleCannotPostDecisionsMerge() throws Exception {
+        mockMvc.perform(post("/api/decisions/merge")
+                        .header("Authorization", "Bearer " + generateValidToken("user-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision_id\":\"test\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40301))
+                .andExpect(jsonPath("$.message").value("insufficient permissions"));
     }
 
     private String generateValidToken(String subject) {

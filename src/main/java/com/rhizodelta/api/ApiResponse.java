@@ -4,6 +4,7 @@ public record ApiResponse<T>(Integer code, String message, T data) {
     private static final int SUCCESS_CODE = 0;
     private static final int BAD_REQUEST_CODE = 40001;
     private static final int UNAUTHORIZED_CODE = 40101;
+    private static final int FORBIDDEN_CODE = 40301;
     private static final int CONFLICT_CODE = 40901;
     private static final int NOT_FOUND_CODE = 40401;
     private static final int INTERNAL_ERROR_CODE = 50001;
@@ -18,6 +19,10 @@ public record ApiResponse<T>(Integer code, String message, T data) {
 
     public static <T> ApiResponse<T> unauthorized(String message) {
         return new ApiResponse<>(UNAUTHORIZED_CODE, message, null);
+    }
+
+    public static <T> ApiResponse<T> forbidden(String message) {
+        return new ApiResponse<>(FORBIDDEN_CODE, message, null);
     }
 
     public static <T> ApiResponse<T> conflict(String message) {
