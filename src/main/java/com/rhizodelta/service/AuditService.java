@@ -30,9 +30,16 @@ public class AuditService {
     static final int MAX_LIMIT = 100;
 
     private static final String LIST_DECISIONS_QUERY = """
-            MATCH (decision:GraphNode)-[rel:MERGED_INTO|BRANCHED_FROM]->(source:GraphNode)
+            MATCH (decision:GraphNode)-[rel:MERGED_INTO|BRANCHED_FROM|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM]->(source:GraphNode)
             WITH decision, source, rel,
-                 CASE WHEN type(rel) = 'MERGED_INTO' THEN 'MERGE' ELSE 'BRANCH' END AS decisionType,
+                 CASE type(rel)
+                   WHEN 'MERGED_INTO' THEN 'MERGE'
+                   WHEN 'BRANCHED_FROM' THEN 'BRANCH'
+                   WHEN 'CONTINUES_FROM' THEN 'INJECT'
+                   WHEN 'CONVERGED_FROM' THEN 'JOIN'
+                   WHEN 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
+                   WHEN 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
+                 END AS decisionType,
                  coalesce(rel.decision_id, decision.decision_id) AS decisionId,
                  rel.created_at AS createdAt
             WHERE decisionId IS NOT NULL
@@ -60,13 +67,20 @@ public class AuditService {
             """;
 
     private static final String GET_DECISION_DETAIL_QUERY = """
-            MATCH (decision:GraphNode {decision_id: $decisionId})-[rel:MERGED_INTO|BRANCHED_FROM]->(source:GraphNode)
+            MATCH (decision:GraphNode {decision_id: $decisionId})-[rel:MERGED_INTO|BRANCHED_FROM|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM]->(source:GraphNode)
             WHERE NOT coalesce(decision._deleted, false)
               AND NOT coalesce(source._deleted, false)
             OPTIONAL MATCH (decision)-[:SYNTHESIZED_FROM]->(contributor:Human_Post)
             WITH decision, source, rel, [id IN collect(DISTINCT contributor.node_id) WHERE id IS NOT NULL] AS synthesizedFrom
             RETURN coalesce(rel.decision_id, decision.decision_id) AS decisionId,
-                   CASE WHEN type(rel) = 'MERGED_INTO' THEN 'MERGE' ELSE 'BRANCH' END AS decisionType,
+                   CASE type(rel)
+                     WHEN 'MERGED_INTO' THEN 'MERGE'
+                     WHEN 'BRANCHED_FROM' THEN 'BRANCH'
+                     WHEN 'CONTINUES_FROM' THEN 'INJECT'
+                     WHEN 'CONVERGED_FROM' THEN 'JOIN'
+                     WHEN 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
+                     WHEN 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
+                   END AS decisionType,
                    decision.node_id AS nodeId,
                    source.node_id AS sourceNodeId,
                    rel.operator_type AS operatorType,
@@ -217,7 +231,7 @@ public class AuditService {
         try {
             return DecisionType.valueOf(rawType.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Invalid decision type. Allowed values: MERGE, BRANCH", exception);
+            throw new IllegalArgumentException("Invalid decision type. Allowed values: MERGE, BRANCH, INJECT, MATERIALIZE, FORK, CROSS_SYNTH, JOIN", exception);
         }
     }
 

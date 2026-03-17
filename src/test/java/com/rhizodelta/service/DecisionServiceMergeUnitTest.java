@@ -7,6 +7,7 @@ import com.rhizodelta.exception.DagIntegrityViolationException;
 
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
+import com.rhizodelta.repository.ResultRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
@@ -40,6 +41,9 @@ class DecisionServiceMergeUnitTest {
     private AIConsensusRepository aiConsensusRepository;
 
     @Mock
+    private ResultRepository resultRepository;
+
+    @Mock
     private DagIntegrityService dagIntegrityService;
 
     @Mock
@@ -52,6 +56,7 @@ class DecisionServiceMergeUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
+                resultRepository,
                 dagIntegrityService,
                 eventPublisher
         );
@@ -73,6 +78,7 @@ class DecisionServiceMergeUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
+                resultRepository,
                 dagIntegrityService,
                 eventPublisher
         );
@@ -95,6 +101,7 @@ class DecisionServiceMergeUnitTest {
                 neo4jClient,
                 humanPostRepository,
                 aiConsensusRepository,
+                resultRepository,
                 dagIntegrityService,
                 eventPublisher
         );

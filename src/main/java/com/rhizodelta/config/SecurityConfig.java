@@ -35,6 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/decisions/fork/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/associations/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/**").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/associations").hasAnyRole("AGENT", "ADMIN")

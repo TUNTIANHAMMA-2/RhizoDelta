@@ -2,8 +2,10 @@ package com.rhizodelta.service;
 
 import com.rhizodelta.domain.node.AIConsensus;
 import com.rhizodelta.domain.node.HumanPost;
+import com.rhizodelta.domain.node.Result;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
+import com.rhizodelta.repository.ResultRepository;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +31,7 @@ public class NodeQueryService {
     private static final int NO_LIMIT = Integer.MAX_VALUE;
 
     private static final String LINEAGE_QUERY = """
-            MATCH path = (start:GraphNode {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO*0..50]->(ancestor)
+            MATCH path = (start:GraphNode {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM*0..50]->(ancestor)
             WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
@@ -41,7 +43,7 @@ public class NodeQueryService {
                  [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
             WITH [node IN filteredNodes | {
                   nodeId: toString(node.node_id),
-                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
+                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' WHEN 'Result' IN labels(node) THEN 'Result' ELSE 'AI_Consensus' END,
                   content: node.content,
                   summaryContent: node.summary_content,
                   authorId: node.author_id,
@@ -60,7 +62,7 @@ public class NodeQueryService {
             """;
 
     private static final String CHILDREN_QUERY = """
-            MATCH path = (start:GraphNode {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO*0..50]-(descendant)
+            MATCH path = (start:GraphNode {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM*0..50]-(descendant)
             WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
@@ -72,7 +74,7 @@ public class NodeQueryService {
                  [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
             WITH [node IN filteredNodes | {
                   nodeId: toString(node.node_id),
-                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' ELSE 'AI_Consensus' END,
+                  label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' WHEN 'Result' IN labels(node) THEN 'Result' ELSE 'AI_Consensus' END,
                   content: node.content,
                   summaryContent: node.summary_content,
                   authorId: node.author_id,
@@ -95,7 +97,7 @@ public class NodeQueryService {
             WHERE NOT coalesce(n._deleted, false)
             WITH n, labels(n) AS nodeLabels
             RETURN n.node_id AS nodeId,
-                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' ELSE 'AI_Consensus' END AS label,
+                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    n.content AS content,
                    n.summary_content AS summaryContent,
                    n.author_id AS authorId,
@@ -107,7 +109,7 @@ public class NodeQueryService {
     private static final String NODE_TYPE_QUERY = """
             MATCH (n:GraphNode {node_id: $nodeId})
             WHERE NOT coalesce(n._deleted, false)
-            RETURN CASE WHEN 'Human_Post' IN labels(n) THEN 'Human_Post' ELSE 'AI_Consensus' END AS label
+            RETURN CASE WHEN 'Human_Post' IN labels(n) THEN 'Human_Post' WHEN 'Result' IN labels(n) THEN 'Result' ELSE 'AI_Consensus' END AS label
             """;
 
     private static final String PROVENANCE_SUMMARY_QUERY = """
@@ -128,13 +130,16 @@ public class NodeQueryService {
 
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
+    private final ResultRepository resultRepository;
     private final Neo4jClient neo4jClient;
 
     public NodeQueryService(HumanPostRepository humanPostRepository,
                             AIConsensusRepository aiConsensusRepository,
+                            ResultRepository resultRepository,
                             Neo4jClient neo4jClient) {
         this.humanPostRepository = humanPostRepository;
         this.aiConsensusRepository = aiConsensusRepository;
+        this.resultRepository = resultRepository;
         this.neo4jClient = neo4jClient;
     }
 
@@ -145,6 +150,7 @@ public class NodeQueryService {
         return humanPostRepository.findActiveByNodeId(nodeId)
                 .<NodeResult>map(HumanPostNode::new)
                 .or(() -> aiConsensusRepository.findActiveByNodeId(nodeId).map(AIConsensusNode::new))
+                .or(() -> resultRepository.findActiveByNodeId(nodeId).map(ResultNode::new))
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
@@ -466,13 +472,16 @@ public class NodeQueryService {
         return null;
     }
 
-    public sealed interface NodeResult permits HumanPostNode, AIConsensusNode {
+    public sealed interface NodeResult permits HumanPostNode, AIConsensusNode, ResultNode {
     }
 
     public record HumanPostNode(HumanPost node) implements NodeResult {
     }
 
     public record AIConsensusNode(AIConsensus node) implements NodeResult {
+    }
+
+    public record ResultNode(Result node) implements NodeResult {
     }
 
     public record GraphTopology(

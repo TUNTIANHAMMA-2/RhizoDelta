@@ -238,6 +238,220 @@ class DecisionApiIntegrationTest {
                 .contains(mergeNodeId, sourceNodeId.toString());
     }
 
+    // --- Inject ---
+
+    @Test
+    void shouldCreateInjectDecisionWithContinuesFromRelationship() {
+        UUID sourceNodeId = UUID.randomUUID();
+        createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
+
+        String decisionId = "inject-int-001";
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/inject",
+                injectRequest(decisionId, sourceNodeId, "injected content"),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("status")).isEqualTo("QUEUED");
+
+        Map<String, Object> record = neo4jClient.query("""
+                MATCH (decision:Human_Post {decision_id: $decisionId})-[rel:CONTINUES_FROM]->(source:GraphNode {node_id: $sourceNodeId})
+                RETURN count(rel) AS relCount,
+                       collect(rel.operator_type) AS operatorTypes,
+                       labels(decision) AS labels
+                """)
+                .bind(decisionId).to("decisionId")
+                .bind(sourceNodeId.toString()).to("sourceNodeId")
+                .fetch().all().iterator().next();
+
+        assertThat(asLong(record.get("relCount"))).isEqualTo(1L);
+        assertThat((List<String>) record.get("operatorTypes")).contains("HUMAN");
+        assertThat((List<String>) record.get("labels")).contains("Human_Post", "GraphNode");
+    }
+
+    // --- Materialize ---
+
+    @Test
+    void shouldCreateMaterializeDecisionWithResultNode() {
+        UUID sourceNodeId = UUID.randomUUID();
+        createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
+
+        String decisionId = "materialize-int-001";
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/materialize",
+                materializeRequest(decisionId, sourceNodeId, "materialized content"),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("status")).isEqualTo("QUEUED");
+        String resultNodeId = (String) bodyData(response).get("node_id");
+
+        Map<String, Object> record = neo4jClient.query("""
+                MATCH (result:Result {decision_id: $decisionId})-[rel:MATERIALIZED_FROM]->(source:GraphNode {node_id: $sourceNodeId})
+                RETURN count(rel) AS relCount,
+                       labels(result) AS labels,
+                       toString(result.node_id) AS resultNodeId
+                """)
+                .bind(decisionId).to("decisionId")
+                .bind(sourceNodeId.toString()).to("sourceNodeId")
+                .fetch().all().iterator().next();
+
+        assertThat(asLong(record.get("relCount"))).isEqualTo(1L);
+        assertThat((List<String>) record.get("labels")).contains("Result", "GraphNode");
+        assertThat(record.get("resultNodeId")).isEqualTo(resultNodeId);
+    }
+
+    @Test
+    void shouldLookupResultNodeById() {
+        UUID sourceNodeId = UUID.randomUUID();
+        createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
+
+        ResponseEntity<Map> matResponse = restTemplate.postForEntity(
+                "/api/decisions/materialize",
+                materializeRequest("mat-lookup-001", sourceNodeId, "materialized"),
+                Map.class
+        );
+        String resultNodeId = (String) bodyData(matResponse).get("node_id");
+
+        ResponseEntity<Map> nodeResponse = restTemplate.getForEntity("/api/nodes/" + resultNodeId, Map.class);
+        assertThat(nodeResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> nodeData = (Map<String, Object>) nodeResponse.getBody().get("data");
+        assertThat(nodeData.get("label")).isEqualTo("Result");
+    }
+
+    // --- Fork ---
+
+    @Test
+    void shouldCreateForkWithMultipleBranches() {
+        UUID sourceNodeId = UUID.randomUUID();
+        createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/fork",
+                forkRequest("fork-int-op-001", sourceNodeId),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("status")).isEqualTo("QUEUED");
+        assertThat(bodyData(response).get("operation_id")).isEqualTo("fork-int-op-001");
+
+        // Verify all branches have BRANCHED_FROM relationship
+        long branchCount = neo4jClient.query("""
+                MATCH (n:Human_Post {operation_id: $operationId})-[:BRANCHED_FROM]->(source:GraphNode {node_id: $sourceNodeId})
+                RETURN count(n) AS branchCount
+                """)
+                .bind("fork-int-op-001").to("operationId")
+                .bind(sourceNodeId.toString()).to("sourceNodeId")
+                .fetchAs(Long.class).one().orElse(0L);
+
+        assertThat(branchCount).isEqualTo(2L);
+    }
+
+    // --- CrossSynth ---
+
+    @Test
+    void shouldCreateCrossSynthFromMultipleResults() {
+        UUID sourceNodeId = UUID.randomUUID();
+        createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
+
+        // Create two Result nodes via materialize
+        ResponseEntity<Map> mat1 = restTemplate.postForEntity(
+                "/api/decisions/materialize",
+                materializeRequest("cs-mat-001", sourceNodeId, "result 1"),
+                Map.class
+        );
+        ResponseEntity<Map> mat2 = restTemplate.postForEntity(
+                "/api/decisions/materialize",
+                materializeRequest("cs-mat-002", sourceNodeId, "result 2"),
+                Map.class
+        );
+        UUID resultId1 = UUID.fromString((String) bodyData(mat1).get("node_id"));
+        UUID resultId2 = UUID.fromString((String) bodyData(mat2).get("node_id"));
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/cross-synth",
+                crossSynthRequest("cs-int-001", List.of(resultId1, resultId2)),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("status")).isEqualTo("QUEUED");
+
+        long crossSynthCount = neo4jClient.query("""
+                MATCH (r:Result {decision_id: $decisionId})-[:CROSS_SYNTHESIZED_FROM]->(source:Result)
+                RETURN count(source) AS crossSynthCount
+                """)
+                .bind("cs-int-001").to("decisionId")
+                .fetchAs(Long.class).one().orElse(0L);
+
+        assertThat(crossSynthCount).isEqualTo(2L);
+    }
+
+    // --- Join ---
+
+    @Test
+    void shouldCreateJoinDecisionWithConvergedFromRelationships() {
+        UUID sourceA = UUID.randomUUID();
+        UUID sourceB = UUID.randomUUID();
+        createHumanPostNode(sourceA, "req-a", "author-a", "content a", null);
+        createHumanPostNode(sourceB, "req-b", "author-b", "content b", null);
+
+        String decisionId = "join-int-001";
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/join",
+                joinRequest(decisionId, List.of(sourceA, sourceB)),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(bodyData(response).get("status")).isEqualTo("QUEUED");
+
+        Map<String, Object> record = neo4jClient.query("""
+                MATCH (decision:AI_Consensus {decision_id: $decisionId})-[rel:CONVERGED_FROM]->(source:GraphNode)
+                RETURN count(rel) AS convergedCount,
+                       collect(toString(source.node_id)) AS sourceIds
+                """)
+                .bind(decisionId).to("decisionId")
+                .fetch().all().iterator().next();
+
+        assertThat(asLong(record.get("convergedCount"))).isEqualTo(2L);
+        assertThat((List<String>) record.get("sourceIds"))
+                .containsExactlyInAnyOrder(sourceA.toString(), sourceB.toString());
+    }
+
+    // --- Lineage with new relationship types ---
+
+    @Test
+    void lineageShouldIncludeInjectAndJoinRelationships() {
+        UUID rootNodeId = UUID.randomUUID();
+        createHumanPostNode(rootNodeId, "req-root", "author-root", "root", null);
+
+        // Inject from root
+        ResponseEntity<Map> injectResponse = restTemplate.postForEntity(
+                "/api/decisions/inject",
+                injectRequest("lineage-inject-001", rootNodeId, "injected"),
+                Map.class
+        );
+        String injectNodeId = (String) bodyData(injectResponse).get("node_id");
+
+        // Verify lineage from injected node includes root
+        ResponseEntity<Map> lineage = restTemplate.getForEntity(
+                "/api/nodes/" + injectNodeId + "/lineage?max_depth=10", Map.class);
+
+        assertThat(lineage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> topology = (Map<String, Object>) lineage.getBody().get("data");
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) topology.get("nodes");
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) topology.get("edges");
+
+        assertThat(nodes).extracting(n -> n.get("node_id"))
+                .contains(injectNodeId, rootNodeId.toString());
+        assertThat(edges).extracting(e -> e.get("type"))
+                .contains("CONTINUES_FROM");
+    }
+
     private Map<String, Object> mergeRequest(String decisionId, UUID sourceNodeId, List<UUID> synthesizedFrom) {
         return Map.of(
                 "decision_id", decisionId,
@@ -262,6 +476,71 @@ class DecisionApiIntegrationTest {
                 "operator_type", "HUMAN",
                 "operator_id", "human-1",
                 "reason", "branch"
+        );
+    }
+
+    private Map<String, Object> injectRequest(String decisionId, UUID sourceNodeId, String content) {
+        return Map.of(
+                "decision_id", decisionId,
+                "request_id", "req-" + decisionId,
+                "source_node_id", sourceNodeId.toString(),
+                "content", content,
+                "author_id", "author-1",
+                "operator_type", "HUMAN",
+                "operator_id", "human-1",
+                "reason", "inject"
+        );
+    }
+
+    private Map<String, Object> materializeRequest(String decisionId, UUID sourceNodeId, String content) {
+        return Map.of(
+                "decision_id", decisionId,
+                "request_id", "req-" + decisionId,
+                "source_node_id", sourceNodeId.toString(),
+                "content", content,
+                "operator_type", "AGENT",
+                "operator_id", "agent-1",
+                "reason", "materialize"
+        );
+    }
+
+    private Map<String, Object> forkRequest(String operationId, UUID sourceNodeId) {
+        return Map.of(
+                "operation_id", operationId,
+                "request_id", "req-" + operationId,
+                "source_node_id", sourceNodeId.toString(),
+                "branches", List.of(
+                        Map.of("decision_id", "fork-b1", "content", "branch A", "author_id", "author-a"),
+                        Map.of("decision_id", "fork-b2", "content", "branch B", "author_id", "author-b")
+                ),
+                "operator_type", "AGENT",
+                "operator_id", "agent-1",
+                "reason", "fork"
+        );
+    }
+
+    private Map<String, Object> crossSynthRequest(String decisionId, List<UUID> sourceResultIds) {
+        return Map.of(
+                "decision_id", decisionId,
+                "request_id", "req-" + decisionId,
+                "source_result_ids", sourceResultIds.stream().map(UUID::toString).toList(),
+                "content", "cross-synthesized content",
+                "operator_type", "AGENT",
+                "operator_id", "agent-1",
+                "reason", "cross-synth"
+        );
+    }
+
+    private Map<String, Object> joinRequest(String decisionId, List<UUID> sourceNodeIds) {
+        return Map.of(
+                "decision_id", decisionId,
+                "request_id", "req-" + decisionId,
+                "source_node_ids", sourceNodeIds.stream().map(UUID::toString).toList(),
+                "summary_content", "joined summary",
+                "agent_version", "gpt-4.1",
+                "operator_type", "AGENT",
+                "operator_id", "agent-1",
+                "reason", "join"
         );
     }
 

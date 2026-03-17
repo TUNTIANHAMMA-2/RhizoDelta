@@ -14,7 +14,15 @@ public class DagIntegrityService {
     private static final String CYCLE_CHECK_QUERY = """
             MATCH (target:GraphNode {node_id: $targetNodeId})
             OPTIONAL MATCH path = shortestPath(
-                (target)-[:BRANCHED_FROM|MERGED_INTO*1..%d]->(source:GraphNode {node_id: $sourceNodeId})
+                (target)-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM*1..%d]->(source:GraphNode {node_id: $sourceNodeId})
+            )
+            RETURN path IS NOT NULL AS hasCycle
+            """.formatted(MAX_ALLOWED_DEPTH);
+
+    private static final String RESULT_CYCLE_CHECK_QUERY = """
+            MATCH (target:Result:GraphNode {node_id: $targetNodeId})
+            OPTIONAL MATCH path = shortestPath(
+                (target)-[:CROSS_SYNTHESIZED_FROM*1..%d]->(source:Result:GraphNode {node_id: $sourceNodeId})
             )
             RETURN path IS NOT NULL AS hasCycle
             """.formatted(MAX_ALLOWED_DEPTH);
@@ -33,13 +41,26 @@ public class DagIntegrityService {
             throw new DagIntegrityViolationException("source_node_id and target_node_id must not be the same");
         }
 
-        if (hasPathFromTargetToSource(source, target)) {
+        if (hasPathFromTargetToSource(CYCLE_CHECK_QUERY, source, target)) {
             throw new DagIntegrityViolationException("cycle detected for version evolution relationship");
         }
     }
 
-    private boolean hasPathFromTargetToSource(UUID sourceNodeId, UUID targetNodeId) {
-        return neo4jClient.query(CYCLE_CHECK_QUERY)
+    public void assertNoResultLayerCycle(UUID newResultNodeId, UUID sourceResultNodeId) {
+        UUID source = requireNodeId(newResultNodeId, "newResultNodeId");
+        UUID target = requireNodeId(sourceResultNodeId, "sourceResultNodeId");
+
+        if (source.equals(target)) {
+            throw new DagIntegrityViolationException("result node cannot reference itself via CROSS_SYNTHESIZED_FROM");
+        }
+
+        if (hasPathFromTargetToSource(RESULT_CYCLE_CHECK_QUERY, source, target)) {
+            throw new DagIntegrityViolationException("cycle detected in Result layer via CROSS_SYNTHESIZED_FROM");
+        }
+    }
+
+    private boolean hasPathFromTargetToSource(String query, UUID sourceNodeId, UUID targetNodeId) {
+        return neo4jClient.query(query)
                 .bind(targetNodeId.toString())
                 .to("targetNodeId")
                 .bind(sourceNodeId.toString())

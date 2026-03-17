@@ -23,4 +23,48 @@ public sealed interface DecisionCommittedEvent {
             OffsetDateTime relationshipCreatedAt
     ) implements DecisionCommittedEvent {
     }
+
+    record InjectCompleted(
+            String decisionId,
+            UUID nodeId,
+            UUID sourceNodeId,
+            String content,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
+
+    record MaterializeCompleted(
+            String decisionId,
+            UUID nodeId,
+            UUID sourceNodeId,
+            String content,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
+
+    record ForkCompleted(
+            String operationId,
+            List<UUID> nodeIds,
+            UUID sourceNodeId,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
+
+    record CrossSynthCompleted(
+            String decisionId,
+            UUID nodeId,
+            List<UUID> sourceResultIds,
+            String content,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
+
+    record JoinCompleted(
+            String decisionId,
+            UUID nodeId,
+            List<UUID> sourceNodeIds,
+            String summaryContent,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
 }

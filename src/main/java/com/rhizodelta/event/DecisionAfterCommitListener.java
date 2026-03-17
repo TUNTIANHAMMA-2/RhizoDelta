@@ -62,12 +62,67 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.BRANCH, event.decisionId());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onInjectCompleted(DecisionCommittedEvent.InjectCompleted event) {
+        publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "CONTINUES_FROM", event.relationshipCreatedAt());
+        publishDecisionComplete(event.nodeId(), DecisionType.INJECT, event.decisionId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onMaterializeCompleted(DecisionCommittedEvent.MaterializeCompleted event) {
+        CompletableFuture.runAsync(
+                () -> writeResultEmbedding(event.nodeId(), event.content(), event.decisionId()),
+                embeddingTaskExecutor);
+        publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "MATERIALIZED_FROM", event.relationshipCreatedAt());
+        publishDecisionComplete(event.nodeId(), DecisionType.MATERIALIZE, event.decisionId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onForkCompleted(DecisionCommittedEvent.ForkCompleted event) {
+        for (UUID nodeId : event.nodeIds()) {
+            publishEdgeCreated(nodeId, event.sourceNodeId(), "BRANCHED_FROM", event.relationshipCreatedAt());
+        }
+        publishDecisionComplete(event.sourceNodeId(), DecisionType.FORK, event.operationId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCrossSynthCompleted(DecisionCommittedEvent.CrossSynthCompleted event) {
+        CompletableFuture.runAsync(
+                () -> writeResultEmbedding(event.nodeId(), event.content(), event.decisionId()),
+                embeddingTaskExecutor);
+        for (UUID sourceResultId : event.sourceResultIds()) {
+            publishEdgeCreated(event.nodeId(), sourceResultId, "CROSS_SYNTHESIZED_FROM", event.relationshipCreatedAt());
+        }
+        publishDecisionComplete(event.nodeId(), DecisionType.CROSS_SYNTH, event.decisionId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onJoinCompleted(DecisionCommittedEvent.JoinCompleted event) {
+        CompletableFuture.runAsync(
+                () -> writeConsensusEmbedding(event.nodeId(), event.summaryContent(), event.decisionId()),
+                embeddingTaskExecutor);
+        for (UUID sourceNodeId : event.sourceNodeIds()) {
+            publishEdgeCreated(event.nodeId(), sourceNodeId, "CONVERGED_FROM", event.relationshipCreatedAt());
+        }
+        publishDecisionComplete(event.nodeId(), DecisionType.JOIN, event.decisionId());
+    }
+
     private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
         try {
             List<Float> vector = embeddingModelService.embed(summaryContent);
             embeddingService.writeEmbedding(nodeId.toString(), vector);
         } catch (Exception exception) {
             LOGGER.error("Failed to generate embedding for AI_Consensus node_id={}, decision_id={}",
+                    nodeId, decisionId, exception);
+        }
+    }
+
+    private void writeResultEmbedding(UUID nodeId, String content, String decisionId) {
+        try {
+            List<Float> vector = embeddingModelService.embed(content);
+            embeddingService.writeEmbedding(nodeId.toString(), vector);
+        } catch (Exception exception) {
+            LOGGER.error("Failed to generate embedding for Result node_id={}, decision_id={}",
                     nodeId, decisionId, exception);
         }
     }
