@@ -1,0 +1,108 @@
+/* ── 节点通用样式 ── */
+.node-card {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  max-width: 320px;
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-radius var(--transition-normal),
+    width var(--transition-normal),
+    height var(--transition-normal);
+  cursor: pointer;
+}
+
+.node-card:hover {
+  background: var(--color-bg-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.node-card.selected {
+  box-shadow: var(--shadow-node-selected);
+}
+
+/* 左边框类型色 */
+.node-card--human {
+  border-left: 2px solid var(--color-node-human);
+}
+
+.node-card--consensus {
+  border-left: 2px solid var(--color-node-consensus);
+}
+
+.node-card--result {
+  border-left: 2px solid var(--color-node-result);
+}
+
+/* ── 节点内部 ── */
+.node-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.node-card__body {
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── 圆形态（远景/中景） ── */
+.node-circle {
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border-default);
+  transition:
+    border-radius var(--transition-normal),
+    width var(--transition-normal),
+    height var(--transition-normal);
+  cursor: pointer;
+}
+
+.node-circle:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.node-circle--sm {
+  width: 40px;
+  height: 40px;
+}
+
+.node-circle--md {
+  width: 60px;
+  height: 60px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 var(--space-2);
+}
+
+/* ── 边 ── */
+.version-edge-tooltip {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
