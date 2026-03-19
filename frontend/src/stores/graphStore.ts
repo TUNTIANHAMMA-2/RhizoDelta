@@ -30,6 +30,10 @@ export interface GraphState {
 
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
+
+  // Optimistic UI
+  addOptimisticNode: (tempId: string, position: { x: number; y: number }, label: string) => void;
+  resolveOptimisticNode: (tempId: string, realNode: GraphNodeDTO) => void;
 }
 
 export const useGraphStore = create<GraphState>((set, get) => ({
@@ -119,5 +123,37 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       edges: [...get().edges, edge],
       rfEdges: [...get().rfEdges, rfEdge],
     });
+  },
+
+  addOptimisticNode: (tempId, position, label) => {
+    const rfNode: Node = {
+      id: tempId,
+      type: label === "AI_Consensus" ? "consensus" : label === "Result" ? "result" : "humanPost",
+      position,
+      data: {
+        node_id: tempId,
+        label,
+        content: null,
+        summary_content: null,
+        author_id: null,
+        agent_version: null,
+        operation_id: null,
+        created_at: new Date().toISOString(),
+        has_embedding: false,
+        isOptimistic: true,
+      },
+    };
+    set({ rfNodes: [...get().rfNodes, rfNode] });
+  },
+
+  resolveOptimisticNode: (tempId, realNode) => {
+    const nodesMap = new Map(get().nodes);
+    nodesMap.set(realNode.node_id, realNode);
+    const rfNodes = get().rfNodes.map((n) =>
+      n.id === tempId
+        ? { ...toRfNode(realNode), position: n.position }
+        : n,
+    );
+    set({ nodes: nodesMap, rfNodes });
   },
 }));

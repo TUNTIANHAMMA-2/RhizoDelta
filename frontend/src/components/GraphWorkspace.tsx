@@ -47,7 +47,7 @@ export function GraphWorkspace() {
       </button>
 
       {/* Left sidebar — overlay on mobile */}
-      {leftSidebarOpen && (
+      {leftSidebarOpen ? (
         <>
           <RhizoneList />
           {/* Mobile backdrop */}
@@ -66,6 +66,31 @@ export function GraphWorkspace() {
             }}
           />
         </>
+      ) : (
+        /* Collapsed: show expand button */
+        <button
+          onClick={toggleLeftSidebar}
+          style={{
+            position: "fixed",
+            top: 48,
+            left: 0,
+            zIndex: 50,
+            background: "rgba(250, 250, 248, 0.85)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid var(--color-border-default)",
+            borderLeft: "none",
+            borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
+            padding: "var(--space-2) var(--space-1)",
+            cursor: "pointer",
+            color: "var(--color-text-secondary)",
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-sm)",
+            lineHeight: 1,
+          }}
+          aria-label="展开侧边栏"
+        >
+          &raquo;
+        </button>
       )}
 
       {/* Canvas */}

@@ -1,9 +1,11 @@
-import { useState } from "react";
-import MDEditor from "@uiw/react-md-editor";
+import { useState, Suspense, lazy } from "react";
 import rehypeSanitize from "rehype-sanitize";
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { createPost } from "../../api/posts";
+import { Skeleton } from "../feedback/Skeleton";
+
+const MDEditor = lazy(() => import("@uiw/react-md-editor"));
 
 export function PostForm() {
   const [content, setContent] = useState("");
@@ -57,13 +59,15 @@ export function PostForm() {
           borderRadius: "var(--radius-sm)",
         }}
       >
-        <MDEditor
-          value={content}
-          onChange={(val) => setContent(val ?? "")}
-          preview="edit"
-          height={200}
-          previewOptions={{ rehypePlugins: [[rehypeSanitize]] }}
-        />
+        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
+          <MDEditor
+            value={content}
+            onChange={(val) => setContent(val ?? "")}
+            preview="edit"
+            height={200}
+            previewOptions={{ rehypePlugins: [[rehypeSanitize]] }}
+          />
+        </Suspense>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button

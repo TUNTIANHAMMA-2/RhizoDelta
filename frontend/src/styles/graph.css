@@ -106,3 +106,134 @@
   box-shadow: var(--shadow-sm);
   pointer-events: none;
 }
+
+/* ── 占位节点（乐观更新） ── */
+.node-card--optimistic {
+  opacity: 0.5;
+  border-style: dashed;
+  pointer-events: none;
+}
+
+/* ── 邻居高亮：非相关节点/边淡化 ── */
+.node-card--dimmed,
+.node-circle--dimmed {
+  opacity: 0.2;
+  transition: opacity var(--transition-normal);
+}
+
+/* ── SSE 状态动画 ── */
+.sse-indicator--connecting {
+  animation: sse-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.sse-indicator--disconnected {
+  animation: sse-blink 1s steps(2, start) infinite;
+}
+@keyframes sse-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes sse-blink {
+  to { visibility: hidden; }
+}
+
+/* ── 通用按钮样式 ── */
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-secondary {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) var(--space-4);
+}
+.btn-secondary:hover { color: var(--color-text-primary); }
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-text-danger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-danger);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+.btn-text-danger:hover { text-decoration: underline; }
+
+/* ── 面板通用 ── */
+.rd-panel {
+  background: var(--color-bg-primary);
+  border-left: 1px solid var(--color-border-default);
+  font-family: var(--font-ui);
+  overscroll-behavior: contain;
+}
+
+.rd-panel-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── 表单通用 ── */
+.rd-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-primary);
+  transition: border-color var(--transition-fast);
+}
+.rd-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.rd-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.rd-md-editor-wrapper {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+}
+
+/* ── 移动端 ── */
+@media (max-width: 1024px) {
+  .react-flow__minimap {
+    display: none !important;
+  }
+  .rd-panel {
+    border-left: none;
+    border-top: 1px solid var(--color-border-default);
+  }
+}

@@ -1,9 +1,11 @@
-import { useState } from "react";
-import MDEditor from "@uiw/react-md-editor";
+import { useState, Suspense, lazy } from "react";
 import rehypeSanitize from "rehype-sanitize";
 import { useUiStore } from "../../stores/uiStore";
 import { useAuthStore } from "../../stores/authStore";
 import { executeInject } from "../../api/decisions";
+import { Skeleton } from "../feedback/Skeleton";
+
+const MDEditor = lazy(() => import("@uiw/react-md-editor"));
 
 interface Props {
   sourceNodeId: string;
@@ -125,6 +127,7 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
             borderRadius: "var(--radius-sm)",
           }}
         >
+        <Suspense fallback={<Skeleton variant="rectangular" height={180} />}>
           <MDEditor
             value={content}
             onChange={(val) => setContent(val ?? "")}
@@ -132,6 +135,7 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
             height={180}
             previewOptions={{ rehypePlugins: [[rehypeSanitize]] }}
           />
+        </Suspense>
         </div>
       </div>
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>

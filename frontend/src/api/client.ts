@@ -15,9 +15,31 @@ export async function request<T>(
       ...options?.headers,
     },
   });
-  const body: ApiResponse<T> = await res.json();
+
+  // Handle non-OK responses
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      text || `Request failed: ${res.status} ${res.statusText}`,
+    );
+  }
+
+  // Handle empty body (e.g. 202 Accepted, 204 No Content)
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  // Parse JSON
+  let body: ApiResponse<T>;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid JSON response from ${path}`);
+  }
+
   if (body.code !== 0) {
-    throw new Error(body.message);
+    throw new Error(body.message || `API error: code ${body.code}`);
   }
   return body.data;
 }

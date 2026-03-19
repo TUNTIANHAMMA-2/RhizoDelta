@@ -16,10 +16,11 @@ export interface UiState {
   rightPanelMode: RightPanelMode;
   rightPanelPayload: {
     nodeId: string;
-    formType?: "inject" | "fork";
+    formType?: "inject" | "fork" | "post";
   } | null;
   openDetailPanel: (nodeId: string) => void;
   openEditPanel: (nodeId: string, formType: "inject" | "fork") => void;
+  openPostPanel: () => void;
   closeRightPanel: () => void;
 
   headerExpanded: boolean;
@@ -55,6 +56,8 @@ export const useUiStore = create<UiState>((set) => ({
     set({ rightPanelMode: "detail", rightPanelPayload: { nodeId } }),
   openEditPanel: (nodeId, formType) =>
     set({ rightPanelMode: "edit", rightPanelPayload: { nodeId, formType } }),
+  openPostPanel: () =>
+    set({ rightPanelMode: "edit", rightPanelPayload: { nodeId: "", formType: "post" } }),
   closeRightPanel: () =>
     set({ rightPanelMode: "hidden", rightPanelPayload: null }),
 

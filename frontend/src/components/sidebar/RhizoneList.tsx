@@ -2,6 +2,7 @@ import { useUiStore } from "../../stores/uiStore";
 
 export function RhizoneList() {
   const toggleSidebar = useUiStore((s) => s.toggleLeftSidebar);
+  const openPostPanel = useUiStore((s) => s.openPostPanel);
 
   return (
     <aside
@@ -13,6 +14,7 @@ export function RhizoneList() {
         display: "flex",
         flexDirection: "column",
         fontFamily: "var(--font-ui)",
+        paddingTop: 40,
       }}
     >
       <div
@@ -39,6 +41,7 @@ export function RhizoneList() {
           &laquo;
         </button>
       </div>
+
       <div
         style={{
           flex: 1,
@@ -50,6 +53,32 @@ export function RhizoneList() {
         }}
       >
         暂无 Rhizone
+      </div>
+
+      {/* 发布观点入口 */}
+      <div
+        style={{
+          padding: "var(--space-3) var(--space-4)",
+          borderTop: "1px solid var(--color-border-default)",
+        }}
+      >
+        <button
+          onClick={openPostPanel}
+          style={{
+            width: "100%",
+            padding: "var(--space-2) var(--space-4)",
+            background: "var(--color-accent)",
+            color: "#fff",
+            border: "none",
+            borderRadius: "var(--radius-sm)",
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-sm)",
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          + 发布观点
+        </button>
       </div>
     </aside>
   );

@@ -30,6 +30,9 @@ export function NodeDetailPanel() {
 
   return (
     <aside
+      className="rd-panel"
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
       style={{
         width: 360,
         minWidth: 360,

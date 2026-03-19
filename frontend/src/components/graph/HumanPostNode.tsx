@@ -6,6 +6,8 @@ export function HumanPostNode({ data, selected }: NodeProps) {
   const node = data as unknown as GraphNodeDTO;
   const zoom = useGraphStore((s) => s.semanticZoom);
 
+  const isOptimistic = (data as any)?.isOptimistic === true;
+
   if (zoom === "micro") {
     return (
       <div
@@ -32,7 +34,7 @@ export function HumanPostNode({ data, selected }: NodeProps) {
   }
 
   return (
-    <div className={`node-card node-card--human${selected ? " selected" : ""}`}>
+    <div className={`node-card node-card--human${selected ? " selected" : ""}${isOptimistic ? " node-card--optimistic" : ""}`}>
       <Handle type="target" position={Position.Top} />
       <div className="node-card__header">
         <span>{node.author_id ?? "Anonymous"}</span>
