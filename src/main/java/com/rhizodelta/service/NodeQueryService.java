@@ -128,6 +128,23 @@ public class NodeQueryService {
             ORDER BY createdAt DESC
             """;
 
+    private static final String ROOTS_QUERY = """
+            MATCH (n:GraphNode)
+            WHERE NOT coalesce(n._deleted, false)
+              AND NOT (n)-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM]->()
+            WITH n, labels(n) AS nodeLabels
+            RETURN n.node_id AS nodeId,
+                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
+                   n.content AS content,
+                   n.summary_content AS summaryContent,
+                   n.author_id AS authorId,
+                   n.agent_version AS agentVersion,
+                   n.created_at AS createdAt,
+                   n.embedding IS NOT NULL AS hasEmbedding
+            ORDER BY createdAt DESC
+            LIMIT $limit
+            """;
+
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
     private final ResultRepository resultRepository;
@@ -220,6 +237,17 @@ public class NodeQueryService {
                 .fetch().all()
                 .stream()
                 .map(NodeQueryService::toLineageNode)
+                .toList();
+    }
+
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public List<LineageNode> getRoots(Integer limit) {
+        int resolvedLimit = limit == null || limit <= 0 ? 50 : limit;
+        return neo4jClient.query(ROOTS_QUERY)
+                .bind(resolvedLimit).to("limit")
+                .fetch().all()
+                .stream()
+                .map(NodeQueryService::toLineageNodeMap)
                 .toList();
     }
 

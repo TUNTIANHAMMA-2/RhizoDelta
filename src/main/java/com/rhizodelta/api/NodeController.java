@@ -40,6 +40,16 @@ public class NodeController {
         this.embeddingService = embeddingService;
     }
 
+    @GetMapping("/roots")
+    public ApiResponse<List<NodePayload>> getRoots(
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        List<NodePayload> roots = nodeQueryService.getRoots(limit).stream()
+                .map(this::fromLineageNode)
+                .toList();
+        return ApiResponse.ok(roots);
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<NodePayload> getNodeById(@PathVariable("id") String id) {
         UUID nodeId = parseUuid(id);
