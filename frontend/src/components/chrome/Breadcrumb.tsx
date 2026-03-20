@@ -22,6 +22,7 @@ export function Breadcrumb() {
       style={{
         color: "var(--color-text-tertiary)",
         margin: "0 var(--space-1)",
+        flexShrink: 0,
       }}
     >
       /
@@ -35,6 +36,9 @@ export function Breadcrumb() {
         alignItems: "center",
         fontFamily: "var(--font-ui)",
         fontSize: "var(--font-size-sm)",
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        width: "100%",
       }}
     >
       {rootNodeId && rootNodeId !== selectedNodeId && (
@@ -49,12 +53,13 @@ export function Breadcrumb() {
               fontFamily: "var(--font-ui)",
               fontSize: "var(--font-size-sm)",
               padding: 0,
+              flexShrink: 0,
             }}
           >
             Root
           </button>
           {separator}
-          <span style={{ color: "var(--color-text-tertiary)" }}>...</span>
+          <span style={{ color: "var(--color-text-tertiary)", flexShrink: 0 }}>...</span>
           {separator}
         </>
       )}
@@ -62,6 +67,8 @@ export function Breadcrumb() {
         style={{
           color: "var(--color-text-primary)",
           fontWeight: 500,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         {selectedNode?.label.replace("_", " ") ?? selectedNodeId.slice(0, 8)}

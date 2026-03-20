@@ -138,7 +138,10 @@ function handleSseEvent(event: SseEvent) {
   switch (event.type) {
     case "NODE_CREATED": {
       const payload: NodeCreatedEvent = JSON.parse(event.data);
-      fetchNode(payload.node_id).then((node) => graphStore.addNode(node));
+      fetchNode(payload.node_id).then((node) => {
+        graphStore.addNode(node);
+        graphStore.loadRhizomes(); // Always refresh in case it's a new root
+      });
       break;
     }
     case "EDGE_CREATED": {
@@ -149,12 +152,45 @@ function handleSseEvent(event: SseEvent) {
         type: payload.type,
         created_at: payload.created_at,
       };
-      graphStore.addEdge(edge);
+
+      // Fetch missing endpoint nodes before adding the edge
+      // (decisions broadcast EDGE_CREATED but not NODE_CREATED)
+      const missing: Promise<void>[] = [];
+      if (!graphStore.nodes.has(payload.source)) {
+        missing.push(
+          fetchNode(payload.source).then((n) => graphStore.addNode(n)),
+        );
+      }
+      if (!graphStore.nodes.has(payload.target)) {
+        missing.push(
+          fetchNode(payload.target).then((n) => graphStore.addNode(n)),
+        );
+      }
+      if (missing.length > 0) {
+        Promise.all(missing).then(() => graphStore.addEdge(edge));
+      } else {
+        graphStore.addEdge(edge);
+      }
       break;
     }
     case "DECISION_COMPLETE": {
-      const _payload: DecisionCompleteEvent = JSON.parse(event.data);
-      // Decision-specific UI updates handled by consumers
+      const payload: DecisionCompleteEvent = JSON.parse(event.data);
+      // Fetch the node created by this decision if not already present
+      if (!graphStore.nodes.has(payload.node_id)) {
+        fetchNode(payload.node_id).then((node) => graphStore.addNode(node));
+      }
+      // Resolve any optimistic placeholder
+      graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, {
+        node_id: payload.node_id,
+        label: "AI_Consensus",
+        content: null,
+        summary_content: null,
+        author_id: null,
+        agent_version: null,
+        operation_id: null,
+        created_at: new Date().toISOString(),
+        has_embedding: false,
+      });
       break;
     }
   }

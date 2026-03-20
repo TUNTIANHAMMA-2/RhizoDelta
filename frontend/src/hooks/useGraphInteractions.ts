@@ -18,8 +18,8 @@ export function useGraphInteractions() {
 
       // Center canvas on selected node
       setCenter(
-        node.position.x + 140,
-        node.position.y + 50,
+        node.position.x,
+        node.position.y,
         { zoom: 1, duration: 600 },
       );
 

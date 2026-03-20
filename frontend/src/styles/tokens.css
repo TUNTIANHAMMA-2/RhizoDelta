@@ -1,22 +1,22 @@
 :root {
   /* ── 色板 ── */
-  --color-bg-primary:       #FAFAF8;
-  --color-bg-secondary:     #F5F5F3;
-  --color-bg-hover:         #EFEDEA;
-  --color-bg-selected:      #E8E6E3;
+  --color-bg-primary:       #FCF9F2;   /* 偏黄的暖白主背景 */
+  --color-bg-secondary:     #F4F0E6;   /* 侧边栏/面板更暖的背景 */
+  --color-bg-hover:         #EBE5D8;   /* 悬浮背景 */
+  --color-bg-selected:      #E1DBCB;   /* 选中背景 */
 
-  --color-text-primary:     #37352F;
-  --color-text-secondary:   #787774;
-  --color-text-tertiary:    #B4B4B0;
+  --color-text-primary:     #37352F;   /* Notion 主文字色 */
+  --color-text-secondary:   #787774;   /* 次要文字 */
+  --color-text-tertiary:    #B4B4B0;   /* 占位/禁用文字 */
 
-  --color-border-default:   #E3E2DE;
-  --color-border-focus:     #37352F;
+  --color-border-default:   #DCD5C4;   /* 更暖的默认边框 */
+  --color-border-focus:     #37352F;   /* 聚焦边框 */
 
-  --color-node-human:       #2E7CF6;
-  --color-node-consensus:   #9B59B6;
-  --color-node-result:      #0D9488;
+  --color-node-human:       #2E7CF6;   /* Human_Post 蓝 */
+  --color-node-consensus:   #9B59B6;   /* AI_Consensus 紫 */
+  --color-node-result:      #0D9488;   /* Result 翡翠绿 */
 
-  --color-edge-default:     #B4B4B0;
+  --color-edge-default:     #C4BCAB;   /* 边默认色（更暖的灰） */
 
   --color-accent:           #2E7CF6;
   --color-danger:           #EB5757;

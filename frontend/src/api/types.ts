@@ -139,7 +139,7 @@ export interface AuditDetail {
   operator_id: string;
   reason: string;
   created_at: string;
-  synthesized_from: string[];
+  synthesized_from?: string[];
 }
 
 export interface AuditListResponse {

@@ -200,41 +200,22 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
       >
         + 添加分支
       </button>
-
-      <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          onClick={onSuccess}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "var(--color-text-secondary)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-          }}
-        >
-          取消
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            background: "var(--color-accent)",
-            color: "#fff",
-            border: "none",
-            padding: "var(--space-2) var(--space-4)",
-            borderRadius: "var(--radius-sm)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-            fontWeight: 500,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting ? 0.6 : 1,
-          }}
-        >
-          {submitting ? "提交中..." : "创建分叉"}
-        </button>
-      </div>
+<div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+  <button
+    className="btn-secondary"
+    type="button"
+    onClick={onSuccess}
+  >
+    取消
+  </button>
+  <button
+    className="btn-primary"
+    type="submit"
+    disabled={submitting}
+  >
+    {submitting ? "创建分叉中..." : "创建分叉"}
+  </button>
+</div>
     </form>
   );
 }

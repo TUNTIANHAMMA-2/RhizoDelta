@@ -71,20 +71,9 @@ export function PostForm() {
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
+          className="btn-primary"
           type="submit"
           disabled={submitting || !content.trim()}
-          style={{
-            background: "var(--color-accent)",
-            color: "#fff",
-            border: "none",
-            padding: "var(--space-2) var(--space-4)",
-            borderRadius: "var(--radius-sm)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-            fontWeight: 500,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting || !content.trim() ? 0.6 : 1,
-          }}
         >
           {submitting ? "发布中..." : "发布"}
         </button>

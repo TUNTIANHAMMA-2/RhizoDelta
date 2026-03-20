@@ -17,7 +17,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const t = localStorage.getItem("jwt_token");
     if (!t) return [];
     try {
-      const payload = JSON.parse(atob(t.split(".")[1]));
+      const base64Url = t.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const payload = JSON.parse(atob(base64));
       return payload.roles ?? [];
     } catch {
       return [];
@@ -27,7 +29,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setToken: (token: string) => {
     localStorage.setItem("jwt_token", token);
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const payload = JSON.parse(atob(base64));
       set({ token, roles: payload.roles ?? [] });
     } catch {
       set({ token, roles: [] });

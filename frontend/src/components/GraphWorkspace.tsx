@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useUiStore } from "../stores/uiStore";
+import { useGraphStore } from "../stores/graphStore";
 import { useSse } from "../hooks/useSse";
 import { DagCanvas } from "./graph/DagCanvas";
 import { RhizoneList } from "./sidebar/RhizoneList";
@@ -14,6 +16,18 @@ export function GraphWorkspace() {
   const setMobileMenuOpen = useUiStore((s) => s.setMobileMenuOpen);
   const toggleLeftSidebar = useUiStore((s) => s.toggleLeftSidebar);
 
+  const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
+  const loadLineage = useGraphStore((s) => s.loadLineage);
+
+  useEffect(() => {
+    loadRhizomes().then(() => {
+      const currentRhizomes = useGraphStore.getState().rhizomes;
+      if (currentRhizomes.length > 0) {
+        loadLineage(currentRhizomes[0].node_id);
+      }
+    }).catch(console.error);
+  }, [loadRhizomes, loadLineage]);
+
   useSse();
 
   return (
@@ -27,13 +41,13 @@ export function GraphWorkspace() {
           if (!leftSidebarOpen) toggleLeftSidebar();
           setMobileMenuOpen(!isMobileMenuOpen);
         }}
+        aria-label="打开菜单"
         style={{
-          display: "none",
           position: "fixed",
           top: "var(--space-2)",
           right: "var(--space-4)",
           zIndex: 101,
-          background: "rgba(250, 250, 248, 0.85)",
+          background: "rgba(252, 249, 242, 0.85)",
           backdropFilter: "blur(8px)",
           border: "1px solid var(--color-border-default)",
           borderRadius: "var(--radius-sm)",
@@ -49,7 +63,9 @@ export function GraphWorkspace() {
       {/* Left sidebar — overlay on mobile */}
       {leftSidebarOpen ? (
         <>
-          <RhizoneList />
+          <div className="sidebar-container">
+            <RhizoneList />
+          </div>
           {/* Mobile backdrop */}
           <div
             className="mobile-backdrop"
@@ -58,7 +74,6 @@ export function GraphWorkspace() {
               setMobileMenuOpen(false);
             }}
             style={{
-              display: "none",
               position: "fixed",
               inset: 0,
               zIndex: 49,
@@ -69,27 +84,34 @@ export function GraphWorkspace() {
       ) : (
         /* Collapsed: show expand button */
         <button
+          className="sidebar-toggle-btn"
           onClick={toggleLeftSidebar}
           style={{
             position: "fixed",
-            top: 48,
+            top: "50%",
             left: 0,
+            transform: "translateY(-50%)",
             zIndex: 50,
-            background: "rgba(250, 250, 248, 0.85)",
+            width: 24,
+            height: 48,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(252, 249, 242, 0.85)",
             backdropFilter: "blur(8px)",
             border: "1px solid var(--color-border-default)",
             borderLeft: "none",
-            borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
-            padding: "var(--space-2) var(--space-1)",
+            borderRadius: "0 var(--radius-full) var(--radius-full) 0",
             cursor: "pointer",
             color: "var(--color-text-secondary)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-            lineHeight: 1,
+            boxShadow: "var(--shadow-sm)",
+            padding: 0,
           }}
           aria-label="展开侧边栏"
         >
-          &raquo;
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -2 }}>
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
         </button>
       )}
 
@@ -106,9 +128,26 @@ export function GraphWorkspace() {
 
       {/* Responsive CSS */}
       <style>{`
+        .sidebar-toggle-btn { transition: all var(--transition-fast); }
+        .sidebar-toggle-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
+
+        .mobile-menu-btn { display: none; }
+        .mobile-backdrop { display: none; }
+        .sidebar-container { height: 100%; display: flex; flex-direction: column; }
+
         @media (max-width: 1024px) {
-          .mobile-menu-btn { display: block !important; }
-          .mobile-backdrop { display: block !important; }
+          .mobile-menu-btn { display: block; }
+          .mobile-backdrop { display: block; }
+          .sidebar-container {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 50;
+            background: var(--color-bg-secondary);
+            width: 80%;
+            max-width: 320px;
+          }
         }
       `}</style>
     </div>

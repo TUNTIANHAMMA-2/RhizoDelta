@@ -12,7 +12,6 @@ function ToastItem({ toast }: { toast: ToastMessage }) {
 
   return (
     <div
-      role="alert"
       style={{
         display: "flex",
         alignItems: "center",

@@ -22,6 +22,7 @@ export function ConfirmDialog({
   isDestructive = false,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,7 +33,30 @@ export function ConfirmDialog({
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      if (e.key === "Tab") {
+        const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus();
+            e.preventDefault();
+          }
+        }
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -54,6 +78,7 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -101,34 +126,13 @@ export function ConfirmDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "var(--space-2) var(--space-4)",
-              borderRadius: "var(--radius-sm)",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-text-secondary)",
-            }}
+            className="btn-secondary"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            style={{
-              background: isDestructive
-                ? "var(--color-danger)"
-                : "var(--color-accent)",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              padding: "var(--space-2) var(--space-4)",
-              borderRadius: "var(--radius-sm)",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: 500,
-            }}
+            className={isDestructive ? "btn-danger" : "btn-primary"}
           >
             {confirmText}
           </button>

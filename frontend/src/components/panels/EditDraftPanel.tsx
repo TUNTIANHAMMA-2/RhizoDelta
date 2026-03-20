@@ -42,6 +42,7 @@ export function EditDraftPanel() {
         </span>
         <button
           onClick={closePanel}
+          aria-label="关闭面板"
           style={{
             background: "none",
             border: "none",

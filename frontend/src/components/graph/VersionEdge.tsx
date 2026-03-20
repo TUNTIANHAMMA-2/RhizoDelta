@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   BaseEdge,
   getSmoothStepPath,
@@ -6,7 +5,6 @@ import {
 } from "@xyflow/react";
 
 export function VersionEdge(props: EdgeProps) {
-  const [hovered, setHovered] = useState(false);
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
@@ -20,48 +18,59 @@ export function VersionEdge(props: EdgeProps) {
   const createdAt = (props.data as { createdAt?: string })?.createdAt ?? "";
 
   return (
-    <g
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <g className="version-edge-group">
+      <style>{`
+        .version-edge-group { cursor: pointer; }
+        .version-edge-group .edge-path {
+          stroke-width: 1.5px;
+          stroke: var(--color-edge-default);
+          transition: stroke-width 120ms ease, stroke 120ms ease;
+        }
+        .version-edge-group:hover .edge-path {
+          stroke-width: 2.5px;
+          stroke: var(--color-text-secondary);
+        }
+        .version-edge-group .edge-tooltip {
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 120ms ease;
+        }
+        .version-edge-group:hover .edge-tooltip {
+          opacity: 1;
+        }
+      `}</style>
       {/* Invisible wider hit area for easier hover */}
       <path
         d={edgePath}
         fill="none"
         stroke="transparent"
         strokeWidth={20}
+        style={{ pointerEvents: "stroke" }}
       />
       <BaseEdge
         id={props.id}
         path={edgePath}
-        style={{
-          ...props.style,
-          strokeWidth: hovered ? 2.5 : 1.5,
-          stroke: hovered
-            ? "var(--color-text-secondary)"
-            : "var(--color-edge-default)",
-          transition: "stroke-width 120ms ease, stroke 120ms ease",
-        }}
+        style={props.style}
+        className="edge-path"
         markerEnd={props.markerEnd}
       />
-      {hovered && (
-        <foreignObject
-          width={180}
-          height={44}
-          x={labelX - 90}
-          y={labelY - 22}
-          style={{ pointerEvents: "none" }}
-        >
-          <div className="version-edge-tooltip">
-            <div>{relType.replace(/_/g, " ")}</div>
-            {createdAt && (
-              <div style={{ fontSize: 10, opacity: 0.7 }}>
-                {new Date(createdAt).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </foreignObject>
-      )}
+      <foreignObject
+        className="edge-tooltip"
+        width={180}
+        height={44}
+        x={labelX - 90}
+        y={labelY - 22}
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="version-edge-tooltip">
+          <div>{relType.replace(/_/g, " ")}</div>
+          {createdAt && (
+            <div style={{ fontSize: 10, opacity: 0.7 }}>
+              {new Date(createdAt).toLocaleString()}
+            </div>
+          )}
+        </div>
+      </foreignObject>
     </g>
   );
 }

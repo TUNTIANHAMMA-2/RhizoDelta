@@ -5,8 +5,8 @@ import type {
   GraphEdgeDTO,
   GraphNodeDTO,
 } from "../api/types";
-import { fetchLineage, fetchChildren, fetchAssociations } from "../api/nodes";
-import { applyDagreLayout } from "../lib/dagre";
+import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
+import { applyTrackLayout } from "../lib/layout";
 import { toRfNode, toRfEdge } from "../lib/mapping";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
@@ -15,6 +15,7 @@ export interface GraphState {
   nodes: Map<string, GraphNodeDTO>;
   edges: GraphEdgeDTO[];
   associations: AssociationInfo[];
+  rhizomes: GraphNodeDTO[];
   rfNodes: Node[];
   rfEdges: Edge[];
 
@@ -22,6 +23,7 @@ export interface GraphState {
   rootNodeId: string | null;
   semanticZoom: SemanticZoom;
 
+  loadRhizomes: () => Promise<void>;
   loadLineage: (nodeId: string, maxDepth?: number) => Promise<void>;
   loadChildren: (nodeId: string) => Promise<void>;
   loadAssociations: (nodeId: string) => Promise<void>;
@@ -40,11 +42,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   nodes: new Map(),
   edges: [],
   associations: [],
+  rhizomes: [],
   rfNodes: [],
   rfEdges: [],
   selectedNodeId: null,
   rootNodeId: null,
   semanticZoom: "normal" as SemanticZoom,
+
+  loadRhizomes: async () => {
+    const rhizomes = await fetchRhizomes(50);
+    set({ rhizomes });
+  },
 
   loadLineage: async (nodeId, maxDepth = 3) => {
     const topo = await fetchLineage(nodeId, maxDepth);
@@ -53,7 +61,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     const rawRfNodes = topo.nodes.map(toRfNode);
     const rawRfEdges = topo.edges.map(toRfEdge);
-    const { nodes: layoutNodes, edges: layoutEdges } = applyDagreLayout(
+    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
       rawRfNodes,
       rawRfEdges,
     );
@@ -75,7 +83,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const allEdges = [...get().edges, ...topo.edges];
     const rawRfNodes = Array.from(nodesMap.values()).map(toRfNode);
     const rawRfEdges = allEdges.map(toRfEdge);
-    const { nodes: layoutNodes, edges: layoutEdges } = applyDagreLayout(
+    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
       rawRfNodes,
       rawRfEdges,
     );
@@ -108,7 +116,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     if (lastNode) {
       rfNode.position = {
         x: lastNode.position.x,
-        y: lastNode.position.y + 120,
+        y: lastNode.position.y + 280,
       };
     }
     set({

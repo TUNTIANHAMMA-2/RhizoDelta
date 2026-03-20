@@ -8,6 +8,7 @@ import type {
 interface AuditQueryParams {
   type?: DecisionType;
   operator_id?: string;
+  node_id?: string;
   since?: string;
   until?: string;
   after?: string;

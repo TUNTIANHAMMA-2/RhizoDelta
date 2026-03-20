@@ -140,36 +140,18 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
       </div>
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
         <button
+          className="btn-secondary"
           type="button"
           onClick={onSuccess}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "var(--color-text-secondary)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-          }}
         >
           取消
         </button>
         <button
+          className="btn-primary"
           type="submit"
           disabled={submitting}
-          style={{
-            background: "var(--color-accent)",
-            color: "#fff",
-            border: "none",
-            padding: "var(--space-2) var(--space-4)",
-            borderRadius: "var(--radius-sm)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-sm)",
-            fontWeight: 500,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting ? 0.6 : 1,
-          }}
         >
-          {submitting ? "提交中..." : "注入"}
+          {submitting ? "注入中..." : "注入"}
         </button>
       </div>
     </form>

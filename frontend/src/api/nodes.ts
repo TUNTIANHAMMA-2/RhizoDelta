@@ -9,6 +9,11 @@ import type {
 export const fetchNode = (id: string) =>
   request<GraphNodeDTO>(`/api/nodes/${id}`);
 
+export const fetchRhizomes = (limit?: number) => {
+  const qs = limit ? `?limit=${limit}` : "";
+  return request<GraphNodeDTO[]>(`/api/nodes/roots${qs}`);
+};
+
 export const fetchLineage = (id: string, maxDepth?: number) =>
   request<GraphTopologyDTO>(
     `/api/nodes/${id}/lineage${maxDepth ? `?max_depth=${maxDepth}` : ""}`,

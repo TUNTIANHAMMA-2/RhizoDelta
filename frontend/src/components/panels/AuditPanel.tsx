@@ -34,13 +34,14 @@ export function AuditPanel({ nodeId }: Props) {
   const load = (cursor?: string) => {
     setLoading(true);
     fetchAuditList({
-      operator_id: nodeId,
+      node_id: nodeId,
       after: cursor,
       limit: 20,
     })
       .then((res) => {
-        setItems((prev) => (cursor ? [...prev, ...res.items] : res.items));
-        setNextCursor(res.next_cursor);
+        const newItems = res?.items ?? [];
+        setItems((prev) => (cursor ? [...prev, ...newItems] : newItems));
+        setNextCursor(res?.next_cursor ?? null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -70,7 +71,7 @@ export function AuditPanel({ nodeId }: Props) {
     }
   };
 
-  if (loading && items.length === 0) {
+  if (loading && (!items || items.length === 0)) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <Skeleton variant="rectangular" height={60} />
@@ -80,7 +81,7 @@ export function AuditPanel({ nodeId }: Props) {
     );
   }
 
-  if (items.length === 0) {
+  if (!items || items.length === 0) {
     return <EmptyState message="暂无审计记录" />;
   }
 
@@ -188,7 +189,7 @@ export function AuditPanel({ nodeId }: Props) {
                     <strong>operator:</strong> {audit.operator_type} /{" "}
                     {audit.operator_id}
                   </div>
-                  {audit.synthesized_from.length > 0 && (
+                  {audit.synthesized_from && audit.synthesized_from.length > 0 && (
                     <div>
                       <strong>synthesized_from:</strong>{" "}
                       {audit.synthesized_from.join(", ")}

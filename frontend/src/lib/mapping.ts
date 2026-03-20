@@ -12,7 +12,8 @@ export function toRfNode(dto: GraphNodeDTO): Node {
     id: dto.node_id,
     type: NODE_TYPE_MAP[dto.label] ?? "humanPost",
     position: { x: 0, y: 0 },
-    data: dto,
+    origin: [0.5, 0.5],
+    data: dto as unknown as Record<string, unknown>,
   };
 }
 

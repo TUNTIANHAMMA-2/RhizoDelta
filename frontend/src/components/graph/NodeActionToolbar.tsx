@@ -10,6 +10,7 @@ export function NodeActionToolbar({ nodeId }: Props) {
   return (
     <div
       style={{
+        position: "relative",
         display: "flex",
         gap: "var(--space-2)",
         padding: "var(--space-2) var(--space-3)",
@@ -17,18 +18,38 @@ export function NodeActionToolbar({ nodeId }: Props) {
         borderRadius: "var(--radius-md)",
         boxShadow: "var(--shadow-md)",
         fontFamily: "var(--font-ui)",
+        border: "1px solid var(--color-border-default)",
         fontSize: "var(--font-size-sm)",
       }}
     >
+      <div
+        style={{
+          position: "absolute",
+          top: -6,
+          left: "50%",
+          transform: "translateX(-50%) rotate(45deg)",
+          width: 10,
+          height: 10,
+          background: "var(--color-bg-primary)",
+          borderLeft: "1px solid var(--color-border-default)",
+          borderTop: "1px solid var(--color-border-default)",
+        }}
+      />
       <button
-        onClick={() => openEditPanel(nodeId, "inject")}
-        style={{ cursor: "pointer", background: "none", border: "none", padding: "var(--space-1) var(--space-2)" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          openEditPanel(nodeId, "inject");
+        }}
+        className="btn-primary"
       >
         延续注入
       </button>
       <button
-        onClick={() => openEditPanel(nodeId, "fork")}
-        style={{ cursor: "pointer", background: "none", border: "none", padding: "var(--space-1) var(--space-2)" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          openEditPanel(nodeId, "fork");
+        }}
+        className="btn-secondary"
       >
         分叉
       </button>

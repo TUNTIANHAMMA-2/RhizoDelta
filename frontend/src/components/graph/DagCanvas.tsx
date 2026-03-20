@@ -6,12 +6,14 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useEffect, useMemo } from "react";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { HumanPostNode } from "./HumanPostNode";
 import { ConsensusNode } from "./ConsensusNode";
 import { ResultNode } from "./ResultNode";
 import { VersionEdge } from "./VersionEdge";
+import { useGraphInteractions } from "../../hooks/useGraphInteractions";
 
 const nodeTypes = {
   humanPost: HumanPostNode,
@@ -39,6 +41,14 @@ const MINIMAP_NODE_COLOR = (node: { type?: string }) => {
 function ViewportListener() {
   const setSemanticZoom = useGraphStore((s) => s.setSemanticZoom);
   const setZoomLevel = useUiStore((s) => s.setZoomLevel);
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const { focusNode } = useGraphInteractions();
+
+  useEffect(() => {
+    if (selectedNodeId) {
+      focusNode(selectedNodeId);
+    }
+  }, [selectedNodeId, focusNode]);
 
   useOnViewportChange({
     onChange: (viewport: Viewport) => {
@@ -60,12 +70,20 @@ export function DagCanvas() {
   const rfNodes = useGraphStore((s) => s.rfNodes);
   const rfEdges = useGraphStore((s) => s.rfEdges);
   const selectNode = useGraphStore((s) => s.selectNode);
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
   const showMiniMap = rfNodes.length > 20;
 
+  const nodesWithSelection = useMemo(() => {
+    return rfNodes.map((node) => ({
+      ...node,
+      selected: node.id === selectedNodeId,
+    }));
+  }, [rfNodes, selectedNodeId]);
+
   return (
     <ReactFlow
-      nodes={rfNodes}
+      nodes={nodesWithSelection}
       edges={rfEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
@@ -94,7 +112,7 @@ export function DagCanvas() {
       {showMiniMap && (
         <MiniMap
           nodeColor={MINIMAP_NODE_COLOR}
-          maskColor="rgba(250, 250, 248, 0.7)"
+          maskColor="rgba(252, 249, 242, 0.7)"
           style={{ borderRadius: 8 }}
         />
       )}
