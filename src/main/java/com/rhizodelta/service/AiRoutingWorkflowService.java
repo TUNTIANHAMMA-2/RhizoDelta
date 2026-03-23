@@ -30,9 +30,14 @@ public class AiRoutingWorkflowService {
     static final String CREATE_REVIEW = "create-review";
 
     private final CompiledGraph<AiRoutingState> workflow;
+    private final AiRoutingEvaluatorService aiRoutingEvaluatorService;
     private final PreCommitGuard preCommitGuard;
 
-    public AiRoutingWorkflowService(PreCommitGuard preCommitGuard) throws GraphStateException {
+    public AiRoutingWorkflowService(
+            AiRoutingEvaluatorService aiRoutingEvaluatorService,
+            PreCommitGuard preCommitGuard
+    ) throws GraphStateException {
+        this.aiRoutingEvaluatorService = aiRoutingEvaluatorService;
         this.preCommitGuard = preCommitGuard;
         this.workflow = buildWorkflow();
     }
@@ -52,7 +57,7 @@ public class AiRoutingWorkflowService {
         graph.addNode(ENSURE_EMBEDDING, appendNode(ENSURE_EMBEDDING));
         graph.addNode(VECTOR_RECALL, vectorRecall());
         graph.addNode(CONTEXT_PRUNE, contextPrune());
-        graph.addNode(LLM_EVALUATE, appendNode(LLM_EVALUATE));
+        graph.addNode(LLM_EVALUATE, llmEvaluate());
         graph.addNode(REFLECTION_VALIDATE, appendNode(REFLECTION_VALIDATE));
         graph.addNode(PRE_COMMIT_GUARD, preCommitGuardNode());
         graph.addNode(EXECUTE_MERGE, appendNode(EXECUTE_MERGE));
@@ -107,6 +112,23 @@ public class AiRoutingWorkflowService {
                     AiRoutingState.EXECUTED_NODES, List.of(CONTEXT_PRUNE),
                     AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, selectedCandidateNodeIds,
                     AiRoutingState.SOURCE_NODE_ID, sourceNodeId
+            );
+        });
+    }
+
+    private AsyncNodeAction<AiRoutingState> llmEvaluate() {
+        return AsyncNodeAction.node_async(state -> {
+            AiRoutingEvaluatorService.RoutingEvaluation evaluation = aiRoutingEvaluatorService.evaluate(
+                    new AiRoutingEvaluatorService.RoutingEvaluationCommand(
+                            state.postContent(),
+                            state.routingContext(),
+                            state.targetNodeId()
+                    )
+            );
+            return Map.of(
+                    AiRoutingState.EXECUTED_NODES, List.of(LLM_EVALUATE),
+                    AiRoutingState.ROUTING_ACTION, normalizeAction(evaluation.action()),
+                    AiRoutingState.REVIEW_REASON, evaluation.reason()
             );
         });
     }
