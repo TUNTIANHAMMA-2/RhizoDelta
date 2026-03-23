@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/fork/*/rollback").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/reviews/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/associations/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/**").hasAnyRole("AGENT", "ADMIN")

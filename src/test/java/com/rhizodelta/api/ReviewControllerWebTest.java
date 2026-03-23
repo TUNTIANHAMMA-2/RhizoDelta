@@ -2,7 +2,9 @@ package com.rhizodelta.api;
 
 import com.rhizodelta.config.JwtAuthenticationFilter;
 import com.rhizodelta.config.SecurityConfig;
+import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.domain.review.ReviewTask;
+import com.rhizodelta.service.DecisionService;
 import com.rhizodelta.service.ReviewTaskService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -40,6 +42,9 @@ class ReviewControllerWebTest {
     @MockBean
     private ReviewTaskService reviewTaskService;
 
+    @MockBean
+    private DecisionService decisionService;
+
     @Test
     void shouldReturnPendingReviewsForAgentRole() throws Exception {
         when(reviewTaskService.findPendingTasks(10)).thenReturn(List.of(sampleTask("review-1")));
@@ -64,7 +69,41 @@ class ReviewControllerWebTest {
     }
 
     @Test
-    void shouldRejectUserRoleAccessToReviewEndpoints() throws Exception {
+    void shouldAcceptApproveMergeForAdminRole() throws Exception {
+        when(reviewTaskService.getTask("review-merge")).thenReturn(sampleMergeTask("review-merge"));
+        when(reviewTaskService.updateStatus("review-merge", ReviewTask.Status.APPROVED))
+                .thenReturn(sampleApprovedTask("review-merge"));
+        when(decisionService.executeMerge(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new DecisionResult("dec-merge-1", java.util.UUID.randomUUID(), "QUEUED"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-merge/approve-merge")
+                        .header("Authorization", "Bearer " + generateTokenWithRole("ADMIN")))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.decision_id").value("dec-merge-1"));
+    }
+
+    @Test
+    void shouldAcceptRejectForAdminRole() throws Exception {
+        when(reviewTaskService.updateStatus("review-reject", ReviewTask.Status.REJECTED))
+                .thenReturn(sampleRejectedTask("review-reject"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-reject/reject")
+                        .header("Authorization", "Bearer " + generateTokenWithRole("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.review_id").value("review-reject"))
+                .andExpect(jsonPath("$.data.status").value("REJECTED"));
+    }
+
+    @Test
+    void shouldRejectUserRoleAccessToReviewWriteEndpoints() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-merge/approve-merge")
+                        .header("Authorization", "Bearer " + generateTokenWithRole("USER")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40301));
+    }
+
+    @Test
+    void shouldRejectUserRoleAccessToReviewQueryEndpoints() throws Exception {
         mockMvc.perform(get("/api/reviews/pending")
                         .header("Authorization", "Bearer " + generateTokenWithRole("USER")))
                 .andExpect(status().isForbidden())
@@ -83,7 +122,69 @@ class ReviewControllerWebTest {
                 Map.of("summary_content", "draft"),
                 List.of("LOW_CONFIDENCE"),
                 Instant.parse("2026-03-23T00:00:00Z"),
+                Instant.parse("2026-03-23T00:00:00Z"),
                 Instant.parse("2026-03-30T00:00:00Z")
+        );
+    }
+
+    private static ReviewTask sampleMergeTask(String reviewId) {
+        return new ReviewTask(
+                reviewId,
+                "req-merge",
+                "post-merge",
+                "trace-merge",
+                ReviewTask.Status.PENDING,
+                "MERGE",
+                List.of("candidate-merge"),
+                Map.of(
+                        "decision_id", "dec-merge-1",
+                        "request_id", "req-merge",
+                        "source_node_id", "11111111-1111-1111-1111-111111111111",
+                        "agent_version", "agent-v1",
+                        "summary_content", "merged summary",
+                        "synthesized_from", List.of("22222222-2222-2222-2222-222222222222"),
+                        "reason", "approved by reviewer"
+                ),
+                List.of("LOW_CONFIDENCE"),
+                Instant.parse("2026-03-23T00:00:00Z"),
+                Instant.parse("2026-03-23T00:00:00Z"),
+                Instant.parse("2026-03-30T00:00:00Z")
+        );
+    }
+
+    private static ReviewTask sampleApprovedTask(String reviewId) {
+        ReviewTask pendingTask = sampleMergeTask(reviewId);
+        return new ReviewTask(
+                pendingTask.reviewId(),
+                pendingTask.requestId(),
+                pendingTask.postNodeId(),
+                pendingTask.workflowTraceId(),
+                ReviewTask.Status.APPROVED,
+                pendingTask.suggestedAction(),
+                pendingTask.candidateNodeIds(),
+                pendingTask.draftPayload(),
+                pendingTask.reviewReasonCodes(),
+                pendingTask.createdAt(),
+                Instant.parse("2026-03-24T00:00:00Z"),
+                Instant.parse("2026-03-31T00:00:00Z")
+        );
+    }
+
+    private static ReviewTask sampleRejectedTask(String reviewId) {
+        ReviewTask pendingTask = sampleTask(reviewId);
+        return new ReviewTask(
+                pendingTask.reviewId(),
+                pendingTask.requestId(),
+                pendingTask.postNodeId(),
+                pendingTask.workflowTraceId(),
+                ReviewTask.Status.REJECTED,
+                pendingTask.suggestedAction(),
+                pendingTask.candidateNodeIds(),
+                pendingTask.draftPayload(),
+                pendingTask.reviewReasonCodes(),
+                pendingTask.createdAt(),
+                Instant.parse("2026-03-24T00:00:00Z"),
+                Instant.parse("2026-03-31T00:00:00Z")
         );
     }
 
