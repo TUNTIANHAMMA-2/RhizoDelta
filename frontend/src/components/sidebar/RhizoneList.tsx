@@ -101,18 +101,26 @@ export function RhizoneList() {
           rhizomes.map((node) => {
             const isSelected = node.node_id === rootNodeId;
             return (
-              <div
+              <button
                 key={node.node_id}
                 onClick={() => handleRhizomeClick(node)}
+                aria-current={isSelected ? "true" : undefined}
                 style={{
                   padding: "var(--space-3) var(--space-4)",
                   cursor: "pointer",
                   background: isSelected ? "var(--color-bg-selected)" : "transparent",
                   borderLeft: isSelected ? "2px solid var(--color-accent)" : "2px solid transparent",
+                  borderTop: "none",
+                  borderRight: "none",
+                  borderBottom: "none",
                   transition: "background var(--transition-fast)",
                   display: "flex",
                   flexDirection: "column",
                   gap: "var(--space-1)",
+                  width: "100%",
+                  textAlign: "left",
+                  font: "inherit",
+                  color: "inherit",
                 }}
               >
                 <div
@@ -138,7 +146,7 @@ export function RhizoneList() {
                   <span>{new Date(node.created_at).toLocaleDateString()}</span>
                   <span>{node.author_id ?? "Anonymous"}</span>
                 </div>
-              </div>
+              </button>
             );
           })
         )}

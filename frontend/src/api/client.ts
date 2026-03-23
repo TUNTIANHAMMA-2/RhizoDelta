@@ -1,4 +1,5 @@
 import type { ApiResponse } from "./types";
+import { useAuthStore } from "../stores/authStore";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -18,6 +19,9 @@ export async function request<T>(
 
   // Handle non-OK responses
   if (!res.ok) {
+    if (res.status === 401) {
+      useAuthStore.getState().clearToken();
+    }
     const text = await res.text().catch(() => "");
     throw new Error(
       text || `Request failed: ${res.status} ${res.statusText}`,

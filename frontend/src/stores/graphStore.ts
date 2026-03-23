@@ -21,6 +21,7 @@ export interface GraphState {
 
   selectedNodeId: string | null;
   rootNodeId: string | null;
+  lineageRequestId: number;
   semanticZoom: SemanticZoom;
 
   loadRhizomes: () => Promise<void>;
@@ -32,6 +33,7 @@ export interface GraphState {
 
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
+  flushLayout: () => void;
 
   // Optimistic UI
   addOptimisticNode: (tempId: string, position: { x: number; y: number }, label: string) => void;
@@ -47,6 +49,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   rfEdges: [],
   selectedNodeId: null,
   rootNodeId: null,
+  lineageRequestId: 0,
   semanticZoom: "normal" as SemanticZoom,
 
   loadRhizomes: async () => {
@@ -55,7 +58,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   loadLineage: async (nodeId, maxDepth = 3) => {
+    const requestId = get().lineageRequestId + 1;
+    set({ lineageRequestId: requestId });
+
     const topo = await fetchLineage(nodeId, maxDepth);
+
+    // Discard stale response if a newer request was issued
+    if (get().lineageRequestId !== requestId) return;
+
     const nodesMap = new Map<string, GraphNodeDTO>();
     topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
@@ -115,23 +125,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   addEdge: (edge) => {
-    const nodesMap = get().nodes;
-    const allEdges = [...get().edges, edge];
+    set({ edges: [...get().edges, edge] });
+  },
 
-    // Rebuild full layout so the track algorithm can place
-    // CONTINUES_FROM children vertically and BRANCHED_FROM horizontally
+  flushLayout: () => {
+    const nodesMap = get().nodes;
+    const allEdges = get().edges;
     const rawRfNodes = Array.from(nodesMap.values()).map(toRfNode);
     const rawRfEdges = allEdges.map(toRfEdge);
     const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
       rawRfNodes,
       rawRfEdges,
     );
-
-    set({
-      edges: allEdges,
-      rfNodes: layoutNodes,
-      rfEdges: layoutEdges,
-    });
+    set({ rfNodes: layoutNodes, rfEdges: layoutEdges });
   },
 
   addOptimisticNode: (tempId, position, label) => {

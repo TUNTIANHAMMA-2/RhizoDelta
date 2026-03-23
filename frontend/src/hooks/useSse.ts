@@ -13,6 +13,8 @@ import type {
 const SSE_URL = "/api/events/stream";
 const MAX_RETRY_DELAY = 30_000;
 const BASE_RETRY_DELAY = 1_000;
+const MAX_RETRIES = 20;
+const LAYOUT_FLUSH_DELAY = 50;
 
 interface SseEvent {
   type: string;
@@ -99,6 +101,10 @@ export function useSse() {
 
     const scheduleReconnect = () => {
       if (!mountedRef.current) return;
+      if (retryCount.current >= MAX_RETRIES) {
+        setStatus("disconnected");
+        return;
+      }
       const delay = Math.min(
         BASE_RETRY_DELAY * 2 ** retryCount.current + Math.random() * 1000,
         MAX_RETRY_DELAY,
@@ -132,12 +138,28 @@ export function useSse() {
   }, [token, setStatus]);
 }
 
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleFlushLayout() {
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    useGraphStore.getState().flushLayout();
+  }, LAYOUT_FLUSH_DELAY);
+}
+
 function handleSseEvent(event: SseEvent) {
   const graphStore = useGraphStore.getState();
 
   switch (event.type) {
     case "NODE_CREATED": {
-      const payload: NodeCreatedEvent = JSON.parse(event.data);
+      let payload: NodeCreatedEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse NODE_CREATED event data:", e);
+        break;
+      }
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
         graphStore.loadRhizomes(); // Always refresh in case it's a new root
@@ -145,7 +167,13 @@ function handleSseEvent(event: SseEvent) {
       break;
     }
     case "EDGE_CREATED": {
-      const payload: EdgeCreatedEvent = JSON.parse(event.data);
+      let payload: EdgeCreatedEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse EDGE_CREATED event data:", e);
+        break;
+      }
       const edge: GraphEdgeDTO = {
         source: payload.source,
         target: payload.target,
@@ -167,21 +195,26 @@ function handleSseEvent(event: SseEvent) {
         );
       }
       if (missing.length > 0) {
-        Promise.all(missing).then(() => graphStore.addEdge(edge));
+        Promise.all(missing).then(() => {
+          graphStore.addEdge(edge);
+          scheduleFlushLayout();
+        });
       } else {
         graphStore.addEdge(edge);
+        scheduleFlushLayout();
       }
       break;
     }
     case "DECISION_COMPLETE": {
-      const payload: DecisionCompleteEvent = JSON.parse(event.data);
-      // Fetch the node to get its ACTUAL type and content from the database.
-      // This is crucial because DECISION_COMPLETE can refer to a newly created node
-      // (Merge, Join) OR an existing source node (Fork).
+      let payload: DecisionCompleteEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse DECISION_COMPLETE event data:", e);
+        break;
+      }
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
-        // Resolve the optimistic placeholder using the REAL data from the backend,
-        // preventing accidental overwrites with hardcoded 'AI_Consensus' labels.
         graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, node);
       });
       break;
