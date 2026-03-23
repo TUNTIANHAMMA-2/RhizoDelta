@@ -1,6 +1,7 @@
 package com.rhizodelta.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.rhizodelta.config.RabbitMqConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +115,8 @@ public class SseEventService {
     public enum SseEventType {
         NODE_CREATED,
         EDGE_CREATED,
-        DECISION_COMPLETE
+        DECISION_COMPLETE,
+        ORCHESTRATION_STATUS
     }
 
     public record NodeCreatedPayload(
@@ -136,6 +138,18 @@ public class SseEventService {
             @JsonProperty("decision_id") String decisionId,
             @JsonProperty("decision_type") String decisionType,
             @JsonProperty("node_id") String nodeId
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record OrchestrationStatusPayload(
+            @JsonProperty("request_id") String requestId,
+            @JsonProperty("event_id") String eventId,
+            @JsonProperty("post_node_id") String postNodeId,
+            @JsonProperty("status") String status,
+            @JsonProperty("message") String message,
+            @JsonProperty("review_id") String reviewId,
+            @JsonProperty("decision_id") String decisionId
     ) {
     }
 

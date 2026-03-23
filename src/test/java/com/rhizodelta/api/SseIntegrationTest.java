@@ -8,9 +8,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.neo4j.core.Neo4jClient;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -30,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -37,6 +45,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -72,12 +82,28 @@ class SseIntegrationTest {
     @Autowired
     private Neo4jClient neo4jClient;
 
+    @Autowired
+    private org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
+
     @Value("${rhizodelta.jwt.secret}")
     private String jwtSecret;
+
+    @MockBean
+    private RabbitTemplate rabbitTemplate;
 
     @BeforeEach
     void cleanDatabase() {
         neo4jClient.query("MATCH (n) DETACH DELETE n").run();
+        doAnswer(invocation -> {
+            CorrelationData correlationData = invocation.getArgument(3);
+            correlationData.getFuture().complete(new CorrelationData.Confirm(true, null));
+            return null;
+        }).when(rabbitTemplate).convertAndSend(
+                anyString(),
+                anyString(),
+                org.mockito.ArgumentMatchers.any(Object.class),
+                org.mockito.ArgumentMatchers.any(CorrelationData.class)
+        );
     }
 
     @Test
@@ -98,7 +124,7 @@ class SseIntegrationTest {
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> dataLine = new AtomicReference<>();
-        Thread readerThread = startSseReader(response, latch, dataLine);
+        Thread readerThread = startSseReader(response, "NODE_CREATED", latch, dataLine);
 
         invokeProcessMessage(postConsumer, new PostEventMessage(
                 TEST_REQUEST_ID,
@@ -115,12 +141,53 @@ class SseIntegrationTest {
         readerThread.interrupt();
     }
 
+    @Test
+    void shouldReceivePostAcceptedStatusAfterSubmittingPost() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder(streamUri())
+                .header("Authorization", "Bearer " + buildToken(jwtSecret))
+                .GET()
+                .build();
+
+        CompletableFuture<HttpResponse<java.io.InputStream>> responseFuture =
+                client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<java.io.InputStream> response = responseFuture.get(
+                RESPONSE_TIMEOUT.toSeconds(),
+                TimeUnit.SECONDS
+        );
+        assertThat(response.statusCode()).isEqualTo(200);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> dataLine = new AtomicReference<>();
+        Thread readerThread = startSseReader(response, "ORCHESTRATION_STATUS", latch, dataLine);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(buildToken(jwtSecret));
+        ResponseEntity<Map> postResponse = restTemplate.postForEntity(
+                "/api/posts",
+                new HttpEntity<>(Map.of(
+                        "request_id", "req-post-accepted-1",
+                        "author_id", "author-accepted",
+                        "content", "queued post"
+                ), headers),
+                Map.class
+        );
+
+        assertThat(postResponse.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(latch.await(EVENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS)).isTrue();
+        assertThat(dataLine.get()).contains("\"status\":\"POST_ACCEPTED\"");
+        assertThat(dataLine.get()).contains("\"request_id\":\"req-post-accepted-1\"");
+
+        readerThread.interrupt();
+    }
+
     private URI streamUri() {
         return URI.create("http://localhost:" + port + "/api/events/stream");
     }
 
     private static Thread startSseReader(
             HttpResponse<java.io.InputStream> response,
+            String expectedEventName,
             CountDownLatch latch,
             AtomicReference<String> dataLine
     ) {
@@ -131,7 +198,7 @@ class SseIntegrationTest {
                 while ((line = reader.readLine()) != null) {
                     if (line.startsWith("event:")) {
                         eventName = line.substring("event:".length()).trim();
-                    } else if (line.startsWith("data:") && "NODE_CREATED".equals(eventName)) {
+                    } else if (line.startsWith("data:") && expectedEventName.equals(eventName)) {
                         dataLine.set(line.substring("data:".length()).trim());
                         latch.countDown();
                         break;

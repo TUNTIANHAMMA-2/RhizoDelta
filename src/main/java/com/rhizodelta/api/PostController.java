@@ -3,6 +3,7 @@ package com.rhizodelta.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.config.RabbitMqConfig;
 import com.rhizodelta.domain.post.PostEventMessage;
+import com.rhizodelta.service.SseEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -38,10 +39,12 @@ public class PostController {
 
     private final RabbitTemplate rabbitTemplate;
     private final Neo4jClient neo4jClient;
+    private final SseEventService sseEventService;
 
-    public PostController(RabbitTemplate rabbitTemplate, Neo4jClient neo4jClient) {
+    public PostController(RabbitTemplate rabbitTemplate, Neo4jClient neo4jClient, SseEventService sseEventService) {
         this.rabbitTemplate = rabbitTemplate;
         this.neo4jClient = neo4jClient;
+        this.sseEventService = sseEventService;
     }
 
     @PostMapping
@@ -69,8 +72,22 @@ public class PostController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
 
+        publishQueuedStatus(request.requestId(), eventId);
         PostAcceptedResponse response = new PostAcceptedResponse(eventId, QUEUED_STATUS);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(response));
+    }
+
+    private void publishQueuedStatus(String requestId, String eventId) {
+        SseEventService.OrchestrationStatusPayload payload = new SseEventService.OrchestrationStatusPayload(
+                requestId,
+                eventId,
+                null,
+                "POST_ACCEPTED",
+                "post accepted and queued",
+                null,
+                null
+        );
+        sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
 
     private void publishPostMessage(PostEventMessage message, String eventId) {
