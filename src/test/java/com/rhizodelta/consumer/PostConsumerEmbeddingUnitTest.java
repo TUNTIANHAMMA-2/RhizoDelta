@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -36,6 +37,7 @@ class PostConsumerEmbeddingUnitTest {
         HumanPost post = HumanPost.create(nodeId, "content-1", "author-1", "req-1");
         CountDownLatch latch = new CountDownLatch(1);
         RecordingEmbeddingService embeddingService = new RecordingEmbeddingService(latch);
+        RecordingSseEventService sseEventService = new RecordingSseEventService();
         EmbeddingModelService embeddingModelService = new EmbeddingModelService(
                 new FixedEmbeddingModel(VALID_VECTOR),
                 EMBEDDING_DIMENSION
@@ -44,7 +46,7 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 embeddingModelService,
                 embeddingService,
-                new SseEventService(mock(RabbitTemplate.class))
+                sseEventService
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-1", "author-1", "content-1", null, "evt-1"));
@@ -52,6 +54,9 @@ class PostConsumerEmbeddingUnitTest {
         assertThat(latch.await(ASYNC_TIMEOUT_MS, TimeUnit.MILLISECONDS)).isTrue();
         assertThat(embeddingService.nodeId).isEqualTo(nodeId.toString());
         assertThat(embeddingService.vector).containsExactly(0.1f, 0.2f, 0.3f);
+        assertThat(sseEventService.findStatus("EMBEDDING_READY")).isNotNull();
+        assertThat(sseEventService.findStatus("EMBEDDING_READY").postNodeId()).isEqualTo(nodeId.toString());
+        assertThat(sseEventService.findStatus("EMBEDDING_READY").eventId()).isEqualTo("evt-1");
     }
 
     @Test
@@ -60,6 +65,7 @@ class PostConsumerEmbeddingUnitTest {
         HumanPost post = HumanPost.create(nodeId, "content-2", "author-2", "req-2");
         CountDownLatch latch = new CountDownLatch(1);
         RecordingEmbeddingService embeddingService = new RecordingEmbeddingService(latch);
+        RecordingSseEventService sseEventService = new RecordingSseEventService();
         EmbeddingModelService embeddingModelService = new EmbeddingModelService(
                 new FixedEmbeddingModel(INVALID_VECTOR),
                 EMBEDDING_DIMENSION
@@ -68,13 +74,16 @@ class PostConsumerEmbeddingUnitTest {
                 new StubPostService(post),
                 embeddingModelService,
                 embeddingService,
-                new SseEventService(mock(RabbitTemplate.class))
+                sseEventService
         );
 
         invokeProcessMessage(consumer, new PostEventMessage("req-2", "author-2", "content-2", null, "evt-2"));
 
         assertThat(latch.await(ASYNC_TIMEOUT_MS, TimeUnit.MILLISECONDS)).isFalse();
         assertThat(embeddingService.nodeId).isNull();
+        assertThat(sseEventService.findStatus("FAILED")).isNotNull();
+        assertThat(sseEventService.findStatus("FAILED").postNodeId()).isEqualTo(nodeId.toString());
+        assertThat(sseEventService.findStatus("FAILED").eventId()).isEqualTo("evt-2");
     }
 
     private static void invokeProcessMessage(PostConsumer consumer, PostEventMessage message) throws Exception {
@@ -129,6 +138,28 @@ class PostConsumerEmbeddingUnitTest {
         @Override
         public HumanPost createHumanPost(CreateHumanPostCommand command) {
             return post;
+        }
+    }
+
+    private static final class RecordingSseEventService extends SseEventService {
+        private final List<OrchestrationStatusPayload> statuses = new ArrayList<>();
+
+        private RecordingSseEventService() {
+            super(mock(RabbitTemplate.class));
+        }
+
+        @Override
+        public void publish(SseEventType type, Object payload) {
+            if (type == SseEventType.ORCHESTRATION_STATUS && payload instanceof OrchestrationStatusPayload statusPayload) {
+                statuses.add(statusPayload);
+            }
+        }
+
+        private OrchestrationStatusPayload findStatus(String status) {
+            return statuses.stream()
+                    .filter(payload -> status.equals(payload.status()))
+                    .findFirst()
+                    .orElse(null);
         }
     }
 }

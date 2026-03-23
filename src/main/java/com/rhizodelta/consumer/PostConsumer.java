@@ -59,16 +59,30 @@ public class PostConsumer {
                 message.targetNodeId()
         );
         HumanPost post = postService.createHumanPost(command);
-        CompletableFuture.runAsync(() -> writeEmbedding(post), embeddingTaskExecutor);
+        CompletableFuture.runAsync(() -> writeEmbedding(message, post), embeddingTaskExecutor);
         publishNodeCreated(post);
     }
 
-    private void writeEmbedding(HumanPost post) {
+    private void writeEmbedding(PostEventMessage message, HumanPost post) {
         try {
             List<Float> vector = embeddingModelService.embed(post.getContent());
             embeddingService.writeEmbedding(post.getNodeId().toString(), vector);
+            publishOrchestrationStatus(
+                    message.requestId(),
+                    message.eventId(),
+                    post.getNodeId().toString(),
+                    "EMBEDDING_READY",
+                    "embedding generated for queued post"
+            );
         } catch (Exception exception) {
             LOGGER.error("Failed to generate embedding for Human_Post node_id={}", post.getNodeId(), exception);
+            publishOrchestrationStatus(
+                    message.requestId(),
+                    message.eventId(),
+                    post.getNodeId().toString(),
+                    "FAILED",
+                    "embedding generation failed"
+            );
         }
     }
 
@@ -79,5 +93,24 @@ public class PostConsumer {
                 post.getCreatedAt()
         );
         sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
+    }
+
+    private void publishOrchestrationStatus(
+            String requestId,
+            String eventId,
+            String postNodeId,
+            String status,
+            String message
+    ) {
+        SseEventService.OrchestrationStatusPayload payload = new SseEventService.OrchestrationStatusPayload(
+                requestId,
+                eventId,
+                postNodeId,
+                status,
+                message,
+                null,
+                null
+        );
+        sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
 }
