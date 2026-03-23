@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/fork/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/associations/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/**").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/**").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/associations").hasAnyRole("AGENT", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/nodes/*/embedding").hasAnyRole("AGENT", "ADMIN")
