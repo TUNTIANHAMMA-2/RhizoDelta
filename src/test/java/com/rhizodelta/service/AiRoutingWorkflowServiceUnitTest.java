@@ -84,4 +84,26 @@ class AiRoutingWorkflowServiceUnitTest {
         assertThat(state.reviewReason()).isEqualTo("source branch advanced during workflow");
         assertThat(state.executedNodes()).contains(AiRoutingWorkflowService.CREATE_REVIEW);
     }
+
+    @Test
+    void shouldDeriveSelectedCandidatesAndSourceNodeFromRecallContext() throws Exception {
+        PreCommitGuard preCommitGuard = mock(PreCommitGuard.class);
+        when(preCommitGuard.evaluate(
+                org.mockito.ArgumentMatchers.eq("source-1"),
+                org.mockito.ArgumentMatchers.any(Instant.class),
+                org.mockito.ArgumentMatchers.eq(""))
+        ).thenReturn(new PreCommitGuard.PreCommitGuardResult(false, ""));
+        AiRoutingWorkflowService service = new AiRoutingWorkflowService(preCommitGuard);
+
+        AiRoutingState state = service.invokeSkeleton(java.util.Map.of(
+                        AiRoutingState.REQUEST_ID, "req-context-1",
+                        AiRoutingState.RECALL_CANDIDATE_NODE_IDS, List.of("source-1", "source-2")
+                ))
+                .orElseThrow();
+
+        assertThat(state.recallCandidateNodeIds()).containsExactly("source-1", "source-2");
+        assertThat(state.selectedCandidateNodeIds()).containsExactly("source-1", "source-2");
+        assertThat(state.sourceNodeId()).isEqualTo("source-1");
+        assertThat(state.executedNodes()).contains(AiRoutingWorkflowService.VECTOR_RECALL, AiRoutingWorkflowService.CONTEXT_PRUNE);
+    }
 }

@@ -15,6 +15,8 @@ public final class AiRoutingState extends AgentState {
     public static final String POST_NODE_ID = "postNodeId";
     public static final String TARGET_NODE_ID = "targetNodeId";
     public static final String SOURCE_NODE_ID = "sourceNodeId";
+    public static final String RECALL_CANDIDATE_NODE_IDS = "recallCandidateNodeIds";
+    public static final String SELECTED_CANDIDATE_NODE_IDS = "selectedCandidateNodeIds";
     public static final String WORKFLOW_STARTED_AT = "workflowStartedAt";
     public static final String ROUTING_ACTION = "routingAction";
     public static final String REVIEW_REASON = "reviewReason";
@@ -46,6 +48,16 @@ public final class AiRoutingState extends AgentState {
         return value(SOURCE_NODE_ID, EMPTY_TEXT);
     }
 
+    @SuppressWarnings("unchecked")
+    public List<String> recallCandidateNodeIds() {
+        return value(RECALL_CANDIDATE_NODE_IDS, List::of);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> selectedCandidateNodeIds() {
+        return value(SELECTED_CANDIDATE_NODE_IDS, List::of);
+    }
+
     public Instant workflowStartedAt() {
         return value(WORKFLOW_STARTED_AT, Instant.EPOCH);
     }
@@ -70,6 +82,8 @@ public final class AiRoutingState extends AgentState {
         channels.put(POST_NODE_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(TARGET_NODE_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(SOURCE_NODE_ID, Channels.base(() -> EMPTY_TEXT));
+        channels.put(RECALL_CANDIDATE_NODE_IDS, Channels.base(() -> List.<String>of()));
+        channels.put(SELECTED_CANDIDATE_NODE_IDS, Channels.base(() -> List.<String>of()));
         channels.put(WORKFLOW_STARTED_AT, Channels.base(() -> Instant.EPOCH));
         channels.put(ROUTING_ACTION, Channels.base(() -> DEFAULT_ACTION));
         channels.put(REVIEW_REASON, Channels.base(() -> EMPTY_TEXT));

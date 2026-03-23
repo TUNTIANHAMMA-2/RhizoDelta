@@ -50,8 +50,8 @@ public class AiRoutingWorkflowService {
         StateGraph<AiRoutingState> graph = new StateGraph<>(AiRoutingState.channels(), AiRoutingState::new);
         graph.addNode(LOAD_POST, loadPost());
         graph.addNode(ENSURE_EMBEDDING, appendNode(ENSURE_EMBEDDING));
-        graph.addNode(VECTOR_RECALL, appendNode(VECTOR_RECALL));
-        graph.addNode(CONTEXT_PRUNE, appendNode(CONTEXT_PRUNE));
+        graph.addNode(VECTOR_RECALL, vectorRecall());
+        graph.addNode(CONTEXT_PRUNE, contextPrune());
         graph.addNode(LLM_EVALUATE, appendNode(LLM_EVALUATE));
         graph.addNode(REFLECTION_VALIDATE, appendNode(REFLECTION_VALIDATE));
         graph.addNode(PRE_COMMIT_GUARD, preCommitGuardNode());
@@ -90,6 +90,27 @@ public class AiRoutingWorkflowService {
         ));
     }
 
+    private AsyncNodeAction<AiRoutingState> vectorRecall() {
+        return AsyncNodeAction.node_async(state -> Map.of(
+                AiRoutingState.EXECUTED_NODES, List.of(VECTOR_RECALL),
+                AiRoutingState.RECALL_CANDIDATE_NODE_IDS, normalizeRecallCandidates(state)
+        ));
+    }
+
+    private AsyncNodeAction<AiRoutingState> contextPrune() {
+        return AsyncNodeAction.node_async(state -> {
+            List<String> selectedCandidateNodeIds = normalizeSelectedCandidates(state);
+            String sourceNodeId = state.sourceNodeId().isBlank() && !selectedCandidateNodeIds.isEmpty()
+                    ? selectedCandidateNodeIds.get(0)
+                    : state.sourceNodeId();
+            return Map.of(
+                    AiRoutingState.EXECUTED_NODES, List.of(CONTEXT_PRUNE),
+                    AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, selectedCandidateNodeIds,
+                    AiRoutingState.SOURCE_NODE_ID, sourceNodeId
+            );
+        });
+    }
+
     private AsyncNodeAction<AiRoutingState> createReview() {
         return AsyncNodeAction.node_async(state -> Map.of(
                 AiRoutingState.EXECUTED_NODES, List.of(CREATE_REVIEW),
@@ -122,6 +143,23 @@ public class AiRoutingWorkflowService {
 
     private AsyncEdgeAction<AiRoutingState> routeByAction() {
         return state -> CompletableFuture.completedFuture(normalizeAction(state.routingAction()));
+    }
+
+    private List<String> normalizeRecallCandidates(AiRoutingState state) {
+        if (!state.recallCandidateNodeIds().isEmpty()) {
+            return List.copyOf(state.recallCandidateNodeIds());
+        }
+        if (state.sourceNodeId().isBlank()) {
+            return List.of();
+        }
+        return List.of(state.sourceNodeId());
+    }
+
+    private List<String> normalizeSelectedCandidates(AiRoutingState state) {
+        if (!state.selectedCandidateNodeIds().isEmpty()) {
+            return List.copyOf(state.selectedCandidateNodeIds());
+        }
+        return normalizeRecallCandidates(state);
     }
 
     private String normalizeAction(String action) {
