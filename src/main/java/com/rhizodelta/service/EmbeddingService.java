@@ -37,6 +37,7 @@ public class EmbeddingService {
             YIELD node, score
             WHERE NOT coalesce(node._deleted, false)
               AND node.node_id IS NOT NULL
+              AND ($rootId IS NULL OR coalesce(node.root_id, node.node_id) = $rootId)
             WITH node, score, labels(node) AS nodeLabels
             CALL {
               WITH node
@@ -97,6 +98,11 @@ public class EmbeddingService {
 
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<SimilaritySearchResult> searchSimilar(List<Float> vector, Integer topK) {
+        return searchSimilar(vector, topK, null);
+    }
+
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public List<SimilaritySearchResult> searchSimilar(List<Float> vector, Integer topK, String rootId) {
         List<Float> validatedVector = requireVector(vector);
         int actualDimension = validatedVector.size();
         if (actualDimension != embeddingDimension) {
@@ -110,6 +116,7 @@ public class EmbeddingService {
         Map<String, Object> params = new HashMap<>();
         params.put("vector", validatedVector);
         params.put("topK", resolvedTopK);
+        params.put("rootId", normalizeRootId(rootId));
 
         Collection<Map<String, Object>> records = neo4jClient.query(SIMILARITY_SEARCH_QUERY)
                 .bindAll(params)
@@ -152,6 +159,13 @@ public class EmbeddingService {
             throw new IllegalArgumentException("top_k must be greater than 0");
         }
         return Math.min(topK, MAX_TOP_K);
+    }
+
+    private static String normalizeRootId(String rootId) {
+        if (rootId == null || rootId.isBlank()) {
+            return null;
+        }
+        return rootId;
     }
 
     private static SimilaritySearchResult toSimilaritySearchResult(Map<String, Object> row) {

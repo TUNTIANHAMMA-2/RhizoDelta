@@ -105,6 +105,22 @@ class EmbeddingServiceUnitTest {
         verify(neo4jClient.query(anyString())).bindAll(argThat(params ->
                 Integer.valueOf(DEFAULT_TOP_K).equals(params.get("topK"))
                         && VALID_VECTOR.equals(params.get("vector"))
+                        && params.get("rootId") == null
+        ));
+    }
+
+    @Test
+    void searchSimilarShouldBindRootIdFilterWhenProvided() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all())
+                .thenReturn(List.of());
+        EmbeddingService service = new EmbeddingService(neo4jClient, EMBEDDING_DIMENSION);
+
+        service.searchSimilar(VALID_VECTOR, 5, "root-1");
+
+        verify(neo4jClient.query(anyString())).bindAll(argThat(params ->
+                Integer.valueOf(5).equals(params.get("topK"))
+                        && "root-1".equals(params.get("rootId"))
         ));
     }
 
