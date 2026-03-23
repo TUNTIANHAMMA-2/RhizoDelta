@@ -33,6 +33,7 @@ public class DecisionService {
     private static final String QUEUED_STATUS = "QUEUED";
     private record UpsertResult(UUID nodeId, boolean created) {}
     private static final String UPSERT_MERGE_NODE_QUERY = """
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (decision:AI_Consensus {decision_id: $decisionId})
             ON CREATE SET
               decision:GraphNode,
@@ -40,6 +41,7 @@ public class DecisionService {
               decision.summary_content = $summaryContent,
               decision.agent_version = $agentVersion,
               decision.request_id = $requestId,
+              decision.root_id = coalesce(source.root_id, source.node_id),
               decision.created_at = $createdAt,
               decision.embedding = null
             RETURN toString(decision.node_id) AS nodeId,
@@ -68,6 +70,7 @@ public class DecisionService {
             RETURN count(synthesized) AS synthesizedCount
             """;
     private static final String UPSERT_BRANCH_NODE_QUERY = """
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (decision:Human_Post {decision_id: $decisionId})
             ON CREATE SET
               decision:GraphNode,
@@ -75,6 +78,7 @@ public class DecisionService {
               decision.request_id = $requestId,
               decision.content = $content,
               decision.author_id = $authorId,
+              decision.root_id = coalesce(source.root_id, source.node_id),
               decision.created_at = $createdAt,
               decision.embedding = null
             RETURN toString(decision.node_id) AS nodeId,
@@ -92,6 +96,7 @@ public class DecisionService {
             RETURN type(branched) AS relType
             """;
     private static final String UPSERT_INJECT_NODE_QUERY = """
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (decision:Human_Post {decision_id: $decisionId})
             ON CREATE SET
               decision:GraphNode,
@@ -99,6 +104,7 @@ public class DecisionService {
               decision.request_id = $requestId,
               decision.content = $content,
               decision.author_id = $authorId,
+              decision.root_id = coalesce(source.root_id, source.node_id),
               decision.created_at = $createdAt,
               decision.embedding = null
             RETURN toString(decision.node_id) AS nodeId,
@@ -116,6 +122,7 @@ public class DecisionService {
             RETURN type(rel) AS relType
             """;
     private static final String UPSERT_MATERIALIZE_NODE_QUERY = """
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (result:Result {decision_id: $decisionId})
             ON CREATE SET
               result:GraphNode,
@@ -124,6 +131,7 @@ public class DecisionService {
               result.content = $content,
               result.operator_type = $operatorType,
               result.operator_id = $operatorId,
+              result.root_id = coalesce(source.root_id, source.node_id),
               result.created_at = $createdAt,
               result.embedding = null
             RETURN toString(result.node_id) AS nodeId,
@@ -150,6 +158,7 @@ public class DecisionService {
               decision.request_id = b.requestId,
               decision.content = b.content,
               decision.author_id = b.authorId,
+              decision.root_id = coalesce(source.root_id, source.node_id),
               decision.created_at = $createdAt,
               decision.embedding = null,
               decision.operation_id = $operationId
@@ -164,6 +173,8 @@ public class DecisionService {
             RETURN count(DISTINCT decision) AS createdCount
             """;
     private static final String UPSERT_CROSS_SYNTH_QUERY = """
+            WITH $sourceResultNodeIds AS sourceIds
+            MATCH (lineageSource:Result:GraphNode {node_id: sourceIds[0]})
             MERGE (result:Result {decision_id: $decisionId})
             ON CREATE SET
               result:GraphNode,
@@ -172,9 +183,10 @@ public class DecisionService {
               result.content = $content,
               result.operator_type = $operatorType,
               result.operator_id = $operatorId,
+              result.root_id = coalesce(lineageSource.root_id, lineageSource.node_id),
               result.created_at = $createdAt,
               result.embedding = null
-            WITH result, $sourceResultNodeIds AS sourceIds
+            WITH result, sourceIds
             UNWIND sourceIds AS sourceId
             MATCH (source:Result:GraphNode {node_id: sourceId})
             MERGE (result)-[rel:CROSS_SYNTHESIZED_FROM]->(source)
@@ -187,6 +199,8 @@ public class DecisionService {
                    count(rel) AS crossSynthCount
             """;
     private static final String UPSERT_JOIN_NODE_QUERY = """
+            WITH $sourceNodeIds AS sourceIds
+            MATCH (lineageSource:GraphNode {node_id: sourceIds[0]})
             MERGE (decision:AI_Consensus {decision_id: $decisionId})
             ON CREATE SET
               decision:GraphNode,
@@ -194,6 +208,7 @@ public class DecisionService {
               decision.summary_content = $summaryContent,
               decision.agent_version = $agentVersion,
               decision.request_id = $requestId,
+              decision.root_id = coalesce(lineageSource.root_id, lineageSource.node_id),
               decision.created_at = $createdAt,
               decision.embedding = null
             RETURN toString(decision.node_id) AS nodeId,
@@ -383,7 +398,8 @@ public class DecisionService {
         Map<String, Object> result = neo4jClient.query(UPSERT_MERGE_NODE_QUERY)
                 .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
                         "summaryContent", command.summary_content(), "agentVersion", command.agent_version(),
-                        "requestId", command.request_id(), "createdAt", createdAt))
+                        "requestId", command.request_id(), "createdAt", createdAt,
+                        "sourceNodeId", command.source_node_id().toString()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve AI_Consensus node_id from upsert query"));
@@ -410,7 +426,8 @@ public class DecisionService {
         Map<String, Object> result = neo4jClient.query(UPSERT_BRANCH_NODE_QUERY)
                 .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
                         "requestId", command.request_id(), "content", command.content(),
-                        "authorId", command.author_id(), "createdAt", createdAt))
+                        "authorId", command.author_id(), "createdAt", createdAt,
+                        "sourceNodeId", command.source_node_id().toString()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve Human_Post node_id from upsert query"));
@@ -430,7 +447,8 @@ public class DecisionService {
         Map<String, Object> result = neo4jClient.query(UPSERT_INJECT_NODE_QUERY)
                 .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
                         "requestId", command.request_id(), "content", command.content(),
-                        "authorId", command.author_id(), "createdAt", createdAt))
+                        "authorId", command.author_id(), "createdAt", createdAt,
+                        "sourceNodeId", command.source_node_id().toString()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve Human_Post node_id from inject upsert query"));
@@ -451,7 +469,7 @@ public class DecisionService {
                 .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
                         "requestId", command.request_id(), "content", command.content(),
                         "operatorType", command.operator_type().name(), "operatorId", command.operator_id(),
-                        "createdAt", createdAt))
+                        "createdAt", createdAt, "sourceNodeId", command.source_node_id().toString()))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve Result node_id from materialize upsert query"));

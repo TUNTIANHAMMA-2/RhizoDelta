@@ -15,6 +15,7 @@ import java.util.UUID;
 @Service
 public class PostService {
     private static final String UPSERT_HUMAN_POST_QUERY = """
+            OPTIONAL MATCH (target:GraphNode {node_id: $targetNodeId})
             MERGE (post:Human_Post {request_id: $requestId})
             ON CREATE SET
               post:GraphNode,
@@ -23,6 +24,10 @@ public class PostService {
               post.author_id = $authorId,
               post.request_id = $requestId,
               post.target_node_id = $targetNodeId,
+              post.root_id = CASE
+                WHEN target IS NULL THEN $nodeId
+                ELSE coalesce(target.root_id, target.node_id)
+              END,
               post.created_at = $createdAt,
               post.embedding = null
             RETURN toString(post.node_id) AS nodeId
