@@ -32,6 +32,9 @@ public class AiRoutingOrchestratorService {
     public void orchestrate(PostEventMessage message, HumanPost post) {
         publishStatus(message, post.getNodeId().toString(), "EVALUATION_STARTED", null, "ai routing workflow started");
         PrunedContext prunedContext = routingRecallService.recall(post.getContent(), message.targetNodeId());
+        List<String> candidateNodeIds = prunedContext.selected().stream()
+                .map(result -> result.node_id().toString())
+                .toList();
         publishStatus(
                 message,
                 post.getNodeId().toString(),
@@ -44,7 +47,8 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.EVENT_ID, message.eventId(),
                         AiRoutingState.POST_NODE_ID, post.getNodeId().toString(),
                         AiRoutingState.TARGET_NODE_ID, message.targetNodeId() == null ? "" : message.targetNodeId(),
-                        AiRoutingState.SOURCE_NODE_ID, resolveSourceNodeId(prunedContext),
+                        AiRoutingState.RECALL_CANDIDATE_NODE_IDS, candidateNodeIds,
+                        AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, candidateNodeIds,
                         AiRoutingState.ROUTING_ACTION, "REVIEW"
                 ))
                 .orElseThrow(() -> new IllegalStateException("ai routing workflow returned no state"));
@@ -58,13 +62,11 @@ public class AiRoutingOrchestratorService {
                 post.getNodeId().toString(),
                 message.eventId(),
                 state.routingAction(),
-                prunedContext.selected().stream()
-                        .map(result -> result.node_id().toString())
-                        .toList(),
+                state.selectedCandidateNodeIds(),
                 Map.of(
                         "request_id", message.requestId(),
                         "post_node_id", post.getNodeId().toString(),
-                        "source_node_id", resolveSourceNodeId(prunedContext)
+                        "source_node_id", state.sourceNodeId()
                 ),
                 state.reviewReason().isBlank() ? List.of("WORKFLOW_SKELETON_FALLBACK") : List.of(state.reviewReason())
         ));
@@ -88,12 +90,5 @@ public class AiRoutingOrchestratorService {
                 null
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
-    }
-
-    private String resolveSourceNodeId(PrunedContext prunedContext) {
-        if (prunedContext.selected().isEmpty()) {
-            return "";
-        }
-        return prunedContext.selected().get(0).node_id().toString();
     }
 }

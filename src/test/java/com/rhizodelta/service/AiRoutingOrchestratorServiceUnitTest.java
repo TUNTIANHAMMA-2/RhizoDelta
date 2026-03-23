@@ -36,7 +36,8 @@ class AiRoutingOrchestratorServiceUnitTest {
                 sseEventService
         );
         UUID postNodeId = UUID.randomUUID();
-        UUID candidateNodeId = UUID.randomUUID();
+        UUID recalledCandidateNodeId = UUID.randomUUID();
+        UUID workflowCandidateNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "post content", "author-1", "req-1");
         PostEventMessage message = new PostEventMessage("req-1", "author-1", "post content", null, "evt-1");
         ReviewTask reviewTask = new ReviewTask(
@@ -54,7 +55,7 @@ class AiRoutingOrchestratorServiceUnitTest {
                 Instant.parse("2026-03-30T00:00:00Z")
         );
         when(routingRecallService.recall("post content", null)).thenReturn(new PrunedContext(
-                List.of(new SimilaritySearchResult(candidateNodeId, "Human_Post", 0.95d, "candidate", Instant.now(), List.of())),
+                List.of(new SimilaritySearchResult(recalledCandidateNodeId, "Human_Post", 0.95d, "candidate", Instant.now(), List.of())),
                 false,
                 0
         ));
@@ -62,7 +63,8 @@ class AiRoutingOrchestratorServiceUnitTest {
                 AiRoutingState.REQUEST_ID, "req-1",
                 AiRoutingState.EVENT_ID, "evt-1",
                 AiRoutingState.POST_NODE_ID, postNodeId.toString(),
-                AiRoutingState.SOURCE_NODE_ID, candidateNodeId.toString(),
+                AiRoutingState.SOURCE_NODE_ID, workflowCandidateNodeId.toString(),
+                AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, List.of(workflowCandidateNodeId.toString()),
                 AiRoutingState.ROUTING_ACTION, "REVIEW",
                 AiRoutingState.REVIEW_REASON, "workflow skeleton fallback"
         ))));
@@ -70,7 +72,20 @@ class AiRoutingOrchestratorServiceUnitTest {
 
         orchestratorService.orchestrate(message, post);
 
-        verify(reviewTaskService).createPendingTask(any());
+        ArgumentCaptor<Map<String, Object>> workflowInputCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowService).invokeSkeleton(workflowInputCaptor.capture());
+        assertThat(workflowInputCaptor.getValue().get(AiRoutingState.RECALL_CANDIDATE_NODE_IDS))
+                .isEqualTo(List.of(recalledCandidateNodeId.toString()));
+        assertThat(workflowInputCaptor.getValue().get(AiRoutingState.SELECTED_CANDIDATE_NODE_IDS))
+                .isEqualTo(List.of(recalledCandidateNodeId.toString()));
+
+        ArgumentCaptor<ReviewTask.CreateReviewTaskCommand> reviewCommandCaptor =
+                ArgumentCaptor.forClass(ReviewTask.CreateReviewTaskCommand.class);
+        verify(reviewTaskService).createPendingTask(reviewCommandCaptor.capture());
+        ReviewTask.CreateReviewTaskCommand command = reviewCommandCaptor.getValue();
+        assertThat(command.candidateNodeIds()).containsExactly(workflowCandidateNodeId.toString());
+        assertThat(command.draftPayload().get("source_node_id")).isEqualTo(workflowCandidateNodeId.toString());
+
         ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
         verify(sseEventService, org.mockito.Mockito.times(3))
                 .publish(org.mockito.Mockito.eq(SseEventService.SseEventType.ORCHESTRATION_STATUS), payloadCaptor.capture());
