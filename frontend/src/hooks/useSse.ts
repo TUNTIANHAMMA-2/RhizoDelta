@@ -175,21 +175,14 @@ function handleSseEvent(event: SseEvent) {
     }
     case "DECISION_COMPLETE": {
       const payload: DecisionCompleteEvent = JSON.parse(event.data);
-      // Fetch the node created by this decision if not already present
-      if (!graphStore.nodes.has(payload.node_id)) {
-        fetchNode(payload.node_id).then((node) => graphStore.addNode(node));
-      }
-      // Resolve any optimistic placeholder
-      graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, {
-        node_id: payload.node_id,
-        label: "AI_Consensus",
-        content: null,
-        summary_content: null,
-        author_id: null,
-        agent_version: null,
-        operation_id: null,
-        created_at: new Date().toISOString(),
-        has_embedding: false,
+      // Fetch the node to get its ACTUAL type and content from the database.
+      // This is crucial because DECISION_COMPLETE can refer to a newly created node
+      // (Merge, Join) OR an existing source node (Fork).
+      fetchNode(payload.node_id).then((node) => {
+        graphStore.addNode(node);
+        // Resolve the optimistic placeholder using the REAL data from the backend,
+        // preventing accidental overwrites with hardcoded 'AI_Consensus' labels.
+        graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, node);
       });
       break;
     }

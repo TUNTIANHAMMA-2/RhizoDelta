@@ -61,7 +61,8 @@ export function applyTrackLayout(
 
     for (const edge of inEdgesMap.get(curr)!) {
       const child = edge.source; // Edge is child -> parent(curr)
-      ranks.set(child, Math.max(ranks.get(child)!, currRank + 1));
+      const rankIncrement = edge.data?.relType === "BRANCHED_FROM" ? 0 : 1;
+      ranks.set(child, Math.max(ranks.get(child)!, currRank + rankIncrement));
       outDegree.set(child, outDegree.get(child)! - 1);
       if (outDegree.get(child) === 0) {
         queue.push(child);

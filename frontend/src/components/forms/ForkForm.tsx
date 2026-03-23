@@ -18,7 +18,6 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
   const [reason, setReason] = useState("");
   const [branches, setBranches] = useState<Branch[]>([
     { id: crypto.randomUUID(), content: "", author_id: "" },
-    { id: crypto.randomUUID(), content: "", author_id: "" },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const addToast = useUiStore((s) => s.addToast);
@@ -37,7 +36,7 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
     ]);
 
   const removeBranch = (idx: number) => {
-    if (branches.length <= 2) return;
+    if (branches.length <= 1) return;
     setBranches(branches.filter((_, i) => i !== idx));
   };
 
@@ -146,7 +145,7 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
               >
                 分支 {idx + 1}
               </span>
-              {branches.length > 2 && (
+              {branches.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeBranch(idx)}

@@ -19,9 +19,16 @@ public record ForkDecisionCommand(
         operation_id = DecisionCommandValidation.requireText(operation_id, "operation_id");
         request_id = DecisionCommandValidation.requireText(request_id, "request_id");
         source_node_id = DecisionCommandValidation.requireUuid(source_node_id, "source_node_id");
-        if (branches == null || branches.size() < 2) {
-            throw new IllegalArgumentException("branches must contain at least 2 entries");
+        if (branches == null || branches.isEmpty()) {
+            throw new IllegalArgumentException("branches must not be empty");
         }
+        // [MVP Design Note]: Previously required branches.size() >= 2.
+        // Changed to allow size >= 1 to support real-world interactions where a user
+        // creates a single branch (alternative) at a time based on a specific node.
+        // The topological relationship (NewNode -[:BRANCHED_FROM]-> SourceNode) is
+        // intentionally preserved in the database to maintain temporal causality and provenance.
+        // The UI (frontend) is responsible for rendering these causal children as
+        // logical siblings on parallel tracks.
         branches = List.copyOf(branches);
         operator_type = DecisionCommandValidation.requireOperatorType(operator_type);
         operator_id = DecisionCommandValidation.requireText(operator_id, "operator_id");

@@ -110,26 +110,27 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   addNode: (node) => {
     const nodesMap = new Map(get().nodes);
     nodesMap.set(node.node_id, node);
-    const rfNode = toRfNode(node);
-    // Place new node below the last node as a simple fallback
-    const lastNode = get().rfNodes[get().rfNodes.length - 1];
-    if (lastNode) {
-      rfNode.position = {
-        x: lastNode.position.x,
-        y: lastNode.position.y + 280,
-      };
-    }
-    set({
-      nodes: nodesMap,
-      rfNodes: [...get().rfNodes, rfNode],
-    });
+    set({ nodes: nodesMap });
+    // Defer relayout to addEdge — node alone has no position context
   },
 
   addEdge: (edge) => {
-    const rfEdge = toRfEdge(edge);
+    const nodesMap = get().nodes;
+    const allEdges = [...get().edges, edge];
+
+    // Rebuild full layout so the track algorithm can place
+    // CONTINUES_FROM children vertically and BRANCHED_FROM horizontally
+    const rawRfNodes = Array.from(nodesMap.values()).map(toRfNode);
+    const rawRfEdges = allEdges.map(toRfEdge);
+    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
+      rawRfNodes,
+      rawRfEdges,
+    );
+
     set({
-      edges: [...get().edges, edge],
-      rfEdges: [...get().rfEdges, rfEdge],
+      edges: allEdges,
+      rfNodes: layoutNodes,
+      rfEdges: layoutEdges,
     });
   },
 
