@@ -4,6 +4,7 @@ import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 import org.bsc.langgraph4j.state.Channels;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ public final class AiRoutingState extends AgentState {
     public static final String EVENT_ID = "eventId";
     public static final String POST_NODE_ID = "postNodeId";
     public static final String TARGET_NODE_ID = "targetNodeId";
+    public static final String SOURCE_NODE_ID = "sourceNodeId";
+    public static final String WORKFLOW_STARTED_AT = "workflowStartedAt";
     public static final String ROUTING_ACTION = "routingAction";
     public static final String REVIEW_REASON = "reviewReason";
     public static final String EXECUTED_NODES = "executedNodes";
@@ -39,6 +42,14 @@ public final class AiRoutingState extends AgentState {
         return value(TARGET_NODE_ID, EMPTY_TEXT);
     }
 
+    public String sourceNodeId() {
+        return value(SOURCE_NODE_ID, EMPTY_TEXT);
+    }
+
+    public Instant workflowStartedAt() {
+        return value(WORKFLOW_STARTED_AT, Instant.EPOCH);
+    }
+
     public String routingAction() {
         return value(ROUTING_ACTION, DEFAULT_ACTION);
     }
@@ -58,6 +69,8 @@ public final class AiRoutingState extends AgentState {
         channels.put(EVENT_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(POST_NODE_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(TARGET_NODE_ID, Channels.base(() -> EMPTY_TEXT));
+        channels.put(SOURCE_NODE_ID, Channels.base(() -> EMPTY_TEXT));
+        channels.put(WORKFLOW_STARTED_AT, Channels.base(() -> Instant.EPOCH));
         channels.put(ROUTING_ACTION, Channels.base(() -> DEFAULT_ACTION));
         channels.put(REVIEW_REASON, Channels.base(() -> EMPTY_TEXT));
         channels.put(EXECUTED_NODES, Channels.appender(java.util.ArrayList::new));

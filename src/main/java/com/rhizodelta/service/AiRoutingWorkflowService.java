@@ -9,6 +9,7 @@ import org.bsc.langgraph4j.action.AsyncEdgeAction;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,8 +30,10 @@ public class AiRoutingWorkflowService {
     static final String CREATE_REVIEW = "create-review";
 
     private final CompiledGraph<AiRoutingState> workflow;
+    private final PreCommitGuard preCommitGuard;
 
-    public AiRoutingWorkflowService() throws GraphStateException {
+    public AiRoutingWorkflowService(PreCommitGuard preCommitGuard) throws GraphStateException {
+        this.preCommitGuard = preCommitGuard;
         this.workflow = buildWorkflow();
     }
 
@@ -51,7 +54,7 @@ public class AiRoutingWorkflowService {
         graph.addNode(CONTEXT_PRUNE, appendNode(CONTEXT_PRUNE));
         graph.addNode(LLM_EVALUATE, appendNode(LLM_EVALUATE));
         graph.addNode(REFLECTION_VALIDATE, appendNode(REFLECTION_VALIDATE));
-        graph.addNode(PRE_COMMIT_GUARD, appendNode(PRE_COMMIT_GUARD));
+        graph.addNode(PRE_COMMIT_GUARD, preCommitGuardNode());
         graph.addNode(EXECUTE_MERGE, appendNode(EXECUTE_MERGE));
         graph.addNode(EXECUTE_BRANCH, appendNode(EXECUTE_BRANCH));
         graph.addNode(CREATE_REVIEW, createReview());
@@ -76,7 +79,8 @@ public class AiRoutingWorkflowService {
     private AsyncNodeAction<AiRoutingState> loadPost() {
         return AsyncNodeAction.node_async(state -> Map.of(
                 AiRoutingState.EXECUTED_NODES, List.of(LOAD_POST),
-                AiRoutingState.ROUTING_ACTION, normalizeAction(state.routingAction())
+                AiRoutingState.ROUTING_ACTION, normalizeAction(state.routingAction()),
+                AiRoutingState.WORKFLOW_STARTED_AT, resolveWorkflowStartedAt(state.workflowStartedAt())
         ));
     }
 
@@ -95,6 +99,27 @@ public class AiRoutingWorkflowService {
         ));
     }
 
+    private AsyncNodeAction<AiRoutingState> preCommitGuardNode() {
+        return AsyncNodeAction.node_async(state -> {
+            if (state.sourceNodeId().isBlank()) {
+                return Map.of(AiRoutingState.EXECUTED_NODES, List.of(PRE_COMMIT_GUARD));
+            }
+            PreCommitGuard.PreCommitGuardResult result = preCommitGuard.evaluate(
+                    state.sourceNodeId(),
+                    resolveWorkflowStartedAt(state.workflowStartedAt()),
+                    state.targetNodeId()
+            );
+            if (!result.stale()) {
+                return Map.of(AiRoutingState.EXECUTED_NODES, List.of(PRE_COMMIT_GUARD));
+            }
+            return Map.of(
+                    AiRoutingState.EXECUTED_NODES, List.of(PRE_COMMIT_GUARD),
+                    AiRoutingState.ROUTING_ACTION, "REVIEW",
+                    AiRoutingState.REVIEW_REASON, result.reason()
+            );
+        });
+    }
+
     private AsyncEdgeAction<AiRoutingState> routeByAction() {
         return state -> CompletableFuture.completedFuture(normalizeAction(state.routingAction()));
     }
@@ -107,5 +132,12 @@ public class AiRoutingWorkflowService {
             return "BRANCH";
         }
         return "REVIEW";
+    }
+
+    private Instant resolveWorkflowStartedAt(Instant workflowStartedAt) {
+        if (workflowStartedAt == null || Instant.EPOCH.equals(workflowStartedAt)) {
+            return Instant.now();
+        }
+        return workflowStartedAt;
     }
 }
