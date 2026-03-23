@@ -1,0 +1,147 @@
+package com.rhizodelta.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rhizodelta.domain.review.ReviewTask;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+@Service
+public class ReviewTaskService {
+    private static final String REVIEW_TASK_KEY_PREFIX = "review:task:";
+    private static final String PENDING_REVIEW_INDEX_KEY = "review:pending";
+    private static final int DEFAULT_PENDING_LIMIT = 50;
+
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final Duration reviewTtl;
+
+    public ReviewTaskService(
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            @Value("${rhizodelta.ai.review.ttl:PT168H}") Duration reviewTtl
+    ) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.reviewTtl = reviewTtl;
+    }
+
+    public ReviewTask createPendingTask(ReviewTask.CreateReviewTaskCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        Instant createdAt = Instant.now();
+        ReviewTask task = new ReviewTask(
+                UUID.randomUUID().toString(),
+                requireText(command.requestId(), "requestId"),
+                requireText(command.postNodeId(), "postNodeId"),
+                requireText(command.workflowTraceId(), "workflowTraceId"),
+                ReviewTask.Status.PENDING,
+                normalizeAction(command.suggestedAction()),
+                command.candidateNodeIds(),
+                command.draftPayload(),
+                command.reviewReasonCodes(),
+                createdAt,
+                createdAt.plus(reviewTtl)
+        );
+        save(task);
+        return task;
+    }
+
+    public Optional<ReviewTask> findTask(String reviewId) {
+        String payload = valueOps().get(taskKey(requireText(reviewId, "reviewId")));
+        if (payload == null || payload.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(deserialize(payload));
+    }
+
+    public ReviewTask getTask(String reviewId) {
+        return findTask(reviewId)
+                .orElseThrow(() -> new NoSuchElementException("review task not found: " + reviewId));
+    }
+
+    public List<ReviewTask> findPendingTasks(Integer limit) {
+        int resolvedLimit = resolveLimit(limit);
+        Set<String> reviewIds = zSetOps().range(PENDING_REVIEW_INDEX_KEY, 0, resolvedLimit - 1);
+        if (reviewIds == null || reviewIds.isEmpty()) {
+            return List.of();
+        }
+        return reviewIds.stream()
+                .map(this::findTask)
+                .flatMap(Optional::stream)
+                .filter(task -> task.status() == ReviewTask.Status.PENDING)
+                .toList();
+    }
+
+    private void save(ReviewTask task) {
+        valueOps().set(taskKey(task.reviewId()), serialize(task), reviewTtl);
+        zSetOps().add(PENDING_REVIEW_INDEX_KEY, task.reviewId(), task.createdAt().toEpochMilli());
+    }
+
+    private ValueOperations<String, String> valueOps() {
+        return redisTemplate.opsForValue();
+    }
+
+    private ZSetOperations<String, String> zSetOps() {
+        return redisTemplate.opsForZSet();
+    }
+
+    private ReviewTask deserialize(String payload) {
+        try {
+            return objectMapper.readValue(payload, ReviewTask.class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("failed to deserialize review task", exception);
+        }
+    }
+
+    private String serialize(ReviewTask task) {
+        try {
+            return objectMapper.writeValueAsString(task);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("failed to serialize review task", exception);
+        }
+    }
+
+    private static String taskKey(String reviewId) {
+        return REVIEW_TASK_KEY_PREFIX + reviewId;
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value;
+    }
+
+    private static int resolveLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_PENDING_LIMIT;
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than 0");
+        }
+        return limit;
+    }
+
+    private static String normalizeAction(String suggestedAction) {
+        if (suggestedAction == null || suggestedAction.isBlank()) {
+            return "REVIEW";
+        }
+        String normalized = suggestedAction.toUpperCase();
+        if ("MERGE".equals(normalized) || "BRANCH".equals(normalized) || "REVIEW".equals(normalized)) {
+            return normalized;
+        }
+        return "REVIEW";
+    }
+}
