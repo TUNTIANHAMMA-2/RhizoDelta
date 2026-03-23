@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +68,7 @@ class ReviewTaskServiceUnitTest {
                 Map.of("content", "draft"),
                 List.of("BUDGET_EXCEEDED"),
                 java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
                 java.time.Instant.parse("2026-03-30T00:00:00Z")
         );
         String serializedTask = new ObjectMapper()
@@ -82,5 +84,32 @@ class ReviewTaskServiceUnitTest {
         List<ReviewTask> pendingTasks = service.findPendingTasks(2);
 
         assertThat(pendingTasks).containsExactly(persistedTask);
+    }
+
+    @Test
+    void shouldUpdateStatusAndRemoveCompletedTaskFromPendingIndex() throws Exception {
+        ReviewTask existingTask = new ReviewTask(
+                "review-2",
+                "req-2",
+                "post-2",
+                "trace-2",
+                ReviewTask.Status.PENDING,
+                "BRANCH",
+                List.of("candidate-2"),
+                Map.of("content", "branch draft"),
+                List.of("LOW_CONFIDENCE"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-30T00:00:00Z")
+        );
+        when(valueOperations.get("review:task:review-2")).thenReturn(new ObjectMapper()
+                .findAndRegisterModules()
+                .writeValueAsString(existingTask));
+
+        ReviewTask updatedTask = service.updateStatus("review-2", ReviewTask.Status.APPROVED);
+
+        assertThat(updatedTask.status()).isEqualTo(ReviewTask.Status.APPROVED);
+        verify(zSetOperations).remove("review:pending", "review-2");
+        verify(zSetOperations, never()).add(eq("review:pending"), eq("review-2"), anyDouble());
     }
 }

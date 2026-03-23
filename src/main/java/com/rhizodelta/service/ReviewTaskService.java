@@ -52,6 +52,7 @@ public class ReviewTaskService {
                 command.draftPayload(),
                 command.reviewReasonCodes(),
                 createdAt,
+                createdAt,
                 createdAt.plus(reviewTtl)
         );
         save(task);
@@ -84,9 +85,34 @@ public class ReviewTaskService {
                 .toList();
     }
 
+    public ReviewTask updateStatus(String reviewId, ReviewTask.Status status) {
+        ReviewTask existing = getTask(reviewId);
+        ReviewTask updated = new ReviewTask(
+                existing.reviewId(),
+                existing.requestId(),
+                existing.postNodeId(),
+                existing.workflowTraceId(),
+                Objects.requireNonNull(status, "status must not be null"),
+                existing.suggestedAction(),
+                existing.candidateNodeIds(),
+                existing.draftPayload(),
+                existing.reviewReasonCodes(),
+                existing.createdAt(),
+                Instant.now(),
+                Instant.now().plus(reviewTtl)
+        );
+        save(updated);
+        if (status != ReviewTask.Status.PENDING) {
+            zSetOps().remove(PENDING_REVIEW_INDEX_KEY, reviewId);
+        }
+        return updated;
+    }
+
     private void save(ReviewTask task) {
         valueOps().set(taskKey(task.reviewId()), serialize(task), reviewTtl);
-        zSetOps().add(PENDING_REVIEW_INDEX_KEY, task.reviewId(), task.createdAt().toEpochMilli());
+        if (task.status() == ReviewTask.Status.PENDING) {
+            zSetOps().add(PENDING_REVIEW_INDEX_KEY, task.reviewId(), task.createdAt().toEpochMilli());
+        }
     }
 
     private ValueOperations<String, String> valueOps() {

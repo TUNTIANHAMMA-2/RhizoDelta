@@ -15,6 +15,7 @@ public record ReviewTask(
         Map<String, Object> draftPayload,
         List<String> reviewReasonCodes,
         Instant createdAt,
+        Instant updatedAt,
         Instant expiresAt
 ) {
     public ReviewTask {
