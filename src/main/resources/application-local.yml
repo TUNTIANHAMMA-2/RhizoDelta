@@ -13,6 +13,10 @@ spring:
     username: guest
     password: guest
     virtual-host: /
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 # rhizodelta 必须顶格写（前面没有空格）
 rhizodelta:
