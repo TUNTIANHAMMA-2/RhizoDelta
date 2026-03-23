@@ -3,6 +3,7 @@ package com.rhizodelta.consumer;
 import com.rhizodelta.config.RabbitMqConfig;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.post.PostEventMessage;
+import com.rhizodelta.service.AiRoutingOrchestratorService;
 import com.rhizodelta.service.EmbeddingModelService;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.PostService;
@@ -27,6 +28,7 @@ public class PostConsumer {
     private final EmbeddingModelService embeddingModelService;
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
+    private AiRoutingOrchestratorService aiRoutingOrchestratorService;
     private Executor embeddingTaskExecutor = Runnable::run;
 
     public PostConsumer(
@@ -51,6 +53,11 @@ public class PostConsumer {
         this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
     }
 
+    @Autowired(required = false)
+    public void setAiRoutingOrchestratorService(AiRoutingOrchestratorService aiRoutingOrchestratorService) {
+        this.aiRoutingOrchestratorService = aiRoutingOrchestratorService;
+    }
+
     private void processMessage(PostEventMessage message) {
         PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
                 message.requestId(),
@@ -61,6 +68,7 @@ public class PostConsumer {
         HumanPost post = postService.createHumanPost(command);
         CompletableFuture.runAsync(() -> writeEmbedding(message, post), embeddingTaskExecutor);
         publishNodeCreated(post);
+        scheduleRouting(message, post);
     }
 
     private void writeEmbedding(PostEventMessage message, HumanPost post) {
@@ -112,5 +120,12 @@ public class PostConsumer {
                 null
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
+    }
+
+    private void scheduleRouting(PostEventMessage message, HumanPost post) {
+        if (aiRoutingOrchestratorService == null) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> aiRoutingOrchestratorService.orchestrate(message, post), embeddingTaskExecutor);
     }
 }
