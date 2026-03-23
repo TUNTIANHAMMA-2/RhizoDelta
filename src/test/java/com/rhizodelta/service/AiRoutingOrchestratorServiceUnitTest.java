@@ -27,11 +27,13 @@ class AiRoutingOrchestratorServiceUnitTest {
     void shouldCreateReviewTaskAndPublishReviewPendingStatus() {
         AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
         RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
+        AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
         ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
         SseEventService sseEventService = mock(SseEventService.class);
         AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
                 workflowService,
                 routingRecallService,
+                aiRoutingExecutionService,
                 reviewTaskService,
                 sseEventService
         );
@@ -102,5 +104,62 @@ class AiRoutingOrchestratorServiceUnitTest {
         assertThat(lastPayload.status()).isEqualTo("REVIEW_PENDING");
         assertThat(lastPayload.reviewId()).isEqualTo("review-1");
         assertThat(lastPayload.postNodeId()).isEqualTo(postNodeId.toString());
+    }
+
+    @Test
+    void shouldExecuteMergeDecisionWithoutCreatingReviewTask() {
+        AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
+        RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
+        AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
+        ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
+        SseEventService sseEventService = mock(SseEventService.class);
+        AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
+                workflowService,
+                routingRecallService,
+                aiRoutingExecutionService,
+                reviewTaskService,
+                sseEventService
+        );
+        UUID postNodeId = UUID.randomUUID();
+        UUID candidateNodeId = UUID.randomUUID();
+        HumanPost post = HumanPost.create(postNodeId, "merged content", "author-1", "req-1");
+        PostEventMessage message = new PostEventMessage("req-1", "author-1", "merged content", null, "evt-1");
+        when(routingRecallService.recall("merged content", null)).thenReturn(new PrunedContext(
+                List.of(new SimilaritySearchResult(candidateNodeId, "Human_Post", 0.98d, "candidate", Instant.now(), List.of())),
+                false,
+                0
+        ));
+        when(workflowService.invokeSkeleton(any())).thenReturn(Optional.of(new AiRoutingState(Map.of(
+                AiRoutingState.REQUEST_ID, "req-1",
+                AiRoutingState.EVENT_ID, "evt-1",
+                AiRoutingState.POST_NODE_ID, postNodeId.toString(),
+                AiRoutingState.SOURCE_NODE_ID, candidateNodeId.toString(),
+                AiRoutingState.ROUTING_ACTION, "MERGE",
+                AiRoutingState.REVIEW_REASON, "same knowledge unit"
+        ))));
+        when(aiRoutingExecutionService.execute(any())).thenReturn(new AiRoutingExecutionService.RoutingExecutionResult(
+                "MERGE",
+                new com.rhizodelta.domain.decision.DecisionResult("evt-1:merge", UUID.randomUUID(), "QUEUED")
+        ));
+
+        orchestratorService.orchestrate(message, post);
+
+        verify(reviewTaskService, org.mockito.Mockito.never()).createPendingTask(any());
+        ArgumentCaptor<AiRoutingExecutionService.RoutingExecutionCommand> executionCaptor =
+                ArgumentCaptor.forClass(AiRoutingExecutionService.RoutingExecutionCommand.class);
+        verify(aiRoutingExecutionService).execute(executionCaptor.capture());
+        AiRoutingExecutionService.RoutingExecutionCommand executionCommand = executionCaptor.getValue();
+        assertThat(executionCommand.action()).isEqualTo("MERGE");
+        assertThat(executionCommand.sourceNodeId()).isEqualTo(candidateNodeId.toString());
+        assertThat(executionCommand.reason()).isEqualTo("same knowledge unit");
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(sseEventService, org.mockito.Mockito.times(3))
+                .publish(org.mockito.Mockito.eq(SseEventService.SseEventType.ORCHESTRATION_STATUS), payloadCaptor.capture());
+        List<Object> payloads = payloadCaptor.getAllValues();
+        SseEventService.OrchestrationStatusPayload lastPayload =
+                (SseEventService.OrchestrationStatusPayload) payloads.get(payloads.size() - 1);
+        assertThat(lastPayload.status()).isEqualTo("MERGE_QUEUED");
+        assertThat(lastPayload.message()).contains("evt-1:merge");
     }
 }

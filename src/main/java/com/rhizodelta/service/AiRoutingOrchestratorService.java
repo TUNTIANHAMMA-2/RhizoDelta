@@ -16,17 +16,20 @@ import java.util.stream.Collectors;
 public class AiRoutingOrchestratorService {
     private final AiRoutingWorkflowService workflowService;
     private final RoutingRecallService routingRecallService;
+    private final AiRoutingExecutionService aiRoutingExecutionService;
     private final ReviewTaskService reviewTaskService;
     private final SseEventService sseEventService;
 
     public AiRoutingOrchestratorService(
             AiRoutingWorkflowService workflowService,
             RoutingRecallService routingRecallService,
+            AiRoutingExecutionService aiRoutingExecutionService,
             ReviewTaskService reviewTaskService,
             SseEventService sseEventService
     ) {
         this.workflowService = workflowService;
         this.routingRecallService = routingRecallService;
+        this.aiRoutingExecutionService = aiRoutingExecutionService;
         this.reviewTaskService = reviewTaskService;
         this.sseEventService = sseEventService;
     }
@@ -56,25 +59,11 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.ROUTING_ACTION, "REVIEW"
                 ))
                 .orElseThrow(() -> new IllegalStateException("ai routing workflow returned no state"));
-        if (!"REVIEW".equals(state.routingAction())) {
-            publishStatus(message, post.getNodeId().toString(), "FAILED", null,
-                    "routing action not yet wired: " + state.routingAction());
-            throw new IllegalStateException("routing action not yet wired: " + state.routingAction());
+        if ("REVIEW".equals(state.routingAction())) {
+            createReviewTask(message, post, state);
+            return;
         }
-        ReviewTask task = reviewTaskService.createPendingTask(new ReviewTask.CreateReviewTaskCommand(
-                message.requestId(),
-                post.getNodeId().toString(),
-                message.eventId(),
-                state.routingAction(),
-                state.selectedCandidateNodeIds(),
-                Map.of(
-                        "request_id", message.requestId(),
-                        "post_node_id", post.getNodeId().toString(),
-                        "source_node_id", state.sourceNodeId()
-                ),
-                state.reviewReason().isBlank() ? List.of("WORKFLOW_SKELETON_FALLBACK") : List.of(state.reviewReason())
-        ));
-        publishStatus(message, post.getNodeId().toString(), "REVIEW_PENDING", task.reviewId(), "review task created");
+        executeDecision(message, post, state);
     }
 
     private void publishStatus(
@@ -111,5 +100,42 @@ public class AiRoutingOrchestratorService {
         return Objects.requireNonNullElse(content, "")
                 .replace('\n', ' ')
                 .trim();
+    }
+
+    private void createReviewTask(PostEventMessage message, HumanPost post, AiRoutingState state) {
+        ReviewTask task = reviewTaskService.createPendingTask(new ReviewTask.CreateReviewTaskCommand(
+                message.requestId(),
+                post.getNodeId().toString(),
+                message.eventId(),
+                state.routingAction(),
+                state.selectedCandidateNodeIds(),
+                Map.of(
+                        "request_id", message.requestId(),
+                        "post_node_id", post.getNodeId().toString(),
+                        "source_node_id", state.sourceNodeId()
+                ),
+                state.reviewReason().isBlank() ? List.of("WORKFLOW_SKELETON_FALLBACK") : List.of(state.reviewReason())
+        ));
+        publishStatus(message, post.getNodeId().toString(), "REVIEW_PENDING", task.reviewId(), "review task created");
+    }
+
+    private void executeDecision(PostEventMessage message, HumanPost post, AiRoutingState state) {
+        AiRoutingExecutionService.RoutingExecutionResult executionResult = aiRoutingExecutionService.execute(
+                new AiRoutingExecutionService.RoutingExecutionCommand(
+                        message.requestId(),
+                        message.eventId(),
+                        state.sourceNodeId(),
+                        state.routingAction(),
+                        state.reviewReason(),
+                        post
+                )
+        );
+        publishStatus(
+                message,
+                post.getNodeId().toString(),
+                executionResult.action() + "_QUEUED",
+                null,
+                "decision queued: " + executionResult.decisionResult().decision_id()
+        );
     }
 }
