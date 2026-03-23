@@ -1,6 +1,8 @@
 package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.AiRoutingState;
+import com.rhizodelta.domain.embedding.PrunedContext;
+import com.rhizodelta.domain.embedding.SimilaritySearchResult;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.domain.review.ReviewTask;
@@ -24,14 +26,17 @@ class AiRoutingOrchestratorServiceUnitTest {
     @Test
     void shouldCreateReviewTaskAndPublishReviewPendingStatus() {
         AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
+        RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
         ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
         SseEventService sseEventService = mock(SseEventService.class);
         AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
                 workflowService,
+                routingRecallService,
                 reviewTaskService,
                 sseEventService
         );
         UUID postNodeId = UUID.randomUUID();
+        UUID candidateNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "post content", "author-1", "req-1");
         PostEventMessage message = new PostEventMessage("req-1", "author-1", "post content", null, "evt-1");
         ReviewTask reviewTask = new ReviewTask(
@@ -48,10 +53,16 @@ class AiRoutingOrchestratorServiceUnitTest {
                 Instant.parse("2026-03-23T00:00:00Z"),
                 Instant.parse("2026-03-30T00:00:00Z")
         );
+        when(routingRecallService.recall("post content", null)).thenReturn(new PrunedContext(
+                List.of(new SimilaritySearchResult(candidateNodeId, "Human_Post", 0.95d, "candidate", Instant.now(), List.of())),
+                false,
+                0
+        ));
         when(workflowService.invokeSkeleton(any())).thenReturn(Optional.of(new AiRoutingState(Map.of(
                 AiRoutingState.REQUEST_ID, "req-1",
                 AiRoutingState.EVENT_ID, "evt-1",
                 AiRoutingState.POST_NODE_ID, postNodeId.toString(),
+                AiRoutingState.SOURCE_NODE_ID, candidateNodeId.toString(),
                 AiRoutingState.ROUTING_ACTION, "REVIEW",
                 AiRoutingState.REVIEW_REASON, "workflow skeleton fallback"
         ))));
@@ -61,11 +72,14 @@ class AiRoutingOrchestratorServiceUnitTest {
 
         verify(reviewTaskService).createPendingTask(any());
         ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(sseEventService, org.mockito.Mockito.times(2))
+        verify(sseEventService, org.mockito.Mockito.times(3))
                 .publish(org.mockito.Mockito.eq(SseEventService.SseEventType.ORCHESTRATION_STATUS), payloadCaptor.capture());
         List<Object> payloads = payloadCaptor.getAllValues();
+        SseEventService.OrchestrationStatusPayload recallPayload =
+                (SseEventService.OrchestrationStatusPayload) payloads.get(1);
         SseEventService.OrchestrationStatusPayload lastPayload =
                 (SseEventService.OrchestrationStatusPayload) payloads.get(payloads.size() - 1);
+        assertThat(recallPayload.status()).isEqualTo("RECALL_COMPLETED");
         assertThat(lastPayload.status()).isEqualTo("REVIEW_PENDING");
         assertThat(lastPayload.reviewId()).isEqualTo("review-1");
         assertThat(lastPayload.postNodeId()).isEqualTo(postNodeId.toString());
