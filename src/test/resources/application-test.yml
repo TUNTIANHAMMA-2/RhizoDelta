@@ -17,13 +17,36 @@ spring:
 rhizodelta:
   embedding:
     dimension: 1024
+  ai:
+    recall:
+      top-k: 10
+    rerank:
+      top-n: 3
+    context:
+      max-lineage-depth: 2
+      max-children-depth: 1
+      max-provenance: 5
+    reflection:
+      max-attempts: 2
+    budget:
+      max-prompt-tokens: 8192
+      max-latency-ms: 30000
+    confidence:
+      review-threshold: 0.65
+    sweeper:
+      batch-size: 50
+      cron: "0 */30 * * * *"
   jwt:
     secret: test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing
 
 
 langchain4j:
   open-ai:
+    chat-model:
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen2.5-7B-Instruct
+      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
     embedding-model:
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen3-Embedding-0.6B
-      api-key: ${SILICON_FLOW_API_KEY:sk-bfmfmfxpdvrfimyjjmpenapnzdfqwoomgrvrjlgnzmdhjfep}
+      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
