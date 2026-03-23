@@ -78,6 +78,10 @@ class AiRoutingOrchestratorServiceUnitTest {
                 .isEqualTo(List.of(recalledCandidateNodeId.toString()));
         assertThat(workflowInputCaptor.getValue().get(AiRoutingState.SELECTED_CANDIDATE_NODE_IDS))
                 .isEqualTo(List.of(recalledCandidateNodeId.toString()));
+        assertThat(workflowInputCaptor.getValue().get(AiRoutingState.POST_CONTENT)).isEqualTo("post content");
+        assertThat((String) workflowInputCaptor.getValue().get(AiRoutingState.ROUTING_CONTEXT))
+                .contains(recalledCandidateNodeId.toString())
+                .contains("candidate");
 
         ArgumentCaptor<ReviewTask.CreateReviewTaskCommand> reviewCommandCaptor =
                 ArgumentCaptor.forClass(ReviewTask.CreateReviewTaskCommand.class);

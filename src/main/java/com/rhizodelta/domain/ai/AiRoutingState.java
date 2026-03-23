@@ -13,10 +13,12 @@ public final class AiRoutingState extends AgentState {
     public static final String REQUEST_ID = "requestId";
     public static final String EVENT_ID = "eventId";
     public static final String POST_NODE_ID = "postNodeId";
+    public static final String POST_CONTENT = "postContent";
     public static final String TARGET_NODE_ID = "targetNodeId";
     public static final String SOURCE_NODE_ID = "sourceNodeId";
     public static final String RECALL_CANDIDATE_NODE_IDS = "recallCandidateNodeIds";
     public static final String SELECTED_CANDIDATE_NODE_IDS = "selectedCandidateNodeIds";
+    public static final String ROUTING_CONTEXT = "routingContext";
     public static final String WORKFLOW_STARTED_AT = "workflowStartedAt";
     public static final String ROUTING_ACTION = "routingAction";
     public static final String REVIEW_REASON = "reviewReason";
@@ -40,6 +42,10 @@ public final class AiRoutingState extends AgentState {
         return value(POST_NODE_ID, EMPTY_TEXT);
     }
 
+    public String postContent() {
+        return value(POST_CONTENT, EMPTY_TEXT);
+    }
+
     public String targetNodeId() {
         return value(TARGET_NODE_ID, EMPTY_TEXT);
     }
@@ -56,6 +62,10 @@ public final class AiRoutingState extends AgentState {
     @SuppressWarnings("unchecked")
     public List<String> selectedCandidateNodeIds() {
         return value(SELECTED_CANDIDATE_NODE_IDS, List::of);
+    }
+
+    public String routingContext() {
+        return value(ROUTING_CONTEXT, EMPTY_TEXT);
     }
 
     public Instant workflowStartedAt() {
@@ -80,10 +90,12 @@ public final class AiRoutingState extends AgentState {
         channels.put(REQUEST_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(EVENT_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(POST_NODE_ID, Channels.base(() -> EMPTY_TEXT));
+        channels.put(POST_CONTENT, Channels.base(() -> EMPTY_TEXT));
         channels.put(TARGET_NODE_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(SOURCE_NODE_ID, Channels.base(() -> EMPTY_TEXT));
         channels.put(RECALL_CANDIDATE_NODE_IDS, Channels.base(() -> List.<String>of()));
         channels.put(SELECTED_CANDIDATE_NODE_IDS, Channels.base(() -> List.<String>of()));
+        channels.put(ROUTING_CONTEXT, Channels.base(() -> EMPTY_TEXT));
         channels.put(WORKFLOW_STARTED_AT, Channels.base(() -> Instant.EPOCH));
         channels.put(ROUTING_ACTION, Channels.base(() -> DEFAULT_ACTION));
         channels.put(REVIEW_REASON, Channels.base(() -> EMPTY_TEXT));

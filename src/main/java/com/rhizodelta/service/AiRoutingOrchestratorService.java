@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class AiRoutingOrchestratorService {
@@ -46,9 +48,11 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.REQUEST_ID, message.requestId(),
                         AiRoutingState.EVENT_ID, message.eventId(),
                         AiRoutingState.POST_NODE_ID, post.getNodeId().toString(),
+                        AiRoutingState.POST_CONTENT, post.getContent(),
                         AiRoutingState.TARGET_NODE_ID, message.targetNodeId() == null ? "" : message.targetNodeId(),
                         AiRoutingState.RECALL_CANDIDATE_NODE_IDS, candidateNodeIds,
                         AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, candidateNodeIds,
+                        AiRoutingState.ROUTING_CONTEXT, buildRoutingContext(prunedContext),
                         AiRoutingState.ROUTING_ACTION, "REVIEW"
                 ))
                 .orElseThrow(() -> new IllegalStateException("ai routing workflow returned no state"));
@@ -90,5 +94,22 @@ public class AiRoutingOrchestratorService {
                 null
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
+    }
+
+    private String buildRoutingContext(PrunedContext prunedContext) {
+        return prunedContext.selected().stream()
+                .map(result -> "node_id=%s label=%s score=%.4f content=%s".formatted(
+                        result.node_id(),
+                        result.label(),
+                        result.score(),
+                        sanitizeContent(result.content())
+                ))
+                .collect(Collectors.joining("\n"));
+    }
+
+    private String sanitizeContent(String content) {
+        return Objects.requireNonNullElse(content, "")
+                .replace('\n', ' ')
+                .trim();
     }
 }
