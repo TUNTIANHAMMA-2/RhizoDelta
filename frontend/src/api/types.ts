@@ -74,6 +74,15 @@ export interface DecisionCompleteEvent {
   node_id: string;
 }
 
+export interface OrchestrationStatusEvent {
+  request_id: string;
+  event_id: string;
+  post_node_id: string;
+  status: string;
+  message: string;
+  review_id?: string | null;
+}
+
 // ────────────────────── 发帖 ──────────────────────
 
 export interface CreatePostRequest {
@@ -149,8 +158,12 @@ export interface AuditListResponse {
 
 // ────────────────────── 向量搜索 ──────────────────────
 
+export interface EmbeddingWriteRequest {
+  vector: number[];
+}
+
 export interface SimilaritySearchRequest {
-  node_id: string;
+  vector: number[];
   top_k?: number;
 }
 

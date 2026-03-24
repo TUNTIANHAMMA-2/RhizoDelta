@@ -4,6 +4,7 @@ import type {
   AssociationType,
   GraphNodeDTO,
   GraphTopologyDTO,
+  EmbeddingWriteRequest,
 } from "./types";
 
 export const fetchNode = (id: string) =>
@@ -50,8 +51,11 @@ export const fetchAssociations = (
   );
 };
 
-export const writeEmbedding = (id: string) =>
+export const writeEmbedding = (id: string, body: EmbeddingWriteRequest) =>
   request<{ node_id: string; dimension: number }>(
     `/api/nodes/${id}/embedding`,
-    { method: "PUT" },
+    { 
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
   );

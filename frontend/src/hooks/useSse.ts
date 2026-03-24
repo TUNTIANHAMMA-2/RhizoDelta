@@ -8,6 +8,7 @@ import type {
   EdgeCreatedEvent,
   DecisionCompleteEvent,
   GraphEdgeDTO,
+  OrchestrationStatusEvent,
 } from "../api/types";
 
 const SSE_URL = "/api/events/stream";
@@ -217,6 +218,17 @@ function handleSseEvent(event: SseEvent) {
         graphStore.addNode(node);
         graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, node);
       });
+      break;
+    }
+    case "ORCHESTRATION_STATUS": {
+      let payload: OrchestrationStatusEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse ORCHESTRATION_STATUS event data:", e);
+        break;
+      }
+      useSseStore.getState().setOrchestrationStatus(payload);
       break;
     }
   }
