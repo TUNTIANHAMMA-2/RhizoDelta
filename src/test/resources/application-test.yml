@@ -45,8 +45,8 @@ langchain4j:
     chat-model:
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen2.5-7B-Instruct
-      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      api-key: test-api-key
     embedding-model:
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen3-Embedding-0.6B
-      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      api-key: test-api-key

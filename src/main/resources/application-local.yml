@@ -22,3 +22,14 @@ spring:
 rhizodelta:
   jwt:
     secret: rhizodelta_local_dev_super_secret_key_2026_spring_boot
+
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: ${SILICON_FLOW_API_KEY:}
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen2.5-7B-Instruct
+    embedding-model:
+      api-key: ${SILICON_FLOW_API_KEY:}
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen3-Embedding-0.6B

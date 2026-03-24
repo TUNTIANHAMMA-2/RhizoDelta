@@ -2,6 +2,7 @@ package com.rhizodelta.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rhizodelta.api.ApiResponse;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,7 +34,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/fork/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/reviews/**").hasRole("ADMIN")

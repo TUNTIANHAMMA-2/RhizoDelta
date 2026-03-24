@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Objects;
 
@@ -39,10 +41,11 @@ public class PreCommitGuard {
     public PreCommitGuardResult evaluate(String sourceNodeId, Instant workflowStartedAt, String targetNodeId) {
         Objects.requireNonNull(sourceNodeId, "sourceNodeId must not be null");
         Objects.requireNonNull(workflowStartedAt, "workflowStartedAt must not be null");
+        OffsetDateTime startedAt = OffsetDateTime.ofInstant(workflowStartedAt, ZoneOffset.UTC);
 
         Map<String, Object> sourceResult = neo4jClient.query(SOURCE_STALENESS_QUERY)
                 .bind(sourceNodeId).to("sourceNodeId")
-                .bind(workflowStartedAt).to("workflowStartedAt")
+                .bind(startedAt).to("workflowStartedAt")
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("failed to evaluate source staleness"));
@@ -57,7 +60,7 @@ public class PreCommitGuard {
         }
         Map<String, Object> targetResult = neo4jClient.query(TARGET_STALENESS_QUERY)
                 .bind(targetNodeId).to("targetNodeId")
-                .bind(workflowStartedAt).to("workflowStartedAt")
+                .bind(startedAt).to("workflowStartedAt")
                 .fetch()
                 .one()
                 .orElse(Map.of("targetAdvanced", false));
