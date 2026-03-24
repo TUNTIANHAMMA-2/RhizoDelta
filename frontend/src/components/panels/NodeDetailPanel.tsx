@@ -1,5 +1,6 @@
 import { useUiStore, type NodeTab } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
+import { useSseStore } from "../../stores/sseStore";
 import { ProvenancePanel } from "./ProvenancePanel";
 import { AssociationPanel } from "./AssociationPanel";
 import { AuditPanel } from "./AuditPanel";
@@ -23,10 +24,13 @@ export function NodeDetailPanel() {
   const activeTab = useUiStore((s) => s.activeNodeTab);
   const setActiveTab = useUiStore((s) => s.setActiveNodeTab);
   const nodes = useGraphStore((s) => s.nodes);
+  const orchestrationStatuses = useSseStore((s) => s.orchestrationStatuses);
 
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
   if (!node) return null;
+
+  const orchestrationStatus = orchestrationStatuses[node.node_id];
 
   return (
     <aside
@@ -172,6 +176,34 @@ export function NodeDetailPanel() {
               <div>node_id: {node.node_id}</div>
               <div>has_embedding: {String(node.has_embedding)}</div>
               {node.operation_id && <div>operation_id: {node.operation_id}</div>}
+              
+              <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--color-border-default)" }}>
+                <div style={{ fontWeight: 600, marginBottom: "var(--space-2)", fontSize: "var(--font-size-sm)" }}>编排状态</div>
+                {orchestrationStatus ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                      <span style={{ color: "var(--color-text-secondary)" }}>状态:</span>
+                      <span style={{ 
+                        color: orchestrationStatus.status === "FAILED" ? "var(--color-danger)" :
+                               orchestrationStatus.status === "EMBEDDING_READY" ? "var(--color-success)" :
+                               "var(--color-text-primary)",
+                        fontWeight: 600
+                      }}>
+                        {orchestrationStatus.status}
+                      </span>
+                    </div>
+                    {orchestrationStatus.message && (
+                      <div style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-xs)" }}>
+                        {orchestrationStatus.message}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ color: "var(--color-text-tertiary)", fontStyle: "italic" }}>
+                    暂无编排状态
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
