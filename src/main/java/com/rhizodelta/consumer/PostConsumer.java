@@ -30,6 +30,7 @@ public class PostConsumer {
     private final SseEventService sseEventService;
     private AiRoutingOrchestratorService aiRoutingOrchestratorService;
     private Executor embeddingTaskExecutor = Runnable::run;
+    private Executor routingTaskExecutor = Runnable::run;
 
     public PostConsumer(
             PostService postService,
@@ -51,6 +52,11 @@ public class PostConsumer {
     @Autowired
     public void setEmbeddingTaskExecutor(@Qualifier("embeddingTaskExecutor") Executor embeddingTaskExecutor) {
         this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
+    }
+
+    @Autowired
+    public void setRoutingTaskExecutor(@Qualifier("routingTaskExecutor") Executor routingTaskExecutor) {
+        this.routingTaskExecutor = Objects.requireNonNull(routingTaskExecutor, "routingTaskExecutor must not be null");
     }
 
     @Autowired(required = false)
@@ -126,6 +132,17 @@ public class PostConsumer {
         if (aiRoutingOrchestratorService == null) {
             return;
         }
-        CompletableFuture.runAsync(() -> aiRoutingOrchestratorService.orchestrate(message, post), embeddingTaskExecutor);
+        CompletableFuture.runAsync(() -> aiRoutingOrchestratorService.orchestrate(message, post), routingTaskExecutor)
+                .exceptionally(exception -> {
+                    LOGGER.error("AI routing failed for post node_id={}", post.getNodeId(), exception);
+                    publishOrchestrationStatus(
+                            message.requestId(),
+                            message.eventId(),
+                            post.getNodeId().toString(),
+                            "FAILED",
+                            "ai routing failed: " + exception.getMessage()
+                    );
+                    return null;
+                });
     }
 }

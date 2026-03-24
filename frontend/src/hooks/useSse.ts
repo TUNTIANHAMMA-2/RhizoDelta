@@ -15,7 +15,6 @@ const SSE_URL = "/api/events/stream";
 const MAX_RETRY_DELAY = 30_000;
 const BASE_RETRY_DELAY = 1_000;
 const MAX_RETRIES = 20;
-const LAYOUT_FLUSH_DELAY = 50;
 
 interface SseEvent {
   type: string;
@@ -139,16 +138,6 @@ export function useSse() {
   }, [token, setStatus]);
 }
 
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleFlushLayout() {
-  if (flushTimer) clearTimeout(flushTimer);
-  flushTimer = setTimeout(() => {
-    flushTimer = null;
-    useGraphStore.getState().flushLayout();
-  }, LAYOUT_FLUSH_DELAY);
-}
-
 function handleSseEvent(event: SseEvent) {
   const graphStore = useGraphStore.getState();
 
@@ -198,11 +187,11 @@ function handleSseEvent(event: SseEvent) {
       if (missing.length > 0) {
         Promise.all(missing).then(() => {
           graphStore.addEdge(edge);
-          scheduleFlushLayout();
+          graphStore.scheduleFlushLayout();
         });
       } else {
         graphStore.addEdge(edge);
-        scheduleFlushLayout();
+        graphStore.scheduleFlushLayout();
       }
       break;
     }

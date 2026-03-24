@@ -23,6 +23,9 @@ public class ReviewTaskService {
     private static final String REVIEW_TASK_KEY_PREFIX = "review:task:";
     private static final String PENDING_REVIEW_INDEX_KEY = "review:pending";
     private static final int DEFAULT_PENDING_LIMIT = 50;
+    private static final Set<ReviewTask.Status> TERMINAL_STATUSES = Set.of(
+            ReviewTask.Status.APPROVED, ReviewTask.Status.REJECTED, ReviewTask.Status.EXPIRED
+    );
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -78,21 +81,32 @@ public class ReviewTaskService {
         if (reviewIds == null || reviewIds.isEmpty()) {
             return List.of();
         }
-        return reviewIds.stream()
-                .map(this::findTask)
-                .flatMap(Optional::stream)
-                .filter(task -> task.status() == ReviewTask.Status.PENDING)
-                .toList();
+        List<String> orphanedIds = new java.util.ArrayList<>();
+        List<ReviewTask> result = new java.util.ArrayList<>();
+        for (String reviewId : reviewIds) {
+            Optional<ReviewTask> task = findTask(reviewId);
+            if (task.isEmpty() || task.get().status() != ReviewTask.Status.PENDING) {
+                orphanedIds.add(reviewId);
+            } else {
+                result.add(task.get());
+            }
+        }
+        if (!orphanedIds.isEmpty()) {
+            zSetOps().remove(PENDING_REVIEW_INDEX_KEY, orphanedIds.toArray());
+        }
+        return List.copyOf(result);
     }
 
     public ReviewTask updateStatus(String reviewId, ReviewTask.Status status) {
         ReviewTask existing = getTask(reviewId);
+        Objects.requireNonNull(status, "status must not be null");
+        validateTransition(existing.status(), status);
         ReviewTask updated = new ReviewTask(
                 existing.reviewId(),
                 existing.requestId(),
                 existing.postNodeId(),
                 existing.workflowTraceId(),
-                Objects.requireNonNull(status, "status must not be null"),
+                status,
                 existing.suggestedAction(),
                 existing.candidateNodeIds(),
                 existing.draftPayload(),
@@ -169,5 +183,16 @@ public class ReviewTaskService {
             return normalized;
         }
         return "REVIEW";
+    }
+
+    private static void validateTransition(ReviewTask.Status current, ReviewTask.Status target) {
+        if (TERMINAL_STATUSES.contains(current)) {
+            throw new IllegalStateException(
+                    "cannot transition from terminal status " + current + " to " + target
+            );
+        }
+        if (current == target) {
+            throw new IllegalStateException("review task is already in status " + current);
+        }
     }
 }

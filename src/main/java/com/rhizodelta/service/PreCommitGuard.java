@@ -11,16 +11,13 @@ import java.util.Objects;
 @Service
 public class PreCommitGuard {
     private static final String SOURCE_STALENESS_QUERY = """
-            MATCH (source:GraphNode {node_id: $sourceNodeId})
+            OPTIONAL MATCH (source:GraphNode {node_id: $sourceNodeId})
             WHERE NOT coalesce(source._deleted, false)
             OPTIONAL MATCH (source)<-[rel:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM]-(child:GraphNode)
             WHERE NOT coalesce(child._deleted, false)
               AND child.created_at > $workflowStartedAt
-            RETURN true AS sourcePresent,
+            RETURN source IS NOT NULL AS sourcePresent,
                    count(child) > 0 AS sourceAdvanced
-            UNION
-            RETURN false AS sourcePresent, false AS sourceAdvanced
-            LIMIT 1
             """;
 
     private static final String TARGET_STALENESS_QUERY = """

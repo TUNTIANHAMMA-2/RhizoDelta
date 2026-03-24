@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -111,5 +112,61 @@ class ReviewTaskServiceUnitTest {
         assertThat(updatedTask.status()).isEqualTo(ReviewTask.Status.APPROVED);
         verify(zSetOperations).remove("review:pending", "review-2");
         verify(zSetOperations, never()).add(eq("review:pending"), eq("review-2"), anyDouble());
+    }
+
+    @Test
+    void shouldRejectTransitionFromTerminalStatus() throws Exception {
+        ReviewTask approvedTask = new ReviewTask(
+                "review-3",
+                "req-3",
+                "post-3",
+                "trace-3",
+                ReviewTask.Status.APPROVED,
+                "MERGE",
+                List.of("candidate-3"),
+                Map.of("content", "approved draft"),
+                List.of("LOW_CONFIDENCE"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-30T00:00:00Z")
+        );
+        when(valueOperations.get("review:task:review-3")).thenReturn(new ObjectMapper()
+                .findAndRegisterModules()
+                .writeValueAsString(approvedTask));
+
+        assertThatThrownBy(() -> service.updateStatus("review-3", ReviewTask.Status.REJECTED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot transition from terminal status");
+    }
+
+    @Test
+    void shouldCleanOrphanedEntriesFromPendingIndex() throws Exception {
+        ReviewTask pendingTask = new ReviewTask(
+                "review-4",
+                "req-4",
+                "post-4",
+                "trace-4",
+                ReviewTask.Status.PENDING,
+                "REVIEW",
+                List.of("candidate-4"),
+                Map.of("content", "draft"),
+                List.of("BUDGET_EXCEEDED"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-23T00:00:00Z"),
+                java.time.Instant.parse("2026-03-30T00:00:00Z")
+        );
+        String serialized = new ObjectMapper().findAndRegisterModules().writeValueAsString(pendingTask);
+        LinkedHashSet<String> reviewIds = new LinkedHashSet<>();
+        reviewIds.add("review-4");
+        reviewIds.add("review-orphan");
+        when(zSetOperations.range("review:pending", 0, 49)).thenReturn(reviewIds);
+        when(valueOperations.get("review:task:review-4")).thenReturn(serialized);
+        when(valueOperations.get("review:task:review-orphan")).thenReturn(null);
+
+        List<ReviewTask> result = service.findPendingTasks(null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).reviewId()).isEqualTo("review-4");
+        verify(zSetOperations).remove(eq("review:pending"), (Object[]) org.mockito.ArgumentMatchers.any());
     }
 }

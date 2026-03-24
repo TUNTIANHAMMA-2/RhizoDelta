@@ -11,6 +11,9 @@ import { toRfNode, toRfEdge } from "../lib/mapping";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
 
+const LAYOUT_FLUSH_DELAY = 50;
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+
 export interface GraphState {
   nodes: Map<string, GraphNodeDTO>;
   edges: GraphEdgeDTO[];
@@ -34,6 +37,7 @@ export interface GraphState {
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
   flushLayout: () => void;
+  scheduleFlushLayout: () => void;
 
   // Optimistic UI
   addOptimisticNode: (tempId: string, position: { x: number; y: number }, label: string) => void;
@@ -138,6 +142,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       rawRfEdges,
     );
     set({ rfNodes: layoutNodes, rfEdges: layoutEdges });
+  },
+
+  scheduleFlushLayout: () => {
+    if (_flushTimer) clearTimeout(_flushTimer);
+    _flushTimer = setTimeout(() => {
+      _flushTimer = null;
+      get().flushLayout();
+    }, LAYOUT_FLUSH_DELAY);
   },
 
   addOptimisticNode: (tempId, position, label) => {

@@ -8,6 +8,8 @@ import com.rhizodelta.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.domain.review.ReviewTask;
 import com.rhizodelta.service.DecisionService;
 import com.rhizodelta.service.ReviewTaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +27,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/reviews")
 public class ReviewController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ReviewController.class);
+
     private final ReviewTaskService reviewTaskService;
     private final DecisionService decisionService;
 
@@ -56,7 +60,11 @@ public class ReviewController {
         ReviewTask task = reviewTaskService.getTask(reviewId);
         MergeDecisionCommand command = toMergeCommand(task, authentication.getName());
         DecisionResult result = decisionService.executeMerge(command);
-        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        try {
+            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        } catch (Exception exception) {
+            LOGGER.error("Decision committed but failed to update review status to APPROVED for reviewId={}", reviewId, exception);
+        }
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
@@ -68,7 +76,11 @@ public class ReviewController {
         ReviewTask task = reviewTaskService.getTask(reviewId);
         BranchDecisionCommand command = toBranchCommand(task, authentication.getName());
         DecisionResult result = decisionService.executeBranch(command);
-        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        try {
+            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        } catch (Exception exception) {
+            LOGGER.error("Decision committed but failed to update review status to APPROVED for reviewId={}", reviewId, exception);
+        }
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
