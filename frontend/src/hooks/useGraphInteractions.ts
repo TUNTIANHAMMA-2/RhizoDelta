@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { useReactFlow } from "@xyflow/react";
-import { useGraphStore } from "../stores/graphStore";
 
 /**
  * Hook for graph canvas interactions:
@@ -8,12 +7,11 @@ import { useGraphStore } from "../stores/graphStore";
  * - Highlight neighbor nodes/edges, dim the rest
  */
 export function useGraphInteractions() {
-  const { setCenter, getEdges } = useReactFlow();
-  const rfNodes = useGraphStore((s) => s.rfNodes);
+  const { setCenter, getEdges, getNode } = useReactFlow();
 
   const focusNode = useCallback(
     (nodeId: string) => {
-      const node = rfNodes.find((n) => n.id === nodeId);
+      const node = getNode(nodeId);
       if (!node) return;
 
       // Center canvas on selected node
@@ -38,7 +36,7 @@ export function useGraphInteractions() {
 
       return { connectedNodeIds, connectedEdgeIds };
     },
-    [rfNodes, setCenter, getEdges],
+    [getEdges, getNode, setCenter],
   );
 
   const resetFocus = useCallback(() => {

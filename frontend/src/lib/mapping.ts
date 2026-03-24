@@ -18,12 +18,22 @@ export function toRfNode(dto: GraphNodeDTO): Node {
 }
 
 export function toRfEdge(dto: GraphEdgeDTO): Edge {
+  const relType = dto.type;
+  const isBranch = relType === "BRANCHED_FROM";
+
   return {
     id: `${dto.source}-${dto.type}-${dto.target}`,
     source: dto.source,
     target: dto.target,
     type: "versionEdge",
-    data: { relType: dto.type, createdAt: dto.created_at },
+    sourceHandle: isBranch ? "source-left" : "source-top",
+    targetHandle: isBranch ? "target-right" : "target-bottom",
+    data: {
+      relType,
+      createdAt: dto.created_at,
+      routeKind: isBranch ? "branch" : relType === "CONTINUES_FROM" ? "continue" : "vertical",
+      branchSide: null,
+    },
     style: { stroke: "var(--color-edge-default)", strokeWidth: 1.5 },
   };
 }

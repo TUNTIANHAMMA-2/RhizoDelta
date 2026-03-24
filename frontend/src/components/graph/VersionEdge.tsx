@@ -1,21 +1,68 @@
 import {
   BaseEdge,
+  getBezierPath,
+  getStraightPath,
   getSmoothStepPath,
   type EdgeProps,
 } from "@xyflow/react";
 
-export function VersionEdge(props: EdgeProps) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+function resolveEdgePath(props: EdgeProps, routeKind: string) {
+  if (routeKind === "explore") {
+    return getBezierPath({
+      sourceX: props.sourceX,
+      sourceY: props.sourceY,
+      targetX: props.targetX,
+      targetY: props.targetY,
+      sourcePosition: props.sourcePosition,
+      targetPosition: props.targetPosition,
+      curvature: 0.32,
+    });
+  }
+
+  if (routeKind === "branch") {
+    return getBezierPath({
+      sourceX: props.sourceX,
+      sourceY: props.sourceY,
+      targetX: props.targetX,
+      targetY: props.targetY,
+      sourcePosition: props.sourcePosition,
+      targetPosition: props.targetPosition,
+      curvature: 0.18,
+    });
+  }
+
+  if (routeKind === "continue" && props.sourceX === props.targetX) {
+    return getStraightPath({
+      sourceX: props.sourceX,
+      sourceY: props.sourceY,
+      targetX: props.targetX,
+      targetY: props.targetY,
+    });
+  }
+
+  return getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
     targetX: props.targetX,
     targetY: props.targetY,
     sourcePosition: props.sourcePosition,
     targetPosition: props.targetPosition,
+    borderRadius: routeKind === "continue" ? 0 : 14,
+    offset: routeKind === "continue" ? 0 : 18,
   });
+}
 
+export function VersionEdge(props: EdgeProps) {
   const relType = (props.data as { relType?: string })?.relType ?? "";
   const createdAt = (props.data as { createdAt?: string })?.createdAt ?? "";
+  const routeKind = (props.data as { routeKind?: string })?.routeKind ?? "vertical";
+  const viewMode = (props.data as { viewMode?: string })?.viewMode ?? "lineage";
+  const [edgePath, labelX, labelY] = resolveEdgePath(props, routeKind);
+  const edgeStyle = {
+    ...props.style,
+    strokeWidth: routeKind === "continue" ? 1.8 : 1.5,
+    opacity: viewMode === "explore" ? 0.82 : 1,
+  };
 
   return (
     <g className="version-edge-group">
@@ -50,7 +97,7 @@ export function VersionEdge(props: EdgeProps) {
       <BaseEdge
         id={props.id}
         path={edgePath}
-        style={props.style}
+        style={edgeStyle}
         className="edge-path"
         markerEnd={props.markerEnd}
       />

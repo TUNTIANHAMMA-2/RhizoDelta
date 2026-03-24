@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type RightPanelMode = "hidden" | "detail" | "edit" | "agent";
 export type NodeTab = "details" | "provenance" | "association" | "audit";
+export type CanvasMode = "lineage" | "explore";
 
 export interface ToastMessage {
   id: string;
@@ -28,6 +29,8 @@ export interface UiState {
 
   zoomLevel: number;
   setZoomLevel: (zoom: number) => void;
+  canvasMode: CanvasMode;
+  setCanvasMode: (mode: CanvasMode) => void;
 
   // Toast
   toasts: ToastMessage[];
@@ -66,6 +69,8 @@ export const useUiStore = create<UiState>((set) => ({
 
   zoomLevel: 1,
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
+  canvasMode: "lineage",
+  setCanvasMode: (canvasMode) => set({ canvasMode }),
 
   // Toast
   toasts: [],

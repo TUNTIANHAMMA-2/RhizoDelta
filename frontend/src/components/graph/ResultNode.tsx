@@ -3,6 +3,26 @@ import type { GraphNodeDTO } from "../../api/types";
 import { useGraphStore } from "../../stores/graphStore";
 import { NodeActionToolbar } from "./NodeActionToolbar";
 
+const HIDDEN_HANDLE_STYLE = {
+  opacity: 0,
+  pointerEvents: "none",
+} as const;
+
+function VersionHandles() {
+  return (
+    <>
+      <Handle id="source-top" type="source" position={Position.Top} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="source-right" type="source" position={Position.Right} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="source-left" type="source" position={Position.Left} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="target-top" type="target" position={Position.Top} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="target-right" type="target" position={Position.Right} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="target-bottom" type="target" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} />
+      <Handle id="target-left" type="target" position={Position.Left} style={HIDDEN_HANDLE_STYLE} />
+    </>
+  );
+}
+
 export function ResultNode({ data, selected }: NodeProps) {
   const node = data as unknown as GraphNodeDTO;
   const zoom = useGraphStore((s) => s.semanticZoom);
@@ -14,7 +34,7 @@ export function ResultNode({ data, selected }: NodeProps) {
   return (
     <>
       <div className={`${baseClass}${stateClass}${zoomClass}`}>
-        <Handle type="target" position={Position.Top} />
+        <VersionHandles />
         
         <div className="node-content-micro" />
         
@@ -31,8 +51,6 @@ export function ResultNode({ data, selected }: NodeProps) {
             {node.content ?? node.summary_content ?? ""}
           </div>
         </div>
-
-        <Handle type="source" position={Position.Bottom} />
       </div>
       {selected && zoom === "normal" && (
         <div style={{ position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>

@@ -1,21 +1,21 @@
 import {
-  ReactFlow,
   Background,
   MiniMap,
+  ReactFlow,
   type Node as FlowNode,
   useOnViewportChange,
+  useReactFlow,
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef } from "react";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
-import { createLineageSimulation } from "../../lib/lineageSimulation";
-import { HumanPostNode } from "./HumanPostNode";
+import { createExploreSimulation } from "../../lib/exploreSimulation";
 import { ConsensusNode } from "./ConsensusNode";
+import { HumanPostNode } from "./HumanPostNode";
 import { ResultNode } from "./ResultNode";
 import { VersionEdge } from "./VersionEdge";
-import { useGraphInteractions } from "../../hooks/useGraphInteractions";
 
 const nodeTypes = {
   humanPost: HumanPostNode,
@@ -40,17 +40,25 @@ const MINIMAP_NODE_COLOR = (node: { type?: string }) => {
   }
 };
 
-function ViewportListener() {
+function ExploreViewportListener() {
+  const { setCenter } = useReactFlow();
   const setSemanticZoom = useGraphStore((s) => s.setSemanticZoom);
-  const setZoomLevel = useUiStore((s) => s.setZoomLevel);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
-  const { focusNode } = useGraphInteractions();
+  const rootNodeId = useGraphStore((s) => s.rootNodeId);
+  const exploreRfNodes = useGraphStore((s) => s.exploreRfNodes);
+  const setZoomLevel = useUiStore((s) => s.setZoomLevel);
 
   useEffect(() => {
-    if (selectedNodeId) {
-      focusNode(selectedNodeId);
+    const focusNodeId = selectedNodeId ?? rootNodeId;
+    if (!focusNodeId) {
+      return;
     }
-  }, [selectedNodeId, focusNode]);
+    const node = exploreRfNodes.find((item) => item.id === focusNodeId);
+    if (!node) {
+      return;
+    }
+    setCenter(node.position.x, node.position.y, { zoom: 1, duration: 600 });
+  }, [exploreRfNodes, rootNodeId, selectedNodeId, setCenter]);
 
   useOnViewportChange({
     onChange: (viewport: Viewport) => {
@@ -68,52 +76,48 @@ function ViewportListener() {
   return null;
 }
 
-export function DagCanvas() {
-  const lineageRfNodes = useGraphStore((s) => s.lineageRfNodes);
-  const lineageRfEdges = useGraphStore((s) => s.lineageRfEdges);
-  const rfNodes = useGraphStore((s) => s.rfNodes);
-  const rfEdges = useGraphStore((s) => s.rfEdges);
-  const setLineagePositions = useGraphStore((s) => s.setLineagePositions);
+export function ExploreCanvas() {
+  const exploreRfNodes = useGraphStore((s) => s.exploreRfNodes);
+  const exploreRfEdges = useGraphStore((s) => s.exploreRfEdges);
+  const rootNodeId = useGraphStore((s) => s.rootNodeId);
+  const setExplorePositions = useGraphStore((s) => s.setExplorePositions);
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
-  const showMiniMap = rfNodes.length > 20;
-  const simulationRef = useRef<ReturnType<typeof createLineageSimulation> | null>(
+  const showMiniMap = exploreRfNodes.length > 20;
+  const simulationRef = useRef<ReturnType<typeof createExploreSimulation> | null>(
     null,
   );
   const graphSignature = useMemo(() => {
-    const nodePart = lineageRfNodes.map((node) => node.id).join("|");
-    const edgePart = lineageRfEdges.map((edge) => edge.id).join("|");
+    const nodePart = exploreRfNodes.map((node) => node.id).join("|");
+    const edgePart = exploreRfEdges.map((edge) => edge.id).join("|");
     return `${nodePart}::${edgePart}`;
-  }, [lineageRfEdges, lineageRfNodes]);
-  const topologyNodes = useMemo(() => lineageRfNodes, [graphSignature]);
-  const topologyEdges = useMemo(() => lineageRfEdges, [graphSignature]);
+  }, [exploreRfEdges, exploreRfNodes]);
+  const topologyNodes = useMemo(() => exploreRfNodes, [graphSignature]);
+  const topologyEdges = useMemo(() => exploreRfEdges, [graphSignature]);
+  const anchorNodeId = selectedNodeId ?? rootNodeId ?? exploreRfNodes[0]?.id ?? null;
 
-  const nodesWithSelection = useMemo(() => {
-    return rfNodes.map((node) => ({
-      ...node,
-      selected: node.id === selectedNodeId,
-      style: {
-        ...node.style,
-        cursor: "grab",
-        transition:
-          "box-shadow var(--transition-fast), filter var(--transition-fast)",
-        boxShadow:
-          node.id === selectedNodeId
-            ? "0 0 0 1px rgba(46, 124, 246, 0.18), var(--shadow-md)"
-            : node.style?.boxShadow,
-      },
-    }));
-  }, [rfNodes, selectedNodeId]);
+  const nodesWithSelection = useMemo(
+    () =>
+      exploreRfNodes.map((node) => ({
+        ...node,
+        selected: node.id === selectedNodeId,
+      })),
+    [exploreRfNodes, selectedNodeId],
+  );
 
   useEffect(() => {
-    if (topologyNodes.length === 0) {
+    if (!anchorNodeId || exploreRfNodes.length === 0) {
       simulationRef.current?.stop();
       simulationRef.current = null;
       return;
     }
 
-    const simulation = createLineageSimulation(topologyNodes, topologyEdges);
+    const simulation = createExploreSimulation(
+      topologyNodes,
+      topologyEdges,
+      anchorNodeId,
+    );
     simulationRef.current = simulation;
     simulation.on("tick", () => {
       const positions = Object.fromEntries(
@@ -125,7 +129,7 @@ export function DagCanvas() {
           },
         ]),
       );
-      setLineagePositions(positions);
+      setExplorePositions(positions);
     });
 
     return () => {
@@ -134,7 +138,7 @@ export function DagCanvas() {
         simulationRef.current = null;
       }
     };
-  }, [graphSignature, setLineagePositions, topologyEdges, topologyNodes]);
+  }, [anchorNodeId, graphSignature, setExplorePositions, topologyEdges, topologyNodes]);
 
   const updateDraggedNode = (node: FlowNode) => {
     const simulationNode = simulationRef.current
@@ -147,7 +151,7 @@ export function DagCanvas() {
     simulationNode.fy = node.position.y;
     simulationNode.x = node.position.x;
     simulationNode.y = node.position.y;
-    setLineagePositions({
+    setExplorePositions({
       [node.id]: {
         x: node.position.x,
         y: node.position.y,
@@ -158,7 +162,7 @@ export function DagCanvas() {
   return (
     <ReactFlow
       nodes={nodesWithSelection}
-      edges={rfEdges}
+      edges={exploreRfEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       defaultViewport={{ x: 0, y: 0, zoom: 1 }}
@@ -173,7 +177,7 @@ export function DagCanvas() {
       }}
       onNodeDragStart={(_event, node) => {
         updateDraggedNode(node);
-        simulationRef.current?.alphaTarget(0.16).restart();
+        simulationRef.current?.alphaTarget(0.12).restart();
       }}
       onNodeDrag={(_event, node) => {
         updateDraggedNode(node);
@@ -187,16 +191,16 @@ export function DagCanvas() {
         }
         simulationNode.fx = null;
         simulationNode.fy = null;
-        simulationRef.current.alpha(0.38).alphaTarget(0).restart();
+        simulationRef.current.alpha(0.35).alphaTarget(0).restart();
       }}
       onPaneClick={() => {
         selectNode(null);
         useUiStore.getState().closeRightPanel();
       }}
     >
-      <ViewportListener />
+      <ExploreViewportListener />
       <Background
-        variant={"dots" as any}
+        variant={"dots" as never}
         gap={20}
         size={1}
         color="var(--color-border-default)"

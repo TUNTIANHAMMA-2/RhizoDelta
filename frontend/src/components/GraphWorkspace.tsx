@@ -3,11 +3,62 @@ import { useUiStore } from "../stores/uiStore";
 import { useGraphStore } from "../stores/graphStore";
 import { useSse } from "../hooks/useSse";
 import { DagCanvas } from "./graph/DagCanvas";
+import { ExploreCanvas } from "./graph/ExploreCanvas";
 import { RhizoneList } from "./sidebar/RhizoneList";
 import { NodeDetailPanel } from "./panels/NodeDetailPanel";
 import { EditDraftPanel } from "./panels/EditDraftPanel";
 import { Header } from "./chrome/Header";
 import { ToastContainer } from "./feedback/Toast";
+
+function CanvasModeSwitch() {
+  const canvasMode = useUiStore((s) => s.canvasMode);
+  const setCanvasMode = useUiStore((s) => s.setCanvasMode);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "var(--space-5)",
+        left: "var(--space-5)",
+        zIndex: 20,
+        display: "flex",
+        gap: "var(--space-2)",
+        padding: "var(--space-2)",
+        background: "rgba(252, 249, 242, 0.88)",
+        border: "1px solid var(--color-border-default)",
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-sm)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
+      {[
+        ["lineage", "版本视图"],
+        ["explore", "探索视图"],
+      ].map(([mode, label]) => {
+        const active = canvasMode === mode;
+        return (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setCanvasMode(mode as "lineage" | "explore")}
+            style={{
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              padding: "var(--space-2) var(--space-3)",
+              background: active ? "var(--color-accent-blue)" : "transparent",
+              color: active ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
+              fontFamily: "var(--font-ui)",
+              fontSize: "var(--font-size-sm)",
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function GraphWorkspace() {
   const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
@@ -15,6 +66,7 @@ export function GraphWorkspace() {
   const isMobileMenuOpen = useUiStore((s) => s.isMobileMenuOpen);
   const setMobileMenuOpen = useUiStore((s) => s.setMobileMenuOpen);
   const toggleLeftSidebar = useUiStore((s) => s.toggleLeftSidebar);
+  const canvasMode = useUiStore((s) => s.canvasMode);
 
   const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
   const loadLineage = useGraphStore((s) => s.loadLineage);
@@ -117,7 +169,8 @@ export function GraphWorkspace() {
 
       {/* Canvas */}
       <div style={{ flex: 1, position: "relative" }}>
-        <DagCanvas />
+        <CanvasModeSwitch />
+        {canvasMode === "lineage" ? <DagCanvas /> : <ExploreCanvas />}
       </div>
 
       {/* Right panel */}

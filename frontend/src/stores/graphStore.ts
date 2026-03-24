@@ -6,8 +6,8 @@ import type {
   GraphNodeDTO,
 } from "../api/types";
 import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
-import { applyTrackLayout } from "../lib/layout";
-import { toRfNode, toRfEdge } from "../lib/mapping";
+import { toRfNode } from "../lib/mapping";
+import { buildGraphViews } from "../lib/graphView";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
 
@@ -19,6 +19,10 @@ export interface GraphState {
   edges: GraphEdgeDTO[];
   associations: AssociationInfo[];
   rhizomes: GraphNodeDTO[];
+  lineageRfNodes: Node[];
+  lineageRfEdges: Edge[];
+  exploreRfNodes: Node[];
+  exploreRfEdges: Edge[];
   rfNodes: Node[];
   rfEdges: Edge[];
 
@@ -38,6 +42,12 @@ export interface GraphState {
   addEdge: (edge: GraphEdgeDTO) => void;
   flushLayout: () => void;
   scheduleFlushLayout: () => void;
+  setLineagePositions: (
+    positions: Record<string, { x: number; y: number }>,
+  ) => void;
+  setExplorePositions: (
+    positions: Record<string, { x: number; y: number }>,
+  ) => void;
 
   // Optimistic UI
   addOptimisticNode: (tempId: string, position: { x: number; y: number }, label: string) => void;
@@ -49,6 +59,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   edges: [],
   associations: [],
   rhizomes: [],
+  lineageRfNodes: [],
+  lineageRfEdges: [],
+  exploreRfNodes: [],
+  exploreRfEdges: [],
   rfNodes: [],
   rfEdges: [],
   selectedNodeId: null,
@@ -73,18 +87,24 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const nodesMap = new Map<string, GraphNodeDTO>();
     topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
-    const rawRfNodes = topo.nodes.map(toRfNode);
-    const rawRfEdges = topo.edges.map(toRfEdge);
-    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
-      rawRfNodes,
-      rawRfEdges,
+    const priorExplorePositions = new Map(
+      get().exploreRfNodes.map((node) => [node.id, node.position]),
+    );
+    const views = buildGraphViews(
+      topo.nodes,
+      topo.edges,
+      priorExplorePositions,
     );
 
     set({
       nodes: nodesMap,
       edges: topo.edges,
-      rfNodes: layoutNodes,
-      rfEdges: layoutEdges,
+      lineageRfNodes: views.lineage.nodes,
+      lineageRfEdges: views.lineage.edges,
+      exploreRfNodes: views.explore.nodes,
+      exploreRfEdges: views.explore.edges,
+      rfNodes: views.lineage.nodes,
+      rfEdges: views.lineage.edges,
       rootNodeId: nodeId,
     });
   },
@@ -95,18 +115,24 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
     const allEdges = [...get().edges, ...topo.edges];
-    const rawRfNodes = Array.from(nodesMap.values()).map(toRfNode);
-    const rawRfEdges = allEdges.map(toRfEdge);
-    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
-      rawRfNodes,
-      rawRfEdges,
+    const priorExplorePositions = new Map(
+      get().exploreRfNodes.map((node) => [node.id, node.position]),
+    );
+    const views = buildGraphViews(
+      nodesMap.values(),
+      allEdges,
+      priorExplorePositions,
     );
 
     set({
       nodes: nodesMap,
       edges: allEdges,
-      rfNodes: layoutNodes,
-      rfEdges: layoutEdges,
+      lineageRfNodes: views.lineage.nodes,
+      lineageRfEdges: views.lineage.edges,
+      exploreRfNodes: views.explore.nodes,
+      exploreRfEdges: views.explore.edges,
+      rfNodes: views.lineage.nodes,
+      rfEdges: views.lineage.edges,
     });
   },
 
@@ -135,13 +161,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   flushLayout: () => {
     const nodesMap = get().nodes;
     const allEdges = get().edges;
-    const rawRfNodes = Array.from(nodesMap.values()).map(toRfNode);
-    const rawRfEdges = allEdges.map(toRfEdge);
-    const { nodes: layoutNodes, edges: layoutEdges } = applyTrackLayout(
-      rawRfNodes,
-      rawRfEdges,
+    const priorExplorePositions = new Map(
+      get().exploreRfNodes.map((node) => [node.id, node.position]),
     );
-    set({ rfNodes: layoutNodes, rfEdges: layoutEdges });
+    const views = buildGraphViews(
+      nodesMap.values(),
+      allEdges,
+      priorExplorePositions,
+    );
+    set({
+      lineageRfNodes: views.lineage.nodes,
+      lineageRfEdges: views.lineage.edges,
+      exploreRfNodes: views.explore.nodes,
+      exploreRfEdges: views.explore.edges,
+      rfNodes: views.lineage.nodes,
+      rfEdges: views.lineage.edges,
+    });
   },
 
   scheduleFlushLayout: () => {
@@ -150,6 +185,34 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       _flushTimer = null;
       get().flushLayout();
     }, LAYOUT_FLUSH_DELAY);
+  },
+
+  setLineagePositions: (positions) => {
+    const nextLineageRfNodes = get().rfNodes.map((node) => {
+      const position = positions[node.id];
+      if (!position) {
+        return node;
+      }
+      return {
+        ...node,
+        position: { x: position.x, y: position.y },
+      };
+    });
+    set({ rfNodes: nextLineageRfNodes });
+  },
+
+  setExplorePositions: (positions) => {
+    const nextExploreRfNodes = get().exploreRfNodes.map((node) => {
+      const position = positions[node.id];
+      if (!position) {
+        return node;
+      }
+      return {
+        ...node,
+        position: { x: position.x, y: position.y },
+      };
+    });
+    set({ exploreRfNodes: nextExploreRfNodes });
   },
 
   addOptimisticNode: (tempId, position, label) => {
