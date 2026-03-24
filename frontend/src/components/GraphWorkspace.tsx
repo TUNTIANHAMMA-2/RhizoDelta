@@ -9,6 +9,7 @@ import { NodeDetailPanel } from "./panels/NodeDetailPanel";
 import { EditDraftPanel } from "./panels/EditDraftPanel";
 import { Header } from "./chrome/Header";
 import { ToastContainer } from "./feedback/Toast";
+import { loadGraphForRoot } from "../lib/loadGraphForRoot";
 
 function CanvasModeSwitch() {
   const canvasMode = useUiStore((s) => s.canvasMode);
@@ -70,15 +71,23 @@ export function GraphWorkspace() {
 
   const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
   const loadLineage = useGraphStore((s) => s.loadLineage);
+  const loadChildren = useGraphStore((s) => s.loadChildren);
 
   useEffect(() => {
-    loadRhizomes().then(() => {
-      const currentRhizomes = useGraphStore.getState().rhizomes;
-      if (currentRhizomes.length > 0) {
-        loadLineage(currentRhizomes[0].node_id);
-      }
-    }).catch(console.error);
-  }, [loadRhizomes, loadLineage]);
+    loadRhizomes()
+      .then(async () => {
+        const rootNodeId = useGraphStore.getState().rhizomes[0]?.node_id;
+        if (!rootNodeId) {
+          return;
+        }
+        await loadGraphForRoot(rootNodeId, {
+          loadLineage,
+          loadChildren,
+          onChildrenError: console.error,
+        });
+      })
+      .catch(console.error);
+  }, [loadRhizomes, loadLineage, loadChildren]);
 
   useSse();
 

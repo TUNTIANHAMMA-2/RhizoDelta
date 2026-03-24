@@ -1,20 +1,31 @@
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
+import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
+import { selectRhizome } from "../../lib/selectRhizome";
 
 export function RhizoneList() {
   const toggleSidebar = useUiStore((s) => s.toggleLeftSidebar);
   const openPostPanel = useUiStore((s) => s.openPostPanel);
+  const closeRightPanel = useUiStore((s) => s.closeRightPanel);
   
   const rhizomes = useGraphStore((s) => s.rhizomes);
   const rootNodeId = useGraphStore((s) => s.rootNodeId);
   const loadLineage = useGraphStore((s) => s.loadLineage);
+  const loadChildren = useGraphStore((s) => s.loadChildren);
   const selectNode = useGraphStore((s) => s.selectNode);
 
   const handleRhizomeClick = (node: GraphNodeDTO) => {
-    selectNode(null); // Clear selected node
-    useUiStore.getState().closeRightPanel();
-    loadLineage(node.node_id);
+    void selectRhizome(node.node_id, {
+      selectNode,
+      closeRightPanel,
+      loadGraphForRoot: (nodeId) =>
+        loadGraphForRoot(nodeId, {
+          loadLineage,
+          loadChildren,
+          onChildrenError: console.error,
+        }),
+    });
   };
 
   return (
