@@ -19,17 +19,18 @@ function CanvasModeSwitch() {
     <div
       style={{
         position: "absolute",
-        top: "var(--space-5)",
-        left: "var(--space-5)",
+        top: 72,
+        left: "var(--space-4)",
         zIndex: 20,
         display: "flex",
         gap: "var(--space-2)",
         padding: "var(--space-2)",
-        background: "rgba(252, 249, 242, 0.88)",
+        background: "rgba(255, 255, 255, 0.88)",
         border: "1px solid var(--color-border-default)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-sm)",
-        backdropFilter: "blur(8px)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       {[
@@ -45,12 +46,14 @@ function CanvasModeSwitch() {
             style={{
               border: "none",
               borderRadius: "var(--radius-sm)",
-              padding: "var(--space-2) var(--space-3)",
-              background: active ? "var(--color-accent-blue)" : "transparent",
-              color: active ? "#fff" : "var(--color-text-secondary)",
+              padding: "var(--space-2) var(--space-4)",
+              background: active ? "var(--color-text-primary)" : "transparent",
+              color: active ? "var(--color-bg-primary)" : "var(--color-text-secondary)",
+              fontWeight: active ? 600 : 500,
               cursor: "pointer",
               fontFamily: "var(--font-ui)",
               fontSize: "var(--font-size-sm)",
+              transition: "all var(--transition-fast)",
             }}
           >
             {label}
@@ -108,7 +111,7 @@ export function GraphWorkspace() {
           top: "var(--space-2)",
           right: "var(--space-4)",
           zIndex: 101,
-          background: "rgba(252, 249, 242, 0.85)",
+          background: "rgba(255, 255, 255, 0.85)",
           backdropFilter: "blur(8px)",
           border: "1px solid var(--color-border-default)",
           borderRadius: "var(--radius-sm)",
@@ -158,7 +161,7 @@ export function GraphWorkspace() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "rgba(252, 249, 242, 0.85)",
+            background: "rgba(255, 255, 255, 0.85)",
             backdropFilter: "blur(8px)",
             border: "1px solid var(--color-border-default)",
             borderLeft: "none",

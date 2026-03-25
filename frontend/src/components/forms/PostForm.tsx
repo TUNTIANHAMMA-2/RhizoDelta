@@ -1,36 +1,52 @@
-import { useState, Suspense, lazy } from "react";
-import rehypeSanitize from "rehype-sanitize";
+import { useState } from "react";
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
+import { useAuthStore } from "../../stores/authStore";
 import { createPost } from "../../api/posts";
-import { Skeleton } from "../feedback/Skeleton";
-
-const MDEditor = lazy(() => import("@uiw/react-md-editor"));
+import { MarkdownEditor } from "../editor/MarkdownEditor";
 
 export function PostForm() {
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const addToast = useUiStore((s) => s.addToast);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const selectedNode = useGraphStore((s) =>
+    s.selectedNodeId ? s.nodes.get(s.selectedNodeId) ?? null : null,
+  );
+  const selectNode = useGraphStore((s) => s.selectNode);
+  const userId = useAuthStore((s) => s.userId);
+  const targetPreview =
+    selectedNode?.summary_content ??
+    selectedNode?.content ??
+    (selectedNodeId ? `节点 ${selectedNodeId.slice(0, 8)}...` : null);
+  const successMessage = selectedNodeId ? "回复已排队" : "发布已排队";
+  const failurePrefix = selectedNodeId ? "回复失败: " : "发布失败: ";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    
+    // 校验去除空壳后的内容
+    const strippedContent = content.replace(/<[^>]+>/g, "").trim();
+    if (!strippedContent) return;
+    if (!userId) {
+      addToast({ type: "error", message: "缺少当前登录用户身份" });
+      return;
+    }
 
     setSubmitting(true);
     try {
       await createPost({
         request_id: crypto.randomUUID(),
-        author_id: "current_user",
+        author_id: userId,
         content,
         target_node_id: selectedNodeId ?? undefined,
       });
-      addToast({ type: "success", message: "发布已排队" });
+      addToast({ type: "success", message: successMessage });
       setContent("");
     } catch (err) {
       addToast({
         type: "error",
-        message: "发布失败: " + (err as Error).message,
+        message: failurePrefix + (err as Error).message,
       });
     } finally {
       setSubmitting(false);
@@ -46,36 +62,61 @@ export function PostForm() {
       {selectedNodeId && (
         <div
           style={{
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "var(--space-3)",
+            padding: "var(--space-3)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-bg-primary)",
           }}
         >
-          回复节点: {selectedNodeId.slice(0, 8)}...
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "var(--font-size-xs)",
+                color: "var(--color-text-secondary)",
+                marginBottom: "var(--space-1)",
+              }}
+            >
+              正在回复
+            </div>
+            <div
+              style={{
+                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text-primary)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {targetPreview}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => selectNode(null)}
+          >
+            取消回复
+          </button>
         </div>
       )}
-      <div
-        style={{
-          border: "1px solid var(--color-border-default)",
-          borderRadius: "var(--radius-sm)",
-        }}
-      >
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <MDEditor
-            value={content}
-            onChange={(val) => setContent(val ?? "")}
-            preview="edit"
-            height={200}
-            previewOptions={{ rehypePlugins: [[rehypeSanitize]] }}
-          />
-        </Suspense>
-      </div>
+      
+      <MarkdownEditor
+        value={content}
+        onChange={(val) => setContent(val)}
+        minHeight={200}
+      />
+
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           className="btn-primary"
           type="submit"
-          disabled={submitting || !content.trim()}
+          disabled={submitting || !userId || !content.replace(/<[^>]+>/g, "").trim()}
         >
-          {submitting ? "发布中..." : "发布"}
+          {submitting ? "发布中..." : selectedNodeId ? "回复" : "发布"}
         </button>
       </div>
     </form>

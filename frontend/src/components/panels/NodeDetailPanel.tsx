@@ -4,6 +4,7 @@ import { useSseStore } from "../../stores/sseStore";
 import { ProvenancePanel } from "./ProvenancePanel";
 import { AssociationPanel } from "./AssociationPanel";
 import { AuditPanel } from "./AuditPanel";
+import { MarkdownViewer } from "../editor/MarkdownViewer";
 
 const TABS: { id: NodeTab; label: string }[] = [
   { id: "details", label: "详情" },
@@ -18,6 +19,17 @@ const TYPE_COLOR = {
   Result: "var(--color-node-result)",
 } as const;
 
+const ORCHESTRATION_STATUS_LABELS: Record<string, string> = {
+  POST_ACCEPTED: "已进入发布队列",
+  EMBEDDING_READY: "内容索引已完成",
+  EVALUATION_STARTED: "AI 正在判断与目标帖的关系",
+  RECALL_COMPLETED: "上下文召回已完成",
+  MERGE_QUEUED: "AI 已判定并入共识",
+  BRANCH_QUEUED: "AI 已判定分出新支线",
+  REVIEW_PENDING: "等待人工复核",
+  FAILED: "处理失败",
+};
+
 export function NodeDetailPanel() {
   const payload = useUiStore((s) => s.rightPanelPayload);
   const closePanel = useUiStore((s) => s.closeRightPanel);
@@ -31,6 +43,9 @@ export function NodeDetailPanel() {
   if (!node) return null;
 
   const orchestrationStatus = orchestrationStatuses[node.node_id];
+  const statusLabel = orchestrationStatus
+    ? ORCHESTRATION_STATUS_LABELS[orchestrationStatus.status] ?? orchestrationStatus.status
+    : null;
 
   return (
     <aside
@@ -38,8 +53,9 @@ export function NodeDetailPanel() {
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
       style={{
-        width: 360,
-        minWidth: 360,
+        width: "45vw",
+        minWidth: 460,
+        position: "relative",
         borderLeft: "1px solid var(--color-border-default)",
         background: "var(--color-bg-primary)",
         display: "flex",
@@ -48,6 +64,7 @@ export function NodeDetailPanel() {
         height: "100%",
       }}
     >
+      <div className="rd-marker-selected" style={{ top: 20, left: 16 }} />
       {/* Header */}
       <div
         style={{
@@ -63,7 +80,7 @@ export function NodeDetailPanel() {
             marginBottom: "var(--space-2)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginLeft: 36 }}>
             <span
               style={{
                 width: 8,
@@ -152,15 +169,19 @@ export function NodeDetailPanel() {
       >
         {activeTab === "details" && (
           <>
-            <div
-              style={{
-                fontFamily: "var(--font-content)",
-                fontSize: "var(--font-size-base)",
-                lineHeight: 1.6,
-                marginBottom: "var(--space-6)",
-              }}
-            >
-              {node.content ?? node.summary_content ?? "No content"}
+            <div style={{ marginBottom: "var(--space-6)" }}>
+              {node.content || node.summary_content ? (
+                <MarkdownViewer content={node.content ?? node.summary_content ?? ""} />
+              ) : (
+                <div style={{
+                  fontFamily: "var(--font-content)",
+                  fontSize: "var(--font-size-base)",
+                  color: "var(--color-text-tertiary)",
+                  fontStyle: "italic",
+                }}>
+                  No content
+                </div>
+              )}
             </div>
             <div
               style={{
@@ -189,7 +210,7 @@ export function NodeDetailPanel() {
                                "var(--color-text-primary)",
                         fontWeight: 600
                       }}>
-                        {orchestrationStatus.status}
+                        {statusLabel}
                       </span>
                     </div>
                     {orchestrationStatus.message && (

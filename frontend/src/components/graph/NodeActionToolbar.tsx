@@ -1,4 +1,6 @@
 import { useUiStore } from "../../stores/uiStore";
+import { useAuthStore } from "../../stores/authStore";
+import { useGraphStore } from "../../stores/graphStore";
 
 interface Props {
   nodeId: string;
@@ -6,6 +8,16 @@ interface Props {
 
 export function NodeActionToolbar({ nodeId }: Props) {
   const openEditPanel = useUiStore((s) => s.openEditPanel);
+  const openPostPanel = useUiStore((s) => s.openPostPanel);
+  const roles = useAuthStore((s) => s.roles);
+  const userId = useAuthStore((s) => s.userId);
+  const selectNode = useGraphStore((s) => s.selectNode);
+  const canReply = userId !== null;
+  const canEdit = roles.includes("AGENT") || roles.includes("ADMIN");
+
+  if (!canReply && !canEdit) {
+    return null;
+  }
 
   return (
     <div
@@ -35,12 +47,25 @@ export function NodeActionToolbar({ nodeId }: Props) {
           borderTop: "1px solid var(--color-border-default)",
         }}
       />
+      {canReply && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            selectNode(nodeId);
+            openPostPanel();
+          }}
+          className="btn-primary"
+        >
+          回复
+        </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();
           openEditPanel(nodeId, "inject");
         }}
         className="btn-primary"
+        style={{ display: canEdit ? undefined : "none" }}
       >
         延续注入
       </button>
@@ -50,6 +75,7 @@ export function NodeActionToolbar({ nodeId }: Props) {
           openEditPanel(nodeId, "fork");
         }}
         className="btn-secondary"
+        style={{ display: canEdit ? undefined : "none" }}
       >
         分叉
       </button>

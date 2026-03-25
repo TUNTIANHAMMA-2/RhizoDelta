@@ -1,11 +1,8 @@
-import { useState, Suspense, lazy } from "react";
-import rehypeSanitize from "rehype-sanitize";
+import { useState } from "react";
 import { useUiStore } from "../../stores/uiStore";
 import { useAuthStore } from "../../stores/authStore";
 import { executeInject } from "../../api/decisions";
-import { Skeleton } from "../feedback/Skeleton";
-
-const MDEditor = lazy(() => import("@uiw/react-md-editor"));
+import { MarkdownEditor } from "../editor/MarkdownEditor";
 
 interface Props {
   sourceNodeId: string;
@@ -17,30 +14,27 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const addToast = useUiStore((s) => s.addToast);
-  const token = useAuthStore((s) => s.token);
+  const userId = useAuthStore((s) => s.userId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !reason.trim()) return;
+    const strippedContent = content.replace(/<[^>]+>/g, "").trim();
+    if (!strippedContent || !reason.trim()) return;
+    if (!userId) {
+      addToast({ type: "error", message: "缺少当前登录用户身份" });
+      return;
+    }
 
     setSubmitting(true);
     try {
-      // Parse operator_id from JWT
-      let operatorId = "unknown";
-      if (token) {
-        try {
-          operatorId = JSON.parse(atob(token.split(".")[1])).sub ?? "unknown";
-        } catch { /* fallback */ }
-      }
-
       await executeInject({
         decision_id: crypto.randomUUID(),
         request_id: crypto.randomUUID(),
         source_node_id: sourceNodeId,
         content,
-        author_id: operatorId,
+        author_id: userId,
         operator_type: "HUMAN",
-        operator_id: operatorId,
+        operator_id: userId,
         reason,
       });
       addToast({ type: "info", message: "注入决策已提交，等待处理..." });
@@ -121,22 +115,11 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
         >
           内容 *
         </label>
-        <div
-          style={{
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-        <Suspense fallback={<Skeleton variant="rectangular" height={180} />}>
-          <MDEditor
-            value={content}
-            onChange={(val) => setContent(val ?? "")}
-            preview="edit"
-            height={180}
-            previewOptions={{ rehypePlugins: [[rehypeSanitize]] }}
-          />
-        </Suspense>
-        </div>
+        <MarkdownEditor
+          value={content}
+          onChange={(val) => setContent(val)}
+          minHeight={180}
+        />
       </div>
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
         <button
@@ -149,7 +132,7 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
         <button
           className="btn-primary"
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !userId}
         >
           {submitting ? "注入中..." : "注入"}
         </button>

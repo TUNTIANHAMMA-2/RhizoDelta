@@ -20,7 +20,7 @@ export function AssociationPanel({ nodeId }: Props) {
   const addToast = useUiStore((s) => s.addToast);
   const isAdmin = useAuthStore((s) => s.hasRole("ADMIN"));
   const canCreate = useAuthStore((s) => s.hasRole("AGENT") || s.hasRole("ADMIN"));
-  const token = useAuthStore((s) => s.token);
+  const userId = useAuthStore((s) => s.userId);
   
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<AssociationInfo | null>(null);
@@ -51,22 +51,15 @@ export function AssociationPanel({ nodeId }: Props) {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetId.trim()) return;
+    if (!targetId.trim() || !userId) return;
     
     setSubmitting(true);
     try {
-      let creatorId = "unknown";
-      if (token) {
-        try {
-          creatorId = JSON.parse(atob(token.split(".")[1])).sub ?? "unknown";
-        } catch {}
-      }
-      
       await createAssociation({
         source_node_id: nodeId,
         target_node_id: targetId.trim(),
         type: assocType,
-        creator_id: creatorId,
+        creator_id: userId,
         reason,
         confidence
       });
@@ -123,7 +116,7 @@ export function AssociationPanel({ nodeId }: Props) {
                 </div>
                 <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
                   <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>取消</button>
-                  <button type="submit" className="btn-primary" disabled={submitting || !targetId.trim()}>{submitting ? "提交中..." : "保存"}</button>
+                  <button type="submit" className="btn-primary" disabled={submitting || !userId || !targetId.trim()}>{submitting ? "提交中..." : "保存"}</button>
                 </div>
               </form>
             )}

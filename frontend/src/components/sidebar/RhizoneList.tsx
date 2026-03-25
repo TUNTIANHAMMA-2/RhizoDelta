@@ -3,6 +3,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
 import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
 import { selectRhizome } from "../../lib/selectRhizome";
+import { stripMarkdown } from "../../lib/markdown";
 
 export function RhizoneList() {
   const toggleSidebar = useUiStore((s) => s.toggleLeftSidebar);
@@ -40,7 +41,7 @@ export function RhizoneList() {
         display: "flex",
         flexDirection: "column",
         fontFamily: "var(--font-ui)",
-        paddingTop: 40,
+        paddingTop: 80,
         boxSizing: "border-box",
       }}
     >
@@ -111,28 +112,13 @@ export function RhizoneList() {
         ) : (
           rhizomes.map((node) => {
             const isSelected = node.node_id === rootNodeId;
+            const plainText = stripMarkdown(node.content ?? node.summary_content);
             return (
               <button
                 key={node.node_id}
+                className="rd-list-item"
                 onClick={() => handleRhizomeClick(node)}
                 aria-current={isSelected ? "true" : undefined}
-                style={{
-                  padding: "var(--space-3) var(--space-4)",
-                  cursor: "pointer",
-                  background: isSelected ? "var(--color-bg-selected)" : "transparent",
-                  borderLeft: isSelected ? "2px solid var(--color-accent)" : "2px solid transparent",
-                  borderTop: "none",
-                  borderRight: "none",
-                  borderBottom: "none",
-                  transition: "background var(--transition-fast)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "var(--space-1)",
-                  width: "100%",
-                  textAlign: "left",
-                  font: "inherit",
-                  color: "inherit",
-                }}
               >
                 <div
                   style={{
@@ -142,9 +128,10 @@ export function RhizoneList() {
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    width: "100%",
                   }}
                 >
-                  {node.content ?? node.summary_content ?? "Unknown Topic"}
+                  {plainText || "Unknown Topic"}
                 </div>
                 <div
                   style={{
@@ -152,6 +139,7 @@ export function RhizoneList() {
                     color: "var(--color-text-secondary)",
                     display: "flex",
                     justifyContent: "space-between",
+                    width: "100%",
                   }}
                 >
                   <span>{new Date(node.created_at).toLocaleDateString()}</span>

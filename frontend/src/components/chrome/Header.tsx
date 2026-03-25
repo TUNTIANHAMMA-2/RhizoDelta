@@ -1,7 +1,8 @@
-import { useRef, useCallback } from "react";
 import { useSseStore } from "../../stores/sseStore";
-import { useUiStore } from "../../stores/uiStore";
 import { useAuthStore } from "../../stores/authStore";
+import { useUiStore } from "../../stores/uiStore";
+import { useGraphStore } from "../../stores/graphStore";
+import { useNavigate } from "react-router-dom";
 import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
 
@@ -18,23 +19,14 @@ const SSE_ANIM_CLASS = {
 } as const;
 
 export function Header() {
+  const navigate = useNavigate();
   const sseStatus = useSseStore((s) => s.status);
-  const headerExpanded = useUiStore((s) => s.headerExpanded);
-  const setHeaderExpanded = useUiStore((s) => s.setHeaderExpanded);
   const roles = useAuthStore((s) => s.roles);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleEnter = useCallback(() => {
-    if (leaveTimer.current) {
-      clearTimeout(leaveTimer.current);
-      leaveTimer.current = null;
-    }
-    setHeaderExpanded(true);
-  }, [setHeaderExpanded]);
-
-  const handleLeave = useCallback(() => {
-    leaveTimer.current = setTimeout(() => setHeaderExpanded(false), 300);
-  }, [setHeaderExpanded]);
+  const userId = useAuthStore((s) => s.userId);
+  const clearToken = useAuthStore((s) => s.clearToken);
+  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
+  const rightPanelMode = useUiStore((s) => s.rightPanelMode);
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
 
   const topRole = roles.includes("ADMIN")
     ? "ADMIN"
@@ -44,95 +36,147 @@ export function Header() {
 
   return (
     <header
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
       style={{
         position: "fixed",
         top: 0,
         left: 0,
         zIndex: 100,
         display: "flex",
-        alignItems: "center",
-        gap: "var(--space-2)",
-        padding: "var(--space-2) var(--space-4)",
-        background: headerExpanded ? "rgba(252, 249, 242, 0.85)" : "transparent",
-        backdropFilter: headerExpanded ? "blur(8px)" : "none",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        width: "100%",
+        padding: "var(--space-4)",
+        pointerEvents: "none",
         fontFamily: "var(--font-ui)",
         fontSize: "var(--font-size-sm)",
-        transition: "all var(--transition-normal)",
-        width: headerExpanded ? 260 : "auto",
-        maxWidth: 260,
         boxSizing: "border-box",
-        borderRight: headerExpanded ? "1px solid var(--color-border-default)" : "1px solid transparent",
-        borderBottom: headerExpanded ? "1px solid var(--color-border-default)" : "1px solid transparent",
       }}
     >
-      <span
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          fontFamily: "var(--font-content)",
-          fontWeight: 600,
-          color: "var(--color-text-primary)",
-          fontSize: "var(--font-size-lg)",
-          letterSpacing: "-0.3px",
-          lineHeight: 1,
-        }}
-      >
-        <span
+      <div style={{ display: "flex", alignItems: "center", position: "relative", width: "100%", height: 40 }}>
+        {/* Logo 胶囊 (紧凑尺寸) */}
+        <div
           style={{
-            overflow: "hidden",
-            transition: "max-width var(--transition-normal), opacity var(--transition-normal)",
-            maxWidth: headerExpanded ? 0 : 100,
-            opacity: headerExpanded ? 0 : 1,
-            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            height: 40,
+            background: "rgba(255, 255, 255, 0.85)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-lg)",
+            padding: "0 var(--space-4)",
+            boxShadow: "var(--shadow-md)",
+            pointerEvents: "auto",
+            width: "max-content",
+            boxSizing: "border-box",
+            zIndex: 2, // 确保 Logo 处于上层，面包屑从其下方滑出
           }}
         >
-          RhizoDelt
-        </span>
-        <span
-          className={SSE_ANIM_CLASS[sseStatus]}
-          aria-live="polite"
-          style={{
-            color: SSE_STATUS_COLOR[sseStatus],
-            fontSize: "var(--font-size-xl)",
-            lineHeight: 1,
-            verticalAlign: "-1px",
-            transition: "color var(--transition-normal)",
-          }}
-        >
-          <span
+          <div
             style={{
-              position: "absolute",
-              width: "1px",
-              height: "1px",
-              padding: 0,
-              margin: "-1px",
-              overflow: "hidden",
-              clip: "rect(0, 0, 0, 0)",
-              whiteSpace: "nowrap",
-              borderWidth: 0,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              fontFamily: "var(--font-content)",
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              fontSize: "var(--font-size-md)",
+              letterSpacing: "-0.2px",
             }}
           >
-            {sseStatus === "connecting" && "连接中"}
-            {sseStatus === "connected" && "已连接"}
-            {sseStatus === "disconnected" && "连接已断开"}
-          </span>
-          <span aria-hidden="true">△</span>
-        </span>
-      </span>
+            RhizoDelt
+            <span
+              className={SSE_ANIM_CLASS[sseStatus]}
+              aria-live="polite"
+              style={{
+                color: SSE_STATUS_COLOR[sseStatus],
+                fontSize: "var(--font-size-lg)",
+                marginLeft: 2,
+              }}
+            >
+              △
+            </span>
+          </div>
+        </div>
 
-      {headerExpanded && (
-        <>
-          <div style={{ display: "flex", flex: 1, minWidth: 0, overflow: "hidden", alignItems: "center" }}>
-            <Breadcrumb />
-          </div>
-          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-            <RoleBadge role={topRole} />
-          </div>
-        </>
-      )}
+        {/* 面包屑胶囊 */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: selectedNodeId 
+              ? (leftSidebarOpen ? 260 : 156) // 260 = 276(绝对坐标) - 16(相对父级); 156 = Logo宽度(~140) + 16px间隙
+              : 80, // 收起时缩入 Logo 背后
+            display: "flex",
+            alignItems: "center",
+            height: 40,
+            background: "rgba(255, 255, 255, 0.85)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            border: selectedNodeId ? "1px solid var(--color-border-default)" : "1px solid transparent",
+            borderRadius: "var(--radius-lg)",
+            padding: selectedNodeId ? "0 var(--space-4)" : "0",
+            boxShadow: selectedNodeId ? "var(--shadow-md)" : "none",
+            pointerEvents: selectedNodeId ? "auto" : "none",
+            opacity: selectedNodeId ? 1 : 0,
+            maxWidth: selectedNodeId ? 400 : 0,
+            overflow: "hidden",
+            transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+            zIndex: 1,
+          }}
+        >
+          {selectedNodeId && <Breadcrumb />}
+        </div>
+      </div>
+
+      <div 
+        style={{ 
+          pointerEvents: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          transition: "transform 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+          transform: rightPanelMode !== "hidden" ? "translateX(calc(-1 * max(45vw, 460px)))" : "translateX(0)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "6px 8px 6px 14px",
+            borderRadius: "999px",
+            background: "rgba(255, 255, 255, 0.85)",
+            border: "1px solid var(--color-border-default)",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          <span style={{ color: "var(--color-text-secondary)" }}>
+            {userId ?? "anonymous"}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              clearToken();
+              navigate("/login", { replace: true });
+            }}
+            style={{
+              border: "none",
+              borderRadius: "999px",
+              padding: "6px 10px",
+              background: "var(--color-bg-tertiary)",
+              color: "var(--color-text-primary)",
+              cursor: "pointer",
+              fontFamily: "var(--font-ui)",
+              fontSize: "var(--font-size-xs)",
+              fontWeight: 600,
+            }}
+          >
+            退出
+          </button>
+        </div>
+        <RoleBadge role={topRole} />
+      </div>
     </header>
   );
 }

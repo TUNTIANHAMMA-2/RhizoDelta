@@ -114,7 +114,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const nodesMap = new Map(get().nodes);
     topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
-    const allEdges = [...get().edges, ...topo.edges];
+    const edgeMap = new Map(
+      get().edges.map((e) => [`${e.source}-${e.type}-${e.target}`, e]),
+    );
+    for (const e of topo.edges) {
+      edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+    }
+    const allEdges = [...edgeMap.values()];
     const priorExplorePositions = new Map(
       get().exploreRfNodes.map((node) => [node.id, node.position]),
     );
@@ -144,7 +150,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
 
   setSemanticZoom: (zoom) => {
-    if (get().semanticZoom !== zoom) set({ semanticZoom: zoom });
+    if (get().semanticZoom !== zoom) {
+      set({ semanticZoom: zoom });
+    }
   },
 
   addNode: (node) => {
@@ -164,6 +172,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const priorExplorePositions = new Map(
       get().exploreRfNodes.map((node) => [node.id, node.position]),
     );
+
     const views = buildGraphViews(
       nodesMap.values(),
       allEdges,
@@ -188,31 +197,49 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   setLineagePositions: (positions) => {
+    let changed = false;
     const nextLineageRfNodes = get().rfNodes.map((node) => {
       const position = positions[node.id];
       if (!position) {
         return node;
       }
+      const dx = position.x - node.position.x;
+      const dy = position.y - node.position.y;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        return node;
+      }
+      changed = true;
       return {
         ...node,
         position: { x: position.x, y: position.y },
       };
     });
-    set({ rfNodes: nextLineageRfNodes });
+    if (changed) {
+      set({ rfNodes: nextLineageRfNodes });
+    }
   },
 
   setExplorePositions: (positions) => {
+    let changed = false;
     const nextExploreRfNodes = get().exploreRfNodes.map((node) => {
       const position = positions[node.id];
       if (!position) {
         return node;
       }
+      const dx = position.x - node.position.x;
+      const dy = position.y - node.position.y;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        return node;
+      }
+      changed = true;
       return {
         ...node,
         position: { x: position.x, y: position.y },
       };
     });
-    set({ exploreRfNodes: nextExploreRfNodes });
+    if (changed) {
+      set({ exploreRfNodes: nextExploreRfNodes });
+    }
   },
 
   addOptimisticNode: (tempId, position, label) => {

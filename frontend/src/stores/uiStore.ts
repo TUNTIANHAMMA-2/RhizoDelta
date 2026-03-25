@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Viewport } from "@xyflow/react";
 
 export type RightPanelMode = "hidden" | "detail" | "edit" | "agent";
 export type NodeTab = "details" | "provenance" | "association" | "audit";
@@ -9,6 +10,8 @@ export interface ToastMessage {
   type: "info" | "success" | "warning" | "error";
   message: string;
 }
+
+const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
 export interface UiState {
   leftSidebarOpen: boolean;
@@ -31,6 +34,10 @@ export interface UiState {
   setZoomLevel: (zoom: number) => void;
   canvasMode: CanvasMode;
   setCanvasMode: (mode: CanvasMode) => void;
+
+  // Viewport persistence
+  viewports: { lineage: Viewport; explore: Viewport };
+  saveViewport: (mode: CanvasMode, viewport: Viewport) => void;
 
   // Toast
   toasts: ToastMessage[];
@@ -56,13 +63,13 @@ export const useUiStore = create<UiState>((set) => ({
   rightPanelMode: "hidden",
   rightPanelPayload: null,
   openDetailPanel: (nodeId) =>
-    set({ rightPanelMode: "detail", rightPanelPayload: { nodeId } }),
+    set({ rightPanelMode: "detail", rightPanelPayload: { nodeId }, leftSidebarOpen: false }),
   openEditPanel: (nodeId, formType) =>
-    set({ rightPanelMode: "edit", rightPanelPayload: { nodeId, formType } }),
+    set({ rightPanelMode: "edit", rightPanelPayload: { nodeId, formType }, leftSidebarOpen: false }),
   openPostPanel: () =>
-    set({ rightPanelMode: "edit", rightPanelPayload: { nodeId: "", formType: "post" } }),
+    set({ rightPanelMode: "edit", rightPanelPayload: { nodeId: "", formType: "post" }, leftSidebarOpen: false }),
   closeRightPanel: () =>
-    set({ rightPanelMode: "hidden", rightPanelPayload: null }),
+    set({ rightPanelMode: "hidden", rightPanelPayload: null, leftSidebarOpen: true }),
 
   headerExpanded: false,
   setHeaderExpanded: (v) => set({ headerExpanded: v }),
@@ -71,6 +78,16 @@ export const useUiStore = create<UiState>((set) => ({
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
   canvasMode: "lineage",
   setCanvasMode: (canvasMode) => set({ canvasMode }),
+
+  // Viewport persistence
+  viewports: {
+    lineage: { ...DEFAULT_VIEWPORT },
+    explore: { ...DEFAULT_VIEWPORT },
+  },
+  saveViewport: (mode, viewport) =>
+    set((s) => ({
+      viewports: { ...s.viewports, [mode]: viewport },
+    })),
 
   // Toast
   toasts: [],

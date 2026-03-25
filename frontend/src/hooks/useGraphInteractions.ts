@@ -7,19 +7,27 @@ import { useReactFlow } from "@xyflow/react";
  * - Highlight neighbor nodes/edges, dim the rest
  */
 export function useGraphInteractions() {
-  const { setCenter, getEdges, getNode } = useReactFlow();
+  const { setCenter, getEdges, getNode, getViewport } = useReactFlow();
 
   const focusNode = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, delayMs = 0) => {
       const node = getNode(nodeId);
       if (!node) return;
 
-      // Center canvas on selected node
-      setCenter(
-        node.position.x,
-        node.position.y,
-        { zoom: 1, duration: 600 },
-      );
+      const performCenter = () => {
+        const { zoom: currentZoom } = getViewport();
+        setCenter(
+          node.position.x,
+          node.position.y,
+          { zoom: Math.max(currentZoom, 0.8), duration: 600 },
+        );
+      };
+
+      if (delayMs > 0) {
+        setTimeout(performCenter, delayMs);
+      } else {
+        performCenter();
+      }
 
       // Find connected node IDs
       const edges = getEdges();
@@ -36,7 +44,7 @@ export function useGraphInteractions() {
 
       return { connectedNodeIds, connectedEdgeIds };
     },
-    [getEdges, getNode, setCenter],
+    [getEdges, getNode, getViewport, setCenter],
   );
 
   const resetFocus = useCallback(() => {

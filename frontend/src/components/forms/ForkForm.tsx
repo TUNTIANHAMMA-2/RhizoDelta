@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUiStore } from "../../stores/uiStore";
 import { useAuthStore } from "../../stores/authStore";
 import { executeFork } from "../../api/decisions";
+import { MarkdownEditor } from "../editor/MarkdownEditor";
 
 interface Branch {
   id: string;
@@ -21,7 +22,7 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const addToast = useUiStore((s) => s.addToast);
-  const token = useAuthStore((s) => s.token);
+  const userId = useAuthStore((s) => s.userId);
 
   const updateBranch = (idx: number, field: keyof Branch, value: string) => {
     const next = [...branches];
@@ -42,20 +43,17 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (branches.some((b) => !b.content.trim())) {
+    if (branches.some((b) => !b.content.replace(/<[^>]+>/g, "").trim())) {
       addToast({ type: "error", message: "所有分支内容不能为空" });
+      return;
+    }
+    if (!userId) {
+      addToast({ type: "error", message: "缺少当前登录用户身份" });
       return;
     }
 
     setSubmitting(true);
     try {
-      let operatorId = "unknown";
-      if (token) {
-        try {
-          operatorId = JSON.parse(atob(token.split(".")[1])).sub ?? "unknown";
-        } catch { /* fallback */ }
-      }
-
       await executeFork({
         operation_id: crypto.randomUUID(),
         request_id: crypto.randomUUID(),
@@ -63,10 +61,10 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
         branches: branches.map((b) => ({
           decision_id: b.id,
           content: b.content,
-          author_id: b.author_id || operatorId,
+          author_id: b.author_id || userId,
         })),
         operator_type: "HUMAN",
-        operator_id: operatorId,
+        operator_id: userId,
         reason,
       });
       addToast({ type: "info", message: "分叉决策已提交" });
@@ -118,7 +116,7 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
         />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
         {branches.map((branch, idx) => (
           <div
             key={branch.id}
@@ -126,6 +124,9 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
               border: "1px solid var(--color-border-default)",
               borderRadius: "var(--radius-sm)",
               padding: "var(--space-3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)"
             }}
           >
             <div
@@ -133,7 +134,6 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "var(--space-2)",
               }}
             >
               <span
@@ -161,18 +161,13 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
                 </button>
               )}
             </div>
-            <textarea
+            
+            <MarkdownEditor
               value={branch.content}
-              onChange={(e) => updateBranch(idx, "content", e.target.value)}
-              placeholder="分支内容..."
-              required
-              rows={3}
-              style={{
-                ...inputStyle,
-                resize: "vertical",
-                marginBottom: "var(--space-2)",
-              }}
+              onChange={(val) => updateBranch(idx, "content", val)}
+              minHeight={120}
             />
+
             <input
               value={branch.author_id}
               onChange={(e) => updateBranch(idx, "author_id", e.target.value)}
@@ -199,22 +194,22 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
       >
         + 添加分支
       </button>
-<div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
-  <button
-    className="btn-secondary"
-    type="button"
-    onClick={onSuccess}
-  >
-    取消
-  </button>
-  <button
-    className="btn-primary"
-    type="submit"
-    disabled={submitting}
-  >
-    {submitting ? "创建分叉中..." : "创建分叉"}
-  </button>
-</div>
+      <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+        <button
+          className="btn-secondary"
+          type="button"
+          onClick={onSuccess}
+        >
+          取消
+        </button>
+        <button
+          className="btn-primary"
+          type="submit"
+          disabled={submitting || !userId}
+        >
+          {submitting ? "创建分叉中..." : "创建分叉"}
+        </button>
+      </div>
     </form>
   );
 }

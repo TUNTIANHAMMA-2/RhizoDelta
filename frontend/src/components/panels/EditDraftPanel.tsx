@@ -23,18 +23,23 @@ export function EditDraftPanel() {
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
       style={{
-        width: 360,
-        minWidth: 360,
+        width: "45vw",
+        minWidth: 460,
+        position: "relative",
         overflowY: "auto",
         padding: "var(--space-4)",
+        borderLeft: "1px solid var(--color-border-default)",
+        background: "var(--color-bg-primary)",
       }}
     >
+      <div className="rd-marker-edit" />
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "var(--space-4)",
+          paddingLeft: "var(--space-6)",
         }}
       >
         <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)" }}>
