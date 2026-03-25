@@ -1,6 +1,7 @@
 package com.rhizodelta.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rhizodelta.config.AuthenticatedUser;
 import com.rhizodelta.config.RabbitMqConfig;
 import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.service.SseEventService;
@@ -12,6 +13,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,14 +50,18 @@ public class PostController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<PostAcceptedResponse>> createPost(@RequestBody CreatePostRequest request) {
+    public ResponseEntity<ApiResponse<PostAcceptedResponse>> createPost(
+            @RequestBody CreatePostRequest request,
+            Authentication authentication
+    ) {
         validateRequest(request);
         validateTargetNodeExists(request.targetNodeId());
+        AuthenticatedUser authenticatedUser = requireAuthenticatedUser(authentication);
 
         String eventId = generateEventId(request.requestId());
         PostEventMessage message = new PostEventMessage(
                 request.requestId(),
-                request.authorId(),
+                authenticatedUser.sub(),
                 request.content(),
                 request.targetNodeId(),
                 eventId
@@ -133,8 +139,14 @@ public class PostController {
             throw new IllegalArgumentException("request body must not be null");
         }
         requireText(request.requestId(), "request_id");
-        requireText(request.authorId(), "author_id");
         requireText(request.content(), "content");
+    }
+
+    private AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
+            throw new IllegalStateException("authenticated user principal not available");
+        }
+        return user;
     }
 
     private void validateTargetNodeExists(String targetNodeId) {

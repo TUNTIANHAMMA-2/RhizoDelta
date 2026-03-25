@@ -76,6 +76,21 @@ class AsyncPostPipelineIntegrationTest {
     }
 
     @Test
+    void shouldUseJwtSubjectAsAuthorId() {
+        Map<String, Object> request = Map.of(
+                "request_id", "req-async-authenticated-author",
+                "author_id", "forged-author",
+                "content", "post author should come from jwt"
+        );
+
+        ResponseEntity<Map> response = restTemplate.postForEntity("/api/posts", request, Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        awaitHumanPost("req-async-authenticated-author");
+        assertThat(findAuthorId("req-async-authenticated-author")).isEqualTo("test-operator");
+    }
+
+    @Test
     void shouldNotCreateDuplicateNodesForRedeliveredMessage() {
         Map<String, Object> request = Map.of(
                 "request_id", "req-async-dup",
@@ -110,6 +125,17 @@ class AsyncPostPipelineIntegrationTest {
                 .fetchAs(Long.class)
                 .one()
                 .orElse(0L);
+    }
+
+    private String findAuthorId(String requestId) {
+        return neo4jClient.query("""
+                MATCH (post:Human_Post {request_id: $requestId})
+                RETURN post.author_id AS authorId
+                """)
+                .bind(requestId).to("requestId")
+                .fetchAs(String.class)
+                .one()
+                .orElseThrow(() -> new AssertionError("Missing Human_Post for request_id=" + requestId));
     }
 
     private void sleep(Duration duration) {

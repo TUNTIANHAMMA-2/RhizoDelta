@@ -80,7 +80,7 @@ class AiRoutingExecutionServiceUnitTest {
         verify(decisionService).executeBranch(commandCaptor.capture());
         BranchDecisionCommand command = commandCaptor.getValue();
         assertThat(command.decision_id()).isEqualTo("evt-2:branch");
-        assertThat(command.request_id()).isEqualTo("req-2");
+        assertThat(command.request_id()).isEqualTo("req-2:branch");
         assertThat(command.source_node_id()).isEqualTo(sourceNodeId);
         assertThat(command.content()).isEqualTo("branch content");
         assertThat(command.author_id()).isEqualTo("author-2");

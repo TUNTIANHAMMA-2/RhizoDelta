@@ -52,7 +52,7 @@ public class AiRoutingExecutionService {
     private BranchDecisionCommand toBranchCommand(RoutingExecutionCommand command) {
         return new BranchDecisionCommand(
                 buildDecisionId(command.eventId(), "branch"),
-                command.requestId(),
+                buildRequestId(command.requestId(), "branch"),
                 UUID.fromString(command.sourceNodeId()),
                 command.post().getContent(),
                 command.post().getAuthorId(),
@@ -64,6 +64,10 @@ public class AiRoutingExecutionService {
 
     private String buildDecisionId(String eventId, String suffix) {
         return eventId + ":" + suffix.toLowerCase(Locale.ROOT);
+    }
+
+    private String buildRequestId(String requestId, String suffix) {
+        return requestId + ":" + suffix.toLowerCase(Locale.ROOT);
     }
 
     public record RoutingExecutionCommand(

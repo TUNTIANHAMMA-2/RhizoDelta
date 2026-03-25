@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,6 +29,7 @@ import java.util.UUID;
 @RequestMapping("/api/reviews")
 public class ReviewController {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReviewController.class);
+    private static final String BRANCH_REQUEST_SUFFIX = "branch";
 
     private final ReviewTaskService reviewTaskService;
     private final DecisionService decisionService;
@@ -126,7 +128,7 @@ public class ReviewController {
         Map<String, Object> draft = task.draftPayload();
         return new BranchDecisionCommand(
                 requireDraftText(draft, "decision_id"),
-                requireDraftText(draft, "request_id"),
+                buildRequestId(requireDraftText(draft, "request_id"), BRANCH_REQUEST_SUFFIX),
                 parseUuid(draft.get("source_node_id"), "source_node_id"),
                 requireDraftText(draft, "content"),
                 requireDraftText(draft, "author_id"),
@@ -134,6 +136,10 @@ public class ReviewController {
                 operatorId,
                 requireDraftText(draft, "reason")
         );
+    }
+
+    private static String buildRequestId(String requestId, String suffix) {
+        return requestId + ":" + suffix.toLowerCase(Locale.ROOT);
     }
 
     private static String requireDraftText(Map<String, Object> draft, String fieldName) {

@@ -6,7 +6,10 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +20,9 @@ import java.util.Set;
 
 @Service
 public class AiRoutingEvaluatorService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AiRoutingEvaluatorService.class);
     private static final Set<String> ALLOWED_ACTIONS = Set.of("MERGE", "BRANCH", "REVIEW");
+    private static final int RESPONSE_PREVIEW_LIMIT = 160;
     private static final String SYSTEM_PROMPT = """
             You are the RhizoDelta routing judge.
             Classify each post into exactly one action:
@@ -44,9 +49,25 @@ public class AiRoutingEvaluatorService {
     }
 
     public RoutingEvaluation evaluate(RoutingEvaluationCommand command) {
+        String modelName = resolveModelName();
         String postContent = DecisionCommandValidation.requireText(command.postContent(), "post_content");
-        String responseText = invokeModel(buildMessages(postContent, command.routingContext(), command.targetNodeId()));
+        List<dev.langchain4j.data.message.ChatMessage> messages =
+                buildMessages(postContent, command.routingContext(), command.targetNodeId());
+        LOGGER.info(
+                "AI routing evaluator invoking chat model={} target_node_id={} has_routing_context={} message_count={}",
+                modelName,
+                blankToEmpty(command.targetNodeId()),
+                hasText(command.routingContext()),
+                messages.size()
+        );
+        String responseText = invokeModel(messages, modelName);
         ModelDecision modelDecision = parseDecision(responseText);
+        LOGGER.info(
+                "AI routing evaluator parsed decision model={} action={} confidence={}",
+                modelName,
+                modelDecision.action(),
+                modelDecision.confidence()
+        );
         return applyThreshold(modelDecision);
     }
 
@@ -66,12 +87,18 @@ public class AiRoutingEvaluatorService {
         return List.of(SystemMessage.from(SYSTEM_PROMPT), UserMessage.from(userPrompt));
     }
 
-    private String invokeModel(List<dev.langchain4j.data.message.ChatMessage> messages) {
+    private String invokeModel(List<dev.langchain4j.data.message.ChatMessage> messages, String modelName) {
         Response<AiMessage> response = chatLanguageModel.generate(messages);
         if (response == null || response.content() == null || response.content().text() == null) {
             throw new IllegalStateException("routing evaluator response content is null");
         }
-        return response.content().text();
+        String responseText = response.content().text();
+        LOGGER.info(
+                "AI routing evaluator received response model={} preview={}",
+                modelName,
+                previewText(responseText)
+        );
+        return responseText;
     }
 
     private ModelDecision parseDecision(String responseText) {
@@ -82,6 +109,12 @@ public class AiRoutingEvaluatorService {
             double confidence = requireConfidence(decision.confidence());
             return new ModelDecision(action, confidence, reason);
         } catch (IOException exception) {
+            LOGGER.error(
+                    "AI routing evaluator failed to parse response model={} response={}",
+                    resolveModelName(),
+                    previewText(responseText),
+                    exception
+            );
             throw new IllegalStateException("failed to parse routing evaluator response", exception);
         }
     }
@@ -90,6 +123,12 @@ public class AiRoutingEvaluatorService {
         if (decision.confidence() >= reviewThreshold || "REVIEW".equals(decision.action())) {
             return new RoutingEvaluation(decision.action(), decision.reason(), decision.confidence());
         }
+        LOGGER.info(
+                "AI routing evaluator downgraded decision action={} confidence={} threshold={}",
+                decision.action(),
+                decision.confidence(),
+                reviewThreshold
+        );
         return new RoutingEvaluation(
                 "REVIEW",
                 "confidence %.2f below threshold %.2f: %s".formatted(
@@ -118,6 +157,25 @@ public class AiRoutingEvaluatorService {
 
     private String blankToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String resolveModelName() {
+        if (chatLanguageModel instanceof OpenAiChatModel openAiChatModel) {
+            return openAiChatModel.modelName();
+        }
+        return chatLanguageModel.getClass().getSimpleName();
+    }
+
+    private String previewText(String value) {
+        String normalized = blankToEmpty(value).replace('\n', ' ').trim();
+        if (normalized.length() <= RESPONSE_PREVIEW_LIMIT) {
+            return normalized;
+        }
+        return normalized.substring(0, RESPONSE_PREVIEW_LIMIT) + "...";
     }
 
     public record RoutingEvaluationCommand(

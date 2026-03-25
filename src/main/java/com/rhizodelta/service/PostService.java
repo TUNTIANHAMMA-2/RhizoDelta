@@ -14,6 +14,8 @@ import java.util.UUID;
 
 @Service
 public class PostService {
+    private static final String HUMAN_OPERATOR_TYPE = "HUMAN";
+    private static final String USER_REPLY_REASON = "user reply";
     private static final String UPSERT_HUMAN_POST_QUERY = """
             OPTIONAL MATCH (target:GraphNode {node_id: $targetNodeId})
             MERGE (post:Human_Post {request_id: $requestId})
@@ -43,6 +45,17 @@ public class PostService {
             WHERE NOT coalesce(node._deleted, false)
             RETURN count(node) > 0 AS exists
             """;
+    private static final String CREATE_REPLY_RELATIONSHIP_QUERY = """
+            MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
+            MATCH (target:GraphNode {node_id: $targetNodeId})
+            MERGE (post)-[rel:CONTINUES_FROM]->(target)
+            ON CREATE SET
+              rel.operator_type = $operatorType,
+              rel.operator_id = $operatorId,
+              rel.created_at = $createdAt,
+              rel.reason = $reason
+            RETURN type(rel) AS relType
+            """;
 
     private final Neo4jClient neo4jClient;
     private final HumanPostRepository humanPostRepository;
@@ -69,6 +82,7 @@ public class PostService {
         UUID generatedNodeId = UUID.randomUUID();
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         String nodeIdString = upsertByRequestId(command, generatedNodeId, createdAt);
+        createReplyRelationshipIfNeeded(nodeIdString, command, createdAt);
         UUID persistedNodeId = UUID.fromString(nodeIdString);
 
         return humanPostRepository.findByNodeId(persistedNodeId)
@@ -90,6 +104,26 @@ public class PostService {
                 .fetchAs(String.class)
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve node_id from upsert query"));
+    }
+
+    private void createReplyRelationshipIfNeeded(
+            String postNodeId,
+            CreateHumanPostCommand command,
+            OffsetDateTime createdAt
+    ) {
+        if (command.targetNodeId() == null) {
+            return;
+        }
+        neo4jClient.query(CREATE_REPLY_RELATIONSHIP_QUERY)
+                .bind(postNodeId).to("postNodeId")
+                .bind(command.targetNodeId()).to("targetNodeId")
+                .bind(HUMAN_OPERATOR_TYPE).to("operatorType")
+                .bind(command.authorId()).to("operatorId")
+                .bind(createdAt).to("createdAt")
+                .bind(USER_REPLY_REASON).to("reason")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to create CONTINUES_FROM relationship"));
     }
 
     private String findNodeIdByRequestId(String requestId) {

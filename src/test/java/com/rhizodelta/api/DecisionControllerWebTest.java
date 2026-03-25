@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,6 +66,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.data.decision_id").value("dec-merge-1"))
                 .andExpect(jsonPath("$.data.node_id").value(nodeId.toString()))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeMerge(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     @Test
@@ -78,6 +83,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.data.decision_id").value("dec-branch-1"))
                 .andExpect(jsonPath("$.data.node_id").value(nodeId.toString()))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeBranch(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     @Test
@@ -123,6 +131,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-inject-1"))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeInject(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     @Test
@@ -148,6 +159,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-mat-1"))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeMaterialize(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     // --- Fork ---
@@ -165,6 +179,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.data.operation_id").value("fork-op-1"))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"))
                 .andExpect(jsonPath("$.data.created_count").value(2));
+
+        verify(decisionService).executeFork(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     // --- CrossSynth ---
@@ -180,6 +197,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-cs-1"))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeCrossSynth(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     // --- Join ---
@@ -195,6 +215,9 @@ class DecisionControllerWebTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.decision_id").value("dec-join-1"))
                 .andExpect(jsonPath("$.data.status").value("QUEUED"));
+
+        verify(decisionService).executeJoin(argThat(command ->
+                "user-1".equals(command.operator_id())));
     }
 
     // --- Fork Rollback ---

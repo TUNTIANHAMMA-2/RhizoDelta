@@ -74,6 +74,7 @@ public class PostConsumer {
         HumanPost post = postService.createHumanPost(command);
         CompletableFuture.runAsync(() -> writeEmbedding(message, post), embeddingTaskExecutor);
         publishNodeCreated(post);
+        publishReplyEdge(post, message.targetNodeId());
         scheduleRouting(message, post);
     }
 
@@ -107,6 +108,19 @@ public class PostConsumer {
                 post.getCreatedAt()
         );
         sseEventService.publish(SseEventService.SseEventType.NODE_CREATED, payload);
+    }
+
+    private void publishReplyEdge(HumanPost post, String targetNodeId) {
+        if (targetNodeId == null || targetNodeId.isBlank()) {
+            return;
+        }
+        SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
+                post.getNodeId().toString(),
+                targetNodeId,
+                "CONTINUES_FROM",
+                post.getCreatedAt()
+        );
+        sseEventService.publish(SseEventService.SseEventType.EDGE_CREATED, payload);
     }
 
     private void publishOrchestrationStatus(

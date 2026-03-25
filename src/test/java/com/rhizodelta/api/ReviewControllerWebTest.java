@@ -23,6 +23,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -73,13 +76,47 @@ class ReviewControllerWebTest {
         when(reviewTaskService.getTask("review-merge")).thenReturn(sampleMergeTask("review-merge"));
         when(reviewTaskService.updateStatus("review-merge", ReviewTask.Status.APPROVED))
                 .thenReturn(sampleApprovedTask("review-merge"));
-        when(decisionService.executeMerge(org.mockito.ArgumentMatchers.any()))
+        when(decisionService.executeMerge(any()))
                 .thenReturn(new DecisionResult("dec-merge-1", java.util.UUID.randomUUID(), "QUEUED"));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-merge/approve-merge")
                         .header("Authorization", "Bearer " + generateTokenWithRole("ADMIN")))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data.decision_id").value("dec-merge-1"));
+    }
+
+    @Test
+    void shouldUseJwtSubjectAsOperatorIdWhenApprovingMerge() throws Exception {
+        when(reviewTaskService.getTask("review-merge")).thenReturn(sampleMergeTask("review-merge"));
+        when(reviewTaskService.updateStatus("review-merge", ReviewTask.Status.APPROVED))
+                .thenReturn(sampleApprovedTask("review-merge"));
+        when(decisionService.executeMerge(any()))
+                .thenReturn(new DecisionResult("dec-merge-1", java.util.UUID.randomUUID(), "QUEUED"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-merge/approve-merge")
+                        .header("Authorization", "Bearer " + generateToken("review-operator-123", "ADMIN")))
+                .andExpect(status().isAccepted());
+
+        verify(decisionService).executeMerge(argThat(command ->
+                "review-operator-123".equals(command.operator_id())));
+    }
+
+    @Test
+    void shouldDeriveBranchRequestIdWhenApprovingBranch() throws Exception {
+        when(reviewTaskService.getTask("review-branch")).thenReturn(sampleBranchTask("review-branch"));
+        when(reviewTaskService.updateStatus("review-branch", ReviewTask.Status.APPROVED))
+                .thenReturn(sampleApprovedTask("review-branch"));
+        when(decisionService.executeBranch(any()))
+                .thenReturn(new DecisionResult("dec-branch-1", java.util.UUID.randomUUID(), "QUEUED"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/reviews/review-branch/approve-branch")
+                        .header("Authorization", "Bearer " + generateToken("review-operator-branch", "ADMIN")))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.decision_id").value("dec-branch-1"));
+
+        verify(decisionService).executeBranch(argThat(command ->
+                "req-branch:branch".equals(command.request_id())
+                        && "review-operator-branch".equals(command.operator_id())));
     }
 
     @Test
@@ -152,6 +189,30 @@ class ReviewControllerWebTest {
         );
     }
 
+    private static ReviewTask sampleBranchTask(String reviewId) {
+        return new ReviewTask(
+                reviewId,
+                "req-branch",
+                "post-branch",
+                "trace-branch",
+                ReviewTask.Status.PENDING,
+                "BRANCH",
+                List.of("candidate-branch"),
+                Map.of(
+                        "decision_id", "dec-branch-1",
+                        "request_id", "req-branch",
+                        "source_node_id", "33333333-3333-3333-3333-333333333333",
+                        "content", "branch content",
+                        "author_id", "user-branch",
+                        "reason", "needs separate branch"
+                ),
+                List.of("LOW_CONFIDENCE"),
+                Instant.parse("2026-03-23T00:00:00Z"),
+                Instant.parse("2026-03-23T00:00:00Z"),
+                Instant.parse("2026-03-30T00:00:00Z")
+        );
+    }
+
     private static ReviewTask sampleApprovedTask(String reviewId) {
         ReviewTask pendingTask = sampleMergeTask(reviewId);
         return new ReviewTask(
@@ -189,9 +250,13 @@ class ReviewControllerWebTest {
     }
 
     private static String generateTokenWithRole(String role) {
+        return generateToken("review-operator", role);
+    }
+
+    private static String generateToken(String subject, String role) {
         SecretKey key = Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8));
         return Jwts.builder()
-                .subject("review-operator")
+                .subject(subject)
                 .claim("roles", List.of(role))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MILLIS))

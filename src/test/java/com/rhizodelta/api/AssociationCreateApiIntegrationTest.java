@@ -77,7 +77,7 @@ class AssociationCreateApiIntegrationTest {
                 .fetch().all().iterator().next();
 
         assertThat(record.get("associationId")).isEqualTo(associationId);
-        assertThat(record.get("creatorId")).isEqualTo("creator-1");
+        assertThat(record.get("creatorId")).isEqualTo("test-operator");
         assertThat(record.get("reason")).isEqualTo("semantic overlap");
         assertThat(((Number) record.get("confidence")).doubleValue()).isEqualTo(0.85d);
     }
