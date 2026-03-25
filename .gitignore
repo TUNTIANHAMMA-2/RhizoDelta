@@ -7,3 +7,17 @@ target/
 # IDE
 .idea/
 *.iml
+
+# Dependencies
+node_modules/
+
+# AI tooling configs
+.claude/
+.codex/
+.gemini/
+openspec/
+
+# Project documentation and assets
+Doc/
+Pic/
+frontend/README.md
