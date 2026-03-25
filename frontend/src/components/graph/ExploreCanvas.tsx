@@ -8,45 +8,21 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { createExploreSimulation } from "../../lib/exploreSimulation";
-import { ConsensusNode } from "./ConsensusNode";
-import { HumanPostNode } from "./HumanPostNode";
-import { ResultNode } from "./ResultNode";
-import { VersionEdge } from "./VersionEdge";
-
-const nodeTypes = {
-  humanPost: HumanPostNode,
-  consensus: ConsensusNode,
-  result: ResultNode,
-};
-
-const edgeTypes = {
-  versionEdge: VersionEdge,
-};
-
-const MINIMAP_NODE_COLOR = (node: { type?: string }) => {
-  switch (node.type) {
-    case "humanPost":
-      return "#2E7CF6";
-    case "consensus":
-      return "#9B59B6";
-    case "result":
-      return "#0D9488";
-    default:
-      return "#B4B4B0";
-  }
-};
+import { nodeTypes, edgeTypes, MINIMAP_NODE_COLOR } from "./graphConstants";
 
 function ExploreViewportListener() {
-  const { setCenter } = useReactFlow();
+  const { setCenter, getViewport } = useReactFlow();
   const setSemanticZoom = useGraphStore((s) => s.setSemanticZoom);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const rootNodeId = useGraphStore((s) => s.rootNodeId);
   const exploreRfNodes = useGraphStore((s) => s.exploreRfNodes);
   const setZoomLevel = useUiStore((s) => s.setZoomLevel);
+  const rightPanelMode = useUiStore((s) => s.rightPanelMode);
+  const saveViewport = useUiStore((s) => s.saveViewport);
 
   useEffect(() => {
     const focusNodeId = selectedNodeId ?? rootNodeId;
@@ -57,11 +33,15 @@ function ExploreViewportListener() {
     if (!node) {
       return;
     }
-    setCenter(node.position.x, node.position.y, { zoom: 1, duration: 600 });
-  }, [exploreRfNodes, rootNodeId, selectedNodeId, setCenter]);
+    const timer = setTimeout(() => {
+      const { zoom: currentZoom } = getViewport();
+      setCenter(node.position.x, node.position.y, { zoom: Math.max(currentZoom, 0.8), duration: 600 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [exploreRfNodes, rootNodeId, selectedNodeId, rightPanelMode, setCenter, getViewport]);
 
-  useOnViewportChange({
-    onChange: (viewport: Viewport) => {
+  const onViewportChange = useCallback(
+    (viewport: Viewport) => {
       setZoomLevel(viewport.zoom);
       if (viewport.zoom < 0.5) {
         setSemanticZoom("micro");
@@ -71,6 +51,19 @@ function ExploreViewportListener() {
         setSemanticZoom("normal");
       }
     },
+    [setZoomLevel, setSemanticZoom],
+  );
+
+  const onViewportEnd = useCallback(
+    (viewport: Viewport) => {
+      saveViewport("explore", viewport);
+    },
+    [saveViewport],
+  );
+
+  useOnViewportChange({
+    onChange: onViewportChange,
+    onEnd: onViewportEnd,
   });
 
   return null;
@@ -84,10 +77,14 @@ export function ExploreCanvas() {
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
+  const savedViewport = useUiStore((s) => s.viewports.explore);
   const showMiniMap = exploreRfNodes.length > 20;
   const simulationRef = useRef<ReturnType<typeof createExploreSimulation> | null>(
     null,
   );
+  const pendingPositionsRef = useRef<Record<string, { x: number; y: number }> | null>(null);
+  const rafIdRef = useRef<number>(0);
+
   const graphSignature = useMemo(() => {
     const nodePart = exploreRfNodes.map((node) => node.id).join("|");
     const edgePart = exploreRfEdges.map((edge) => edge.id).join("|");
@@ -120,7 +117,7 @@ export function ExploreCanvas() {
     );
     simulationRef.current = simulation;
     simulation.on("tick", () => {
-      const positions = Object.fromEntries(
+      pendingPositionsRef.current = Object.fromEntries(
         simulation.nodes().map((node) => [
           node.id,
           {
@@ -129,11 +126,23 @@ export function ExploreCanvas() {
           },
         ]),
       );
-      setExplorePositions(positions);
+      if (!rafIdRef.current) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = 0;
+          if (pendingPositionsRef.current) {
+            setExplorePositions(pendingPositionsRef.current);
+            pendingPositionsRef.current = null;
+          }
+        });
+      }
     });
 
     return () => {
       simulation.stop();
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
       if (simulationRef.current === simulation) {
         simulationRef.current = null;
       }
@@ -165,7 +174,7 @@ export function ExploreCanvas() {
       edges={exploreRfEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+      defaultViewport={savedViewport}
       minZoom={0.2}
       maxZoom={2}
       panOnDrag
@@ -208,7 +217,7 @@ export function ExploreCanvas() {
       {showMiniMap && (
         <MiniMap
           nodeColor={MINIMAP_NODE_COLOR}
-          maskColor="rgba(252, 249, 242, 0.7)"
+          maskColor="rgba(255, 255, 255, 0.7)"
           style={{ borderRadius: 8 }}
         />
       )}

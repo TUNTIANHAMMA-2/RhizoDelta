@@ -11,13 +11,13 @@ import {
 } from "d3-force";
 import type { Edge, Node } from "@xyflow/react";
 
-const BRANCH_X_STEP = 280;
-const BRANCH_Y_OFFSET = 40;
-const CONTINUE_Y_STEP = 240;
-const MERGE_Y_STEP = -180;
-const CHARGE_STRENGTH = -700;
-const COLLISION_RADIUS = 110;
-const LINK_DISTANCE = 220;
+const BRANCH_X_STEP = 340;
+const BRANCH_Y_OFFSET = 60;
+const CONTINUE_Y_STEP = 220;
+const MERGE_Y_STEP = -200;
+const CHARGE_STRENGTH = -900;
+const COLLISION_RADIUS = 160;
+const LINK_DISTANCE = 260;
 const TARGET_FORCE_STRENGTH = 0.28;
 const TARGET_FORCE_Y_STRENGTH = 0.34;
 const ALPHA_DECAY = 0.08;

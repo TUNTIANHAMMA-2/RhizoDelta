@@ -1,9 +1,16 @@
 import type { Edge, Node } from "@xyflow/react";
 
-const NODE_WIDTH = 320;
-const NODE_HEIGHT = 160;
-const NODE_SEP_X = 80;
-const RANK_SEP_Y = 120;
+export type SemanticZoom = "micro" | "mini" | "normal";
+
+export function getLayoutMetrics() {
+  return {
+    NODE_WIDTH: 280,
+    NODE_HEIGHT: 120,
+    NODE_SEP_X: 220,
+    RANK_SEP_Y: 100,
+  };
+}
+
 const ROOT_LANE_GAP = 4;
 
 const edgePriority = (type?: string) => {
@@ -135,19 +142,37 @@ function assignLanes(
   nodes: Node[],
   outEdgesMap: Map<string, Edge[]>,
   primaryChildren: Map<string, Edge[]>,
+  ranks: Map<string, number>,
 ) {
   const lanes = new Map<string, number>();
+  const occupied = new Set<string>();
   const visited = new Set<string>();
   const rootIds = nodes
     .filter((node) => (outEdgesMap.get(node.id)?.length ?? 0) === 0)
     .map((node) => node.id);
 
-  const visitNode = (nodeId: string, lane: number) => {
+  const visitNode = (nodeId: string, preferredLane: number) => {
     if (visited.has(nodeId)) {
       return;
     }
 
     visited.add(nodeId);
+
+    const rank = ranks.get(nodeId) ?? 0;
+    let lane = preferredLane;
+    
+    // Collision avoidance: find the nearest free lane at this rank
+    let offset = 1;
+    let sign = lane >= 0 ? 1 : -1;
+    while (occupied.has(`${rank},${lane}`)) {
+      lane = preferredLane + sign * offset;
+      if (sign === 1 && preferredLane >= 0) { sign = -1; }
+      else if (sign === -1 && preferredLane >= 0) { sign = 1; offset++; }
+      else if (sign === -1 && preferredLane < 0) { sign = 1; }
+      else { sign = -1; offset++; }
+    }
+    
+    occupied.add(`${rank},${lane}`);
     lanes.set(nodeId, lane);
 
     const children = primaryChildren.get(nodeId) ?? [];
@@ -223,6 +248,8 @@ export function applyTrackLayout(
     return { nodes, edges };
   }
 
+  const { NODE_WIDTH, NODE_HEIGHT, NODE_SEP_X, RANK_SEP_Y } = getLayoutMetrics();
+
   const inEdgesMap = new Map<string, Edge[]>();
   const outEdgesMap = new Map<string, Edge[]>();
   nodes.forEach((node) => {
@@ -242,7 +269,7 @@ export function applyTrackLayout(
   const { ranks } = computeRanks(nodes, inEdgesMap, outEdgesMap);
   const primaryParent = resolvePrimaryParents(nodes, outEdgesMap);
   const primaryChildren = buildPrimaryChildren(edges, primaryParent);
-  const lanes = assignLanes(nodes, outEdgesMap, primaryChildren);
+  const lanes = assignLanes(nodes, outEdgesMap, primaryChildren, ranks);
 
   const layoutNodes = nodes.map((node) => ({
     ...node,

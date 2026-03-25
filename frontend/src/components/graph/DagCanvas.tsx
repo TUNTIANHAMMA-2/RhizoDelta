@@ -7,53 +7,29 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { createLineageSimulation } from "../../lib/lineageSimulation";
-import { HumanPostNode } from "./HumanPostNode";
-import { ConsensusNode } from "./ConsensusNode";
-import { ResultNode } from "./ResultNode";
-import { VersionEdge } from "./VersionEdge";
+import { nodeTypes, edgeTypes, MINIMAP_NODE_COLOR } from "./graphConstants";
 import { useGraphInteractions } from "../../hooks/useGraphInteractions";
-
-const nodeTypes = {
-  humanPost: HumanPostNode,
-  consensus: ConsensusNode,
-  result: ResultNode,
-};
-
-const edgeTypes = {
-  versionEdge: VersionEdge,
-};
-
-const MINIMAP_NODE_COLOR = (node: { type?: string }) => {
-  switch (node.type) {
-    case "humanPost":
-      return "#2E7CF6";
-    case "consensus":
-      return "#9B59B6";
-    case "result":
-      return "#0D9488";
-    default:
-      return "#B4B4B0";
-  }
-};
 
 function ViewportListener() {
   const setSemanticZoom = useGraphStore((s) => s.setSemanticZoom);
   const setZoomLevel = useUiStore((s) => s.setZoomLevel);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const rightPanelMode = useUiStore((s) => s.rightPanelMode);
+  const saveViewport = useUiStore((s) => s.saveViewport);
   const { focusNode } = useGraphInteractions();
 
   useEffect(() => {
     if (selectedNodeId) {
-      focusNode(selectedNodeId);
+      focusNode(selectedNodeId, 300);
     }
-  }, [selectedNodeId, focusNode]);
+  }, [selectedNodeId, rightPanelMode, focusNode]);
 
-  useOnViewportChange({
-    onChange: (viewport: Viewport) => {
+  const onViewportChange = useCallback(
+    (viewport: Viewport) => {
       setZoomLevel(viewport.zoom);
       if (viewport.zoom < 0.5) {
         setSemanticZoom("micro");
@@ -63,6 +39,19 @@ function ViewportListener() {
         setSemanticZoom("normal");
       }
     },
+    [setZoomLevel, setSemanticZoom],
+  );
+
+  const onViewportEnd = useCallback(
+    (viewport: Viewport) => {
+      saveViewport("lineage", viewport);
+    },
+    [saveViewport],
+  );
+
+  useOnViewportChange({
+    onChange: onViewportChange,
+    onEnd: onViewportEnd,
   });
 
   return null;
@@ -77,10 +66,14 @@ export function DagCanvas() {
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
+  const savedViewport = useUiStore((s) => s.viewports.lineage);
   const showMiniMap = rfNodes.length > 20;
   const simulationRef = useRef<ReturnType<typeof createLineageSimulation> | null>(
     null,
   );
+  const pendingPositionsRef = useRef<Record<string, { x: number; y: number }> | null>(null);
+  const rafIdRef = useRef<number>(0);
+
   const graphSignature = useMemo(() => {
     const nodePart = lineageRfNodes.map((node) => node.id).join("|");
     const edgePart = lineageRfEdges.map((edge) => edge.id).join("|");
@@ -116,7 +109,7 @@ export function DagCanvas() {
     const simulation = createLineageSimulation(topologyNodes, topologyEdges);
     simulationRef.current = simulation;
     simulation.on("tick", () => {
-      const positions = Object.fromEntries(
+      pendingPositionsRef.current = Object.fromEntries(
         simulation.nodes().map((node) => [
           node.id,
           {
@@ -125,11 +118,23 @@ export function DagCanvas() {
           },
         ]),
       );
-      setLineagePositions(positions);
+      if (!rafIdRef.current) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = 0;
+          if (pendingPositionsRef.current) {
+            setLineagePositions(pendingPositionsRef.current);
+            pendingPositionsRef.current = null;
+          }
+        });
+      }
     });
 
     return () => {
       simulation.stop();
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
       if (simulationRef.current === simulation) {
         simulationRef.current = null;
       }
@@ -161,7 +166,7 @@ export function DagCanvas() {
       edges={rfEdges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+      defaultViewport={savedViewport}
       minZoom={0.2}
       maxZoom={2}
       panOnDrag
@@ -204,7 +209,7 @@ export function DagCanvas() {
       {showMiniMap && (
         <MiniMap
           nodeColor={MINIMAP_NODE_COLOR}
-          maskColor="rgba(252, 249, 242, 0.7)"
+          maskColor="rgba(255, 255, 255, 0.7)"
           style={{ borderRadius: 8 }}
         />
       )}
