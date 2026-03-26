@@ -28,6 +28,10 @@ export const HumanPostNode = memo(function HumanPostNode({ data, selected }: Nod
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ position: "relative", width: "100%", height: "100%" }}
+      role="article"
+      tabIndex={0}
+      aria-label={`Human post: ${plainText.slice(0, 50)}`}
+      aria-selected={selected}
     >
       <div className={`${baseClass}${stateClass}${optClass}${zoomClass}`}>
         {selected && <div className="rd-marker-selected" />}

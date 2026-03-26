@@ -26,6 +26,10 @@ export const ConsensusNode = memo(function ConsensusNode({ data, selected }: Nod
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ position: "relative", width: "100%", height: "100%" }}
+      role="article"
+      tabIndex={0}
+      aria-label={`AI Consensus: ${plainText.slice(0, 50)}`}
+      aria-selected={selected}
     >
       <div className={`${baseClass}${stateClass}${zoomClass}`}>
         {selected && <div className="rd-marker-selected" />}

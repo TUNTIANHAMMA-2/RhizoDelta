@@ -26,6 +26,10 @@ export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ position: "relative", width: "100%", height: "100%" }}
+      role="article"
+      tabIndex={0}
+      aria-label={`Result: ${plainText.slice(0, 50)}`}
+      aria-selected={selected}
     >
       <div className={`${baseClass}${stateClass}${zoomClass}`}>
         {selected && <div className="rd-marker-selected" />}
