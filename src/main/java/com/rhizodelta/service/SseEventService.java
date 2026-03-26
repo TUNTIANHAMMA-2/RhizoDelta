@@ -24,6 +24,7 @@ public class SseEventService {
     private static final long HEARTBEAT_INTERVAL_MILLIS = 30_000L;
 
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> emitterUserMap = new ConcurrentHashMap<>();
     private final RabbitTemplate rabbitTemplate;
     private final String instanceId = UUID.randomUUID().toString();
 
@@ -31,10 +32,13 @@ public class SseEventService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
-    public SseEmitter register() {
+    public SseEmitter register(String userId) {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
         String emitterId = UUID.randomUUID().toString();
         emitters.put(emitterId, emitter);
+        if (userId != null) {
+            emitterUserMap.put(emitterId, userId);
+        }
         registerCallbacks(emitterId, emitter);
         return emitter;
     }
@@ -87,6 +91,12 @@ public class SseEventService {
     private void publishLocal(SseEventType type, Object payload) {
         emitters.forEach((emitterId, emitter) -> {
             try {
+                if (type == SseEventType.ORCHESTRATION_STATUS && payload instanceof OrchestrationStatusPayload statusPayload) {
+                    String emitterUserId = emitterUserMap.get(emitterId);
+                    if (emitterUserId == null || !emitterUserId.equals(statusPayload.authorId())) {
+                        return;
+                    }
+                }
                 emitter.send(SseEmitter.event().name(type.name()).data(payload));
             } catch (Exception exception) {
                 LOGGER.warn("Failed to publish SSE event type={}", type, exception);
@@ -110,6 +120,7 @@ public class SseEventService {
 
     private void removeEmitter(String emitterId, SseEmitter emitter) {
         emitters.remove(emitterId, emitter);
+        emitterUserMap.remove(emitterId);
     }
 
     public enum SseEventType {
@@ -149,7 +160,8 @@ public class SseEventService {
             @JsonProperty("status") String status,
             @JsonProperty("message") String message,
             @JsonProperty("review_id") String reviewId,
-            @JsonProperty("decision_id") String decisionId
+            @JsonProperty("decision_id") String decisionId,
+            @JsonProperty("author_id") String authorId
     ) {
     }
 

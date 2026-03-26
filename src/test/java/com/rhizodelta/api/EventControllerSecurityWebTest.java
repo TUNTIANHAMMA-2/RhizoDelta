@@ -31,7 +31,7 @@ class EventControllerSecurityWebTest {
 
     @Test
     void asyncDispatcherShouldBypassAuthenticationForSseRedispatch() throws Exception {
-        when(sseEventService.register()).thenReturn(new SseEmitter());
+        when(sseEventService.register(org.mockito.ArgumentMatchers.any())).thenReturn(new SseEmitter());
 
         mockMvc.perform(get("/api/events/stream").with(request -> {
                     request.setDispatcherType(DispatcherType.ASYNC);

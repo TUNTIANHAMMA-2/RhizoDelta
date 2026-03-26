@@ -87,7 +87,8 @@ public class PostConsumer {
                     message.eventId(),
                     post.getNodeId().toString(),
                     "EMBEDDING_READY",
-                    "embedding generated for queued post"
+                    "embedding generated for queued post",
+                    message.authorId()
             );
         } catch (Exception exception) {
             LOGGER.error("Failed to generate embedding for Human_Post node_id={}", post.getNodeId(), exception);
@@ -96,7 +97,8 @@ public class PostConsumer {
                     message.eventId(),
                     post.getNodeId().toString(),
                     "FAILED",
-                    "embedding generation failed"
+                    "embedding generation failed",
+                    message.authorId()
             );
         }
     }
@@ -128,7 +130,8 @@ public class PostConsumer {
             String eventId,
             String postNodeId,
             String status,
-            String message
+            String message,
+            String authorId
     ) {
         SseEventService.OrchestrationStatusPayload payload = new SseEventService.OrchestrationStatusPayload(
                 requestId,
@@ -137,7 +140,8 @@ public class PostConsumer {
                 status,
                 message,
                 null,
-                null
+                null,
+                authorId
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
