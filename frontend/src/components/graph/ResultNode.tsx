@@ -59,7 +59,7 @@ export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps
         <NodeEdgeInfo nodeId={node.node_id} />
       )}
       {selected && zoom === "normal" && (
-        <div style={{ position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
+        <div style={{ position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)", zIndex: 30 }}>
           <NodeActionToolbar nodeId={node.node_id} />
         </div>
       )}

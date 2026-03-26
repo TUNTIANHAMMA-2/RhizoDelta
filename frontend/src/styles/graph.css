@@ -180,6 +180,9 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .node-edge-item {
@@ -191,6 +194,18 @@
   color: var(--color-text-secondary);
   white-space: nowrap;
   line-height: 1.4;
+  min-width: 0;
+}
+
+.node-edge-target {
+  margin-left: 6px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .node-edge-arrow {

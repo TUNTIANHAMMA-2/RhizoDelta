@@ -62,7 +62,7 @@ export const NodeEdgeInfo = memo(function NodeEdgeInfo({
             {edge.isOutgoing ? "→" : "←"}
           </span>
           <span className="node-edge-type">{formatRelType(edge.type)}</span>
-          <span className="node-edge-target" style={{ marginLeft: "6px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+          <span className="node-edge-target">
             "{edge.otherNodeText}"
           </span>
           <span className="node-edge-time" style={{ marginLeft: "auto", opacity: 0.6 }}>
