@@ -78,12 +78,12 @@ public class PostController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
 
-        publishQueuedStatus(request.requestId(), eventId);
+        publishQueuedStatus(request.requestId(), eventId, authenticatedUser.sub());
         PostAcceptedResponse response = new PostAcceptedResponse(eventId, QUEUED_STATUS);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(response));
     }
 
-    private void publishQueuedStatus(String requestId, String eventId) {
+    private void publishQueuedStatus(String requestId, String eventId, String authorId) {
         SseEventService.OrchestrationStatusPayload payload = new SseEventService.OrchestrationStatusPayload(
                 requestId,
                 eventId,
@@ -91,7 +91,8 @@ public class PostController {
                 "POST_ACCEPTED",
                 "post accepted and queued",
                 null,
-                null
+                null,
+                authorId
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }

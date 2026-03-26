@@ -78,7 +78,7 @@ class PostReplyUnitTest {
 
         HumanPost result = postService.createHumanPost(
                 new PostService.CreateHumanPostCommand(requestId, "user-1", "reply content", targetNodeId)
-        );
+        ).post();
 
         assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
         verify(deepStubClient).query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")));
@@ -152,8 +152,8 @@ class PostReplyUnitTest {
         }
 
         @Override
-        public HumanPost createHumanPost(CreateHumanPostCommand command) {
-            return post;
+        public CreateHumanPostResult createHumanPost(CreateHumanPostCommand command) {
+            return new CreateHumanPostResult(post, true);
         }
     }
 

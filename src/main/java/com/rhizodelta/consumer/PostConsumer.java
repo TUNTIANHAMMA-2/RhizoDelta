@@ -71,7 +71,12 @@ public class PostConsumer {
                 message.content(),
                 message.targetNodeId()
         );
-        HumanPost post = postService.createHumanPost(command);
+        PostService.CreateHumanPostResult result = postService.createHumanPost(command);
+        if (!result.created()) {
+            LOGGER.info("Duplicate message detected for request_id={}, skipping side effects", message.requestId());
+            return;
+        }
+        HumanPost post = result.post();
         CompletableFuture.runAsync(() -> writeEmbedding(message, post), embeddingTaskExecutor);
         publishNodeCreated(post);
         publishReplyEdge(post, message.targetNodeId());
@@ -158,7 +163,8 @@ public class PostConsumer {
                             message.eventId(),
                             post.getNodeId().toString(),
                             "FAILED",
-                            "ai routing failed: " + exception.getMessage()
+                            "ai routing failed: " + exception.getMessage(),
+                            message.authorId()
                     );
                     return null;
                 });

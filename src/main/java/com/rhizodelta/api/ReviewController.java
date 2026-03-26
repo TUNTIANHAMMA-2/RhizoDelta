@@ -60,13 +60,9 @@ public class ReviewController {
             Authentication authentication
     ) {
         ReviewTask task = reviewTaskService.getTask(reviewId);
+        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
         MergeDecisionCommand command = toMergeCommand(task, authentication.getName());
         DecisionResult result = decisionService.executeMerge(command);
-        try {
-            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
-        } catch (Exception exception) {
-            LOGGER.error("Decision committed but failed to update review status to APPROVED for reviewId={}", reviewId, exception);
-        }
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
@@ -76,13 +72,9 @@ public class ReviewController {
             Authentication authentication
     ) {
         ReviewTask task = reviewTaskService.getTask(reviewId);
+        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
         BranchDecisionCommand command = toBranchCommand(task, authentication.getName());
         DecisionResult result = decisionService.executeBranch(command);
-        try {
-            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
-        } catch (Exception exception) {
-            LOGGER.error("Decision committed but failed to update review status to APPROVED for reviewId={}", reviewId, exception);
-        }
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 

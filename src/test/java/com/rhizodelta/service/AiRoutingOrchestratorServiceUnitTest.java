@@ -35,7 +35,8 @@ class AiRoutingOrchestratorServiceUnitTest {
                 routingRecallService,
                 aiRoutingExecutionService,
                 reviewTaskService,
-                sseEventService
+                sseEventService,
+                "gpt-4o-test"
         );
         UUID postNodeId = UUID.randomUUID();
         UUID recalledCandidateNodeId = UUID.randomUUID();
@@ -91,6 +92,13 @@ class AiRoutingOrchestratorServiceUnitTest {
         ReviewTask.CreateReviewTaskCommand command = reviewCommandCaptor.getValue();
         assertThat(command.candidateNodeIds()).containsExactly(workflowCandidateNodeId.toString());
         assertThat(command.draftPayload().get("source_node_id")).isEqualTo(workflowCandidateNodeId.toString());
+        assertThat(command.draftPayload().get("decision_id")).isEqualTo("evt-1:review");
+        assertThat(command.draftPayload().get("agent_version")).isEqualTo("gpt-4o-test");
+        assertThat(command.draftPayload().get("summary_content")).isEqualTo("post content");
+        assertThat(command.draftPayload().get("synthesized_from")).isEqualTo(List.of(postNodeId.toString()));
+        assertThat(command.draftPayload().get("content")).isEqualTo("post content");
+        assertThat(command.draftPayload().get("author_id")).isEqualTo("author-1");
+        assertThat(command.draftPayload().get("reason")).isNotNull();
 
         ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
         verify(sseEventService, org.mockito.Mockito.times(3))
@@ -104,6 +112,7 @@ class AiRoutingOrchestratorServiceUnitTest {
         assertThat(lastPayload.status()).isEqualTo("REVIEW_PENDING");
         assertThat(lastPayload.reviewId()).isEqualTo("review-1");
         assertThat(lastPayload.postNodeId()).isEqualTo(postNodeId.toString());
+        assertThat(lastPayload.authorId()).isEqualTo("author-1");
     }
 
     @Test
@@ -118,7 +127,8 @@ class AiRoutingOrchestratorServiceUnitTest {
                 routingRecallService,
                 aiRoutingExecutionService,
                 reviewTaskService,
-                sseEventService
+                sseEventService,
+                "gpt-4o-test"
         );
         UUID postNodeId = UUID.randomUUID();
         UUID candidateNodeId = UUID.randomUUID();

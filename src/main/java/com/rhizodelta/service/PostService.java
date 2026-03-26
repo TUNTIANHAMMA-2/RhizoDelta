@@ -66,13 +66,14 @@ public class PostService {
     }
 
     @Transactional(transactionManager = "transactionManager")
-    public HumanPost createHumanPost(CreateHumanPostCommand command) {
+    public CreateHumanPostResult createHumanPost(CreateHumanPostCommand command) {
         Objects.requireNonNull(command, "command must not be null");
 
         String existingNodeId = findNodeIdByRequestId(command.requestId());
         if (existingNodeId != null) {
-            return humanPostRepository.findByNodeId(UUID.fromString(existingNodeId))
+            HumanPost existing = humanPostRepository.findByNodeId(UUID.fromString(existingNodeId))
                     .orElseThrow(() -> new IllegalStateException("Human_Post not found after upsert"));
+            return new CreateHumanPostResult(existing, false);
         }
 
         if (command.targetNodeId() != null) {
@@ -85,8 +86,12 @@ public class PostService {
         createReplyRelationshipIfNeeded(nodeIdString, command, createdAt);
         UUID persistedNodeId = UUID.fromString(nodeIdString);
 
-        return humanPostRepository.findByNodeId(persistedNodeId)
+        HumanPost created = humanPostRepository.findByNodeId(persistedNodeId)
                 .orElseThrow(() -> new IllegalStateException("Human_Post not found after upsert"));
+        return new CreateHumanPostResult(created, true);
+    }
+
+    public record CreateHumanPostResult(HumanPost post, boolean created) {
     }
 
     private String upsertByRequestId(

@@ -136,8 +136,8 @@ class PostConsumerEmbeddingUnitTest {
         }
 
         @Override
-        public HumanPost createHumanPost(CreateHumanPostCommand command) {
-            return post;
+        public CreateHumanPostResult createHumanPost(CreateHumanPostCommand command) {
+            return new CreateHumanPostResult(post, true);
         }
     }
 

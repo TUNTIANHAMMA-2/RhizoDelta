@@ -96,7 +96,7 @@ class ServiceLayerUnitTest {
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
 
-        HumanPost result = postService.createHumanPost(new PostService.CreateHumanPostCommand(requestId, "author", "content"));
+        HumanPost result = postService.createHumanPost(new PostService.CreateHumanPostCommand(requestId, "author", "content")).post();
 
         assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
         assertThat(result.getRequestId()).isEqualTo(requestId);
@@ -133,7 +133,7 @@ class ServiceLayerUnitTest {
 
         HumanPost result = postService.createHumanPost(
                 new PostService.CreateHumanPostCommand(requestId, "author", "content", targetNodeId)
-        );
+        ).post();
 
         assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
     }

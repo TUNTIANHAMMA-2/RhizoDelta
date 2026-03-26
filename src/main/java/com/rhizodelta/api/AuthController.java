@@ -48,19 +48,19 @@ public class AuthController {
                    user.roles AS roles
             """;
     private static final String CREATE_USER_QUERY = """
-            CREATE (user:UserAccount {
-              user_id: $userId,
-              username: $username,
-              display_name: $displayName,
-              password_hash: $passwordHash,
-              roles: $roles,
-              created_at: datetime()
-            })
+            MERGE (user:UserAccount {username: $username})
+            ON CREATE SET
+              user.user_id = $userId,
+              user.display_name = $displayName,
+              user.password_hash = $passwordHash,
+              user.roles = $roles,
+              user.created_at = datetime()
             RETURN user.user_id AS userId,
                    user.username AS username,
                    user.display_name AS displayName,
                    user.password_hash AS passwordHash,
-                   user.roles AS roles
+                   user.roles AS roles,
+                   user.user_id = $userId AS created
             """;
 
     private final Neo4jClient neo4jClient;
@@ -80,10 +80,6 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<AuthSessionPayload> register(@RequestBody RegisterRequest request) {
         validateCredentials(request.username(), request.password());
-        if (findUserByUsername(request.username()).isPresent()) {
-            throw new IllegalArgumentException("username already exists");
-        }
-
         StoredUser user = createUser(request);
         return ApiResponse.ok(toSessionPayload(user, issueToken(user)));
     }
@@ -124,6 +120,9 @@ public class AuthController {
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("failed to create user"));
+        if (!Boolean.TRUE.equals(result.get("created"))) {
+            throw new IllegalArgumentException("username already exists");
+        }
         return toStoredUser(result);
     }
 

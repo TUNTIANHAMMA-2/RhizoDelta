@@ -5,8 +5,10 @@ import com.rhizodelta.domain.embedding.PrunedContext;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.domain.review.ReviewTask;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,19 +21,22 @@ public class AiRoutingOrchestratorService {
     private final AiRoutingExecutionService aiRoutingExecutionService;
     private final ReviewTaskService reviewTaskService;
     private final SseEventService sseEventService;
+    private final String agentVersion;
 
     public AiRoutingOrchestratorService(
             AiRoutingWorkflowService workflowService,
             RoutingRecallService routingRecallService,
             AiRoutingExecutionService aiRoutingExecutionService,
             ReviewTaskService reviewTaskService,
-            SseEventService sseEventService
+            SseEventService sseEventService,
+            @Value("${langchain4j.open-ai.chat-model.model-name}") String agentVersion
     ) {
         this.workflowService = workflowService;
         this.routingRecallService = routingRecallService;
         this.aiRoutingExecutionService = aiRoutingExecutionService;
         this.reviewTaskService = reviewTaskService;
         this.sseEventService = sseEventService;
+        this.agentVersion = agentVersion;
     }
 
     public void orchestrate(PostEventMessage message, HumanPost post) {
@@ -80,7 +85,8 @@ public class AiRoutingOrchestratorService {
                 status,
                 statusMessage,
                 reviewId,
-                null
+                null,
+                message.authorId()
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
@@ -103,17 +109,25 @@ public class AiRoutingOrchestratorService {
     }
 
     private void createReviewTask(PostEventMessage message, HumanPost post, AiRoutingState state) {
+        Map<String, Object> draft = new HashMap<>();
+        draft.put("request_id", message.requestId());
+        draft.put("post_node_id", post.getNodeId().toString());
+        draft.put("source_node_id", state.sourceNodeId());
+        draft.put("decision_id", message.eventId() + ":review");
+        draft.put("reason", state.reviewReason().isBlank() ? "pending human review" : state.reviewReason());
+        draft.put("agent_version", agentVersion);
+        draft.put("summary_content", post.getContent());
+        draft.put("synthesized_from", List.of(post.getNodeId().toString()));
+        draft.put("content", post.getContent());
+        draft.put("author_id", post.getAuthorId());
+
         ReviewTask task = reviewTaskService.createPendingTask(new ReviewTask.CreateReviewTaskCommand(
                 message.requestId(),
                 post.getNodeId().toString(),
                 message.eventId(),
                 state.routingAction(),
                 state.selectedCandidateNodeIds(),
-                Map.of(
-                        "request_id", message.requestId(),
-                        "post_node_id", post.getNodeId().toString(),
-                        "source_node_id", state.sourceNodeId()
-                ),
+                draft,
                 state.reviewReason().isBlank() ? List.of("WORKFLOW_SKELETON_FALLBACK") : List.of(state.reviewReason())
         ));
         publishStatus(message, post.getNodeId().toString(), "REVIEW_PENDING", task.reviewId(), "review task created");
