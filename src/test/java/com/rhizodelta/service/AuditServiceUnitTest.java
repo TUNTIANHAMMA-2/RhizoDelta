@@ -42,7 +42,7 @@ class AuditServiceUnitTest {
         when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all()).thenReturn(buildRecords(21));
         AuditService auditService = new AuditService(neo4jClient);
 
-        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, null);
+        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, null, null);
 
         assertThat(response.records()).hasSize(20);
         assertThat(response.next_cursor()).isNotBlank();
@@ -65,6 +65,7 @@ class AuditServiceUnitTest {
         AuditListResponse response = auditService.listDecisions(
                 "merge",
                 "agent-42",
+                null,
                 Instant.parse("2026-01-01T00:00:00Z"),
                 Instant.parse("2026-03-01T00:00:00Z"),
                 cursor,
@@ -89,7 +90,7 @@ class AuditServiceUnitTest {
         when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all()).thenReturn(List.of());
         AuditService auditService = new AuditService(neo4jClient);
 
-        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, 500);
+        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, null, 500);
 
         assertThat(response.records()).isEmpty();
         verify(neo4jClient.query(anyString())).bindAll(argThat((Map<String, Object> params) ->
@@ -102,7 +103,7 @@ class AuditServiceUnitTest {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         AuditService auditService = new AuditService(neo4jClient);
 
-        assertThatThrownBy(() -> auditService.listDecisions("INVALID", null, null, null, null, 10))
+        assertThatThrownBy(() -> auditService.listDecisions("INVALID", null, null, null, null, null, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Allowed values: MERGE, BRANCH");
     }
@@ -115,7 +116,7 @@ class AuditServiceUnitTest {
         when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all()).thenReturn(List.of(record(1)));
         AuditService auditService = new AuditService(neo4jClient);
 
-        AuditListResponse response = auditService.listDecisions(null, null, since, until, null, 5);
+        AuditListResponse response = auditService.listDecisions(null, null, null, since, until, null, 5);
 
         assertThat(response.records()).hasSize(1);
         verify(neo4jClient.query(anyString())).bindAll(argThat((Map<String, Object> params) ->
@@ -129,9 +130,24 @@ class AuditServiceUnitTest {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         AuditService auditService = new AuditService(neo4jClient);
 
-        assertThatThrownBy(() -> auditService.listDecisions(null, null, null, null, "not-a-cursor", 10))
+        assertThatThrownBy(() -> auditService.listDecisions(null, null, null, null, null, "not-a-cursor", 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid cursor");
+    }
+
+    @Test
+    void listDecisionsShouldBindNodeIdFilter() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        String targetNodeId = UUID.randomUUID().toString();
+        when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all()).thenReturn(List.of(record(1)));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditListResponse response = auditService.listDecisions(null, null, targetNodeId, null, null, null, 10);
+
+        assertThat(response.records()).hasSize(1);
+        verify(neo4jClient.query(anyString())).bindAll(argThat((Map<String, Object> params) ->
+                targetNodeId.equals(params.get("nodeId"))
+        ));
     }
 
     @Test

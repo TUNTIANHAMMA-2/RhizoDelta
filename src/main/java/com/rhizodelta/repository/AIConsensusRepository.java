@@ -28,6 +28,8 @@ public interface AIConsensusRepository extends ImmutableNeo4jRepository<AIConsen
 
     @Query("""
             MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(source._deleted, false)
             RETURN source
             ORDER BY source.created_at DESC
             """)

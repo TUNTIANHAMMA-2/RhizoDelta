@@ -47,6 +47,7 @@ public class AuditService {
               AND NOT coalesce(source._deleted, false)
               AND ($decisionType IS NULL OR decisionType = $decisionType)
               AND ($operatorId IS NULL OR rel.operator_id = $operatorId)
+              AND ($nodeId IS NULL OR toString(decision.node_id) = $nodeId)
               AND ($since IS NULL OR createdAt >= $since)
               AND ($until IS NULL OR createdAt < $until)
               AND (
@@ -104,6 +105,7 @@ public class AuditService {
     public AuditListResponse listDecisions(
             String type,
             String operatorId,
+            String nodeId,
             Instant since,
             Instant until,
             String after,
@@ -114,7 +116,7 @@ public class AuditService {
         int pageSize = resolvePageSize(limit);
         Cursor cursor = resolveCursor(after);
 
-        Map<String, Object> params = buildListParams(decisionType, operatorId, since, until, cursor, pageSize + 1);
+        Map<String, Object> params = buildListParams(decisionType, operatorId, nodeId, since, until, cursor, pageSize + 1);
         List<AuditRecord> records = neo4jClient.query(LIST_DECISIONS_QUERY)
                 .bindAll(params)
                 .fetch()
@@ -140,6 +142,7 @@ public class AuditService {
     private static Map<String, Object> buildListParams(
             DecisionType decisionType,
             String operatorId,
+            String nodeId,
             Instant since,
             Instant until,
             Cursor cursor,
@@ -148,6 +151,7 @@ public class AuditService {
         Map<String, Object> params = new HashMap<>();
         params.put("decisionType", decisionType == null ? null : decisionType.name());
         params.put("operatorId", operatorId);
+        params.put("nodeId", nodeId);
         params.put("since", since == null ? null : OffsetDateTime.ofInstant(since, java.time.ZoneOffset.UTC));
         params.put("until", until == null ? null : OffsetDateTime.ofInstant(until, java.time.ZoneOffset.UTC));
         params.put("afterCreatedAt", cursor == null ? null : OffsetDateTime.ofInstant(cursor.createdAt(), java.time.ZoneOffset.UTC));

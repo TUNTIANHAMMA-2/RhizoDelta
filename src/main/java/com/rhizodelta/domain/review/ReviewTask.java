@@ -28,7 +28,8 @@ public record ReviewTask(
         PENDING,
         APPROVED,
         REJECTED,
-        EXPIRED
+        EXPIRED,
+        EXECUTION_FAILED
     }
 
     public record CreateReviewTaskCommand(

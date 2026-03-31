@@ -85,7 +85,7 @@ public class ReviewTaskService {
         List<ReviewTask> result = new java.util.ArrayList<>();
         for (String reviewId : reviewIds) {
             Optional<ReviewTask> task = findTask(reviewId);
-            if (task.isEmpty() || task.get().status() != ReviewTask.Status.PENDING) {
+            if (task.isEmpty() || (task.get().status() != ReviewTask.Status.PENDING && task.get().status() != ReviewTask.Status.EXECUTION_FAILED)) {
                 orphanedIds.add(reviewId);
             } else {
                 result.add(task.get());
@@ -116,7 +116,7 @@ public class ReviewTaskService {
                 Instant.now().plus(reviewTtl)
         );
         save(updated);
-        if (status != ReviewTask.Status.PENDING) {
+        if (status != ReviewTask.Status.PENDING && status != ReviewTask.Status.EXECUTION_FAILED) {
             zSetOps().remove(PENDING_REVIEW_INDEX_KEY, reviewId);
         }
         return updated;
@@ -124,7 +124,7 @@ public class ReviewTaskService {
 
     private void save(ReviewTask task) {
         valueOps().set(taskKey(task.reviewId()), serialize(task), reviewTtl);
-        if (task.status() == ReviewTask.Status.PENDING) {
+        if (task.status() == ReviewTask.Status.PENDING || task.status() == ReviewTask.Status.EXECUTION_FAILED) {
             zSetOps().add(PENDING_REVIEW_INDEX_KEY, task.reviewId(), task.createdAt().toEpochMilli());
         }
     }

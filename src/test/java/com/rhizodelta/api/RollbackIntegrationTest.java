@@ -69,13 +69,13 @@ class RollbackIntegrationTest {
         Map<String, Object> rollbackData = bodyData(rollbackResponse);
         assertThat(((Number) rollbackData.get("relationships_removed")).longValue()).isGreaterThan(0L);
 
-        Map<String, Object> nodeCount = neo4jClient.query("""
+        Map<String, Object> nodeStatus = neo4jClient.query("""
                 MATCH (n:GraphNode {decision_id: $decisionId})
-                RETURN count(n) AS cnt
+                RETURN coalesce(n._deleted, false) AS deleted
                 """)
                 .bind("rollback-merge-001").to("decisionId")
                 .fetch().all().iterator().next();
-        assertThat(((Number) nodeCount.get("cnt")).longValue()).isEqualTo(0L);
+        assertThat(nodeStatus.get("deleted")).isEqualTo(true);
 
         ResponseEntity<Map> listResponse = restTemplate.getForEntity("/api/audit/decisions", Map.class);
         assertThat(listResponse.getStatusCode()).isEqualTo(HttpStatus.OK);

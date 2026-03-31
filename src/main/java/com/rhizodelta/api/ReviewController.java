@@ -60,9 +60,17 @@ public class ReviewController {
             Authentication authentication
     ) {
         ReviewTask task = reviewTaskService.getTask(reviewId);
-        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        validateApprovableStatus(task);
         MergeDecisionCommand command = toMergeCommand(task, authentication.getName());
-        DecisionResult result = decisionService.executeMerge(command);
+        DecisionResult result;
+        try {
+            result = decisionService.executeMerge(command);
+        } catch (RuntimeException ex) {
+            LOGGER.error("merge execution failed for review {}", reviewId, ex);
+            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.EXECUTION_FAILED);
+            throw ex;
+        }
+        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
@@ -72,10 +80,25 @@ public class ReviewController {
             Authentication authentication
     ) {
         ReviewTask task = reviewTaskService.getTask(reviewId);
-        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        validateApprovableStatus(task);
         BranchDecisionCommand command = toBranchCommand(task, authentication.getName());
-        DecisionResult result = decisionService.executeBranch(command);
+        DecisionResult result;
+        try {
+            result = decisionService.executeBranch(command);
+        } catch (RuntimeException ex) {
+            LOGGER.error("branch execution failed for review {}", reviewId, ex);
+            reviewTaskService.updateStatus(reviewId, ReviewTask.Status.EXECUTION_FAILED);
+            throw ex;
+        }
+        reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
+    }
+
+    private static void validateApprovableStatus(ReviewTask task) {
+        ReviewTask.Status status = task.status();
+        if (status != ReviewTask.Status.PENDING && status != ReviewTask.Status.EXECUTION_FAILED) {
+            throw new IllegalStateException("review task is not in an approvable status: " + status);
+        }
     }
 
     @PostMapping("/{id}/reject")

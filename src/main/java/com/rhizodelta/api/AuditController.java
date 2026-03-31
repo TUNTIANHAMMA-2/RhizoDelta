@@ -26,6 +26,7 @@ public class AuditController {
     public ResponseEntity<ApiResponse<AuditListResponse>> listDecisions(
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "operator_id", required = false) String operatorId,
+            @RequestParam(value = "node_id", required = false) String nodeId,
             @RequestParam(value = "since", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
             @RequestParam(value = "until", required = false)
@@ -33,7 +34,7 @@ public class AuditController {
             @RequestParam(value = "after", required = false) String after,
             @RequestParam(value = "limit", required = false) Integer limit
     ) {
-        AuditListResponse response = auditService.listDecisions(type, operatorId, since, until, after, limit);
+        AuditListResponse response = auditService.listDecisions(type, operatorId, nodeId, since, until, after, limit);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

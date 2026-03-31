@@ -6,7 +6,8 @@ import { useUiStore } from "../../stores/uiStore";
 import { Skeleton } from "../feedback/Skeleton";
 import { EmptyState } from "../feedback/EmptyState";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
-import type { AuditDetail } from "../../api/types";
+import type { AuditRecord, AuditDetail } from "../../api/types";
+import { fetchAuditDetail } from "../../api/audit";
 
 const DECISION_TYPE_COLOR: Record<string, string> = {
   MERGE: "var(--color-node-consensus)",
@@ -23,11 +24,12 @@ interface Props {
 }
 
 export function AuditPanel({ nodeId }: Props) {
-  const [items, setItems] = useState<AuditDetail[]>([]);
+  const [items, setItems] = useState<AuditRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [rollbackTarget, setRollbackTarget] = useState<AuditDetail | null>(null);
+  const [expandedDetail, setExpandedDetail] = useState<AuditDetail | null>(null);
+  const [rollbackTarget, setRollbackTarget] = useState<AuditRecord | null>(null);
   const isAdmin = useAuthStore((s) => s.hasRole("ADMIN"));
   const addToast = useUiStore((s) => s.addToast);
 
@@ -39,7 +41,7 @@ export function AuditPanel({ nodeId }: Props) {
       limit: 20,
     })
       .then((res) => {
-        const newItems = res?.items ?? [];
+        const newItems = res?.records ?? [];
         setItems((prev) => (cursor ? [...prev, ...newItems] : newItems));
         setNextCursor(res?.next_cursor ?? null);
       })
@@ -116,9 +118,14 @@ export function AuditPanel({ nodeId }: Props) {
               />
 
               <button
-                onClick={() =>
-                  setExpandedId(expanded ? null : audit.decision_id)
-                }
+                onClick={() => {
+                  const newId = expanded ? null : audit.decision_id;
+                  setExpandedId(newId);
+                  setExpandedDetail(null);
+                  if (newId) {
+                    fetchAuditDetail(newId).then((d) => setExpandedDetail(d ?? null)).catch(() => {});
+                  }
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -189,10 +196,10 @@ export function AuditPanel({ nodeId }: Props) {
                     <strong>operator:</strong> {audit.operator_type} /{" "}
                     {audit.operator_id}
                   </div>
-                  {audit.synthesized_from && audit.synthesized_from.length > 0 && (
+                  {expandedDetail?.synthesized_from && expandedDetail.synthesized_from.length > 0 && (
                     <div>
                       <strong>synthesized_from:</strong>{" "}
-                      {audit.synthesized_from.join(", ")}
+                      {expandedDetail.synthesized_from.join(", ")}
                     </div>
                   )}
                   {isAdmin && (

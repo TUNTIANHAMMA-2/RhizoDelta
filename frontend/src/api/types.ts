@@ -139,7 +139,7 @@ export interface AssociationInfo {
 
 // ────────────────────── 审计 ──────────────────────
 
-export interface AuditDetail {
+export interface AuditRecord {
   decision_id: string;
   decision_type: DecisionType;
   node_id: string;
@@ -148,11 +148,14 @@ export interface AuditDetail {
   operator_id: string;
   reason: string;
   created_at: string;
+}
+
+export interface AuditDetail extends AuditRecord {
   synthesized_from?: string[];
 }
 
 export interface AuditListResponse {
-  items: AuditDetail[];
+  records: AuditRecord[];
   next_cursor: string | null;
 }
 

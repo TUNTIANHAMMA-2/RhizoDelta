@@ -45,10 +45,16 @@ class RollbackServiceUnitTest {
                         "nodeId", decisionNodeId.toString(),
                         "labels", List.of("AI_Consensus")
                 )));
+        when(neo4jClient.query(argThat((String query) -> query != null
+                && query.contains("coalesce(target._deleted")))
+                .bind(anyString())
+                .to(anyString())
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("deleted", false)));
         ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().nodesDeleted()).thenReturn(1);
+        when(summary.counters().propertiesSet()).thenReturn(2);
         when(summary.counters().relationshipsDeleted()).thenReturn(0);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("SET target._deleted = true")))
                 .bind(anyString())
                 .to(anyString())
                 .run()).thenReturn(summary);
@@ -160,7 +166,7 @@ class RollbackServiceUnitTest {
     }
 
     @Test
-    void rollbackMergeShouldReturnSuccessWhenNodeAlreadyDeletedConcurrently() {
+    void rollbackMergeShouldReturnSuccessWhenNodeAlreadySoftDeleted() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         UUID decisionNodeId = UUID.randomUUID();
         when(neo4jClient.query(argThat((String query) -> query != null && query.contains("decision_id: $decisionId")))
@@ -171,19 +177,12 @@ class RollbackServiceUnitTest {
                         "nodeId", decisionNodeId.toString(),
                         "labels", List.of("AI_Consensus")
                 )));
-        ResultSummary summary = mock(ResultSummary.class, Answers.RETURNS_DEEP_STUBS);
-        when(summary.counters().nodesDeleted()).thenReturn(0);
-        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DETACH DELETE target")))
-                .bind(anyString())
-                .to(anyString())
-                .run()).thenReturn(summary);
         when(neo4jClient.query(argThat((String query) -> query != null
-                && query.contains("dependentNodeId")
-                && query.contains("NOT coalesce(dependent._deleted, false)")))
+                && query.contains("coalesce(target._deleted")))
                 .bind(anyString())
                 .to(anyString())
                 .fetch()
-                .all()).thenReturn(List.of());
+                .one()).thenReturn(Optional.of(Map.of("deleted", true)));
         RollbackService rollbackService = new RollbackService(neo4jClient);
 
         RollbackResult result = rollbackService.rollbackDecision("decision-merge-retry");

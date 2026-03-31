@@ -29,7 +29,6 @@ public class RollbackService {
             """;
 
     private static final int MIN_PROPERTIES_UPDATED = 1;
-    private static final int MIN_NODES_DELETED = 1;
     private static final long NO_RELATIONSHIPS_REMOVED = 0L;
     private static final String FIND_SOFT_DELETE_STATUS_QUERY = """
             MATCH (target:GraphNode {node_id: $nodeId})
@@ -53,7 +52,11 @@ public class RollbackService {
             WHERE NOT coalesce(dep._deleted, false)
             WITH target, collect(DISTINCT dep.node_id) AS deps
             WHERE size(deps) = 0
-            DETACH DELETE target
+            SET target._deleted = true,
+                target._deleted_at = datetime()
+            WITH target
+            OPTIONAL MATCH (target)-[rel]-()
+            DELETE rel
             """;
     private static final String ATOMIC_RESULT_ROLLBACK_QUERY = """
             MATCH (target:Result:GraphNode {node_id: $nodeId})
@@ -61,7 +64,11 @@ public class RollbackService {
             WHERE NOT coalesce(dep._deleted, false)
             WITH target, collect(DISTINCT dep.node_id) AS deps
             WHERE size(deps) = 0
-            DETACH DELETE target
+            SET target._deleted = true,
+                target._deleted_at = datetime()
+            WITH target
+            OPTIONAL MATCH (target)-[rel]-()
+            DELETE rel
             """;
 
     private static final String FIND_DEPENDENTS_QUERY = """
@@ -176,25 +183,23 @@ public class RollbackService {
     }
 
     private RollbackResult rollbackMerge(String decisionId, UUID nodeId) {
+        if (isSoftDeleted(nodeId)) {
+            return new RollbackResult(decisionId, nodeId, NO_RELATIONSHIPS_REMOVED, true);
+        }
         ResultSummary summary = runRollbackQuery(ATOMIC_MERGE_ROLLBACK_QUERY, nodeId);
-        if (summary.counters().nodesDeleted() < MIN_NODES_DELETED) {
-            List<UUID> dependents = findDependentNodeIds(nodeId);
-            if (dependents.isEmpty()) {
-                return new RollbackResult(decisionId, nodeId, NO_RELATIONSHIPS_REMOVED, true);
-            }
-            throw new RollbackBlockedException(dependents);
+        if (summary.counters().propertiesSet() < MIN_PROPERTIES_UPDATED) {
+            throw new RollbackBlockedException(findDependentNodeIds(nodeId));
         }
         return new RollbackResult(decisionId, nodeId, summary.counters().relationshipsDeleted(), true);
     }
 
     private RollbackResult rollbackResult(String decisionId, UUID nodeId) {
+        if (isSoftDeleted(nodeId)) {
+            return new RollbackResult(decisionId, nodeId, NO_RELATIONSHIPS_REMOVED, true);
+        }
         ResultSummary summary = runRollbackQuery(ATOMIC_RESULT_ROLLBACK_QUERY, nodeId);
-        if (summary.counters().nodesDeleted() < MIN_NODES_DELETED) {
-            List<UUID> dependents = findResultDependentNodeIds(nodeId);
-            if (dependents.isEmpty()) {
-                return new RollbackResult(decisionId, nodeId, NO_RELATIONSHIPS_REMOVED, true);
-            }
-            throw new RollbackBlockedException(dependents);
+        if (summary.counters().propertiesSet() < MIN_PROPERTIES_UPDATED) {
+            throw new RollbackBlockedException(findResultDependentNodeIds(nodeId));
         }
         return new RollbackResult(decisionId, nodeId, summary.counters().relationshipsDeleted(), true);
     }
