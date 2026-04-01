@@ -40,6 +40,7 @@ export interface GraphState {
 
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
+  removeEdgesBySourceAndType: (source: string, type: string) => void;
   flushLayout: () => void;
   scheduleFlushLayout: () => void;
   setLineagePositions: (
@@ -164,6 +165,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   addEdge: (edge) => {
     set({ edges: [...get().edges, edge] });
+  },
+
+  removeEdgesBySourceAndType: (source, type) => {
+    const filtered = get().edges.filter(
+      (e) => !(e.source === source && e.type === type),
+    );
+    if (filtered.length !== get().edges.length) {
+      set({ edges: filtered });
+      get().scheduleFlushLayout();
+    }
   },
 
   flushLayout: () => {

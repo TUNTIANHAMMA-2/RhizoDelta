@@ -269,13 +269,13 @@ class DecisionCommandUnitTest {
     }
 
     @Test
-    void forkCommandShouldRejectFewerThanTwoBranches() {
-        assertThatThrownBy(() -> new ForkDecisionCommand(
+    void forkCommandShouldAcceptSingleBranch() {
+        ForkDecisionCommand command = new ForkDecisionCommand(
                 "fork-1", "req-1", UUID.randomUUID(),
                 List.of(new ForkDecisionCommand.ForkBranchSpec("b1", "c1", "a1")),
                 DecisionOperatorType.AGENT, "op-1", "reason"
-        )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("at least 2");
+        );
+        assertThat(command.branches()).hasSize(1);
     }
 
     @Test
@@ -284,7 +284,7 @@ class DecisionCommandUnitTest {
                 "fork-1", "req-1", UUID.randomUUID(), null,
                 DecisionOperatorType.AGENT, "op-1", "reason"
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("at least 2");
+                .hasMessageContaining("must not be empty");
     }
 
     @Test

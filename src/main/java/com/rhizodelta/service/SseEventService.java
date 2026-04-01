@@ -126,6 +126,7 @@ public class SseEventService {
     public enum SseEventType {
         NODE_CREATED,
         EDGE_CREATED,
+        EDGE_REMOVED,
         DECISION_COMPLETE,
         ORCHESTRATION_STATUS
     }
@@ -142,6 +143,12 @@ public class SseEventService {
             @JsonProperty("target") String target,
             @JsonProperty("type") String type,
             @JsonProperty("created_at") Instant createdAt
+    ) {
+    }
+
+    public record EdgeRemovedPayload(
+            @JsonProperty("source") String source,
+            @JsonProperty("type") String type
     ) {
     }
 

@@ -20,6 +20,7 @@ public sealed interface DecisionCommittedEvent {
             String decisionId,
             UUID nodeId,
             UUID sourceNodeId,
+            List<UUID> contributorNodeIds,
             OffsetDateTime relationshipCreatedAt
     ) implements DecisionCommittedEvent {
     }

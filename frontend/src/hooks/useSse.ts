@@ -6,6 +6,7 @@ import { fetchNode } from "../api/nodes";
 import type {
   NodeCreatedEvent,
   EdgeCreatedEvent,
+  EdgeRemovedEvent,
   DecisionCompleteEvent,
   GraphEdgeDTO,
   OrchestrationStatusEvent,
@@ -193,6 +194,17 @@ function handleSseEvent(event: SseEvent) {
         graphStore.addEdge(edge);
         graphStore.scheduleFlushLayout();
       }
+      break;
+    }
+    case "EDGE_REMOVED": {
+      let payload: EdgeRemovedEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse EDGE_REMOVED event data:", e);
+        break;
+      }
+      graphStore.removeEdgesBySourceAndType(payload.source, payload.type);
       break;
     }
     case "DECISION_COMPLETE": {

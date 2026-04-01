@@ -80,7 +80,7 @@ function resolveRelationTarget(
     return null;
   }
 
-  if (relType === "CONTINUES_FROM") {
+  if (relType === "CONTINUES_FROM" || relType === "PENDING_EVALUATION") {
     const y = direction === "incoming" ? CONTINUE_Y_STEP : -CONTINUE_Y_STEP;
     return { x: 0, y, fixed: false };
   }

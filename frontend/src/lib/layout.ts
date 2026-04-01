@@ -16,6 +16,7 @@ const ROOT_LANE_GAP = 4;
 const edgePriority = (type?: string) => {
   switch (type) {
     case "CONTINUES_FROM":
+    case "PENDING_EVALUATION":
       return 1;
     case "MATERIALIZED_FROM":
       return 2;
@@ -223,7 +224,7 @@ function resolveEdgeHandles(
     };
   }
 
-  if (relType === "CONTINUES_FROM") {
+  if (relType === "CONTINUES_FROM" || relType === "PENDING_EVALUATION") {
     return {
       routeKind: "continue",
       branchSide: null,

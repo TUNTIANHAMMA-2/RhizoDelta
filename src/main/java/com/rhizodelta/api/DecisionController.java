@@ -149,7 +149,8 @@ public class DecisionController {
                 command.author_id(),
                 command.operator_type(),
                 operatorId,
-                command.reason()
+                command.reason(),
+                command.contributor_node_ids()
         );
     }
 

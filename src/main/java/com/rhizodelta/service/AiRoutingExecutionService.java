@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -58,7 +59,8 @@ public class AiRoutingExecutionService {
                 command.post().getAuthorId(),
                 DecisionOperatorType.AGENT,
                 AI_OPERATOR_ID,
-                command.reason()
+                command.reason(),
+                List.of(command.post().getNodeId())
         );
     }
 

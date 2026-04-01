@@ -48,7 +48,7 @@ public class PostService {
     private static final String CREATE_REPLY_RELATIONSHIP_QUERY = """
             MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
             MATCH (target:GraphNode {node_id: $targetNodeId})
-            MERGE (post)-[rel:CONTINUES_FROM]->(target)
+            MERGE (post)-[rel:PENDING_EVALUATION]->(target)
             ON CREATE SET
               rel.operator_type = $operatorType,
               rel.operator_id = $operatorId,
@@ -128,7 +128,7 @@ public class PostService {
                 .bind(USER_REPLY_REASON).to("reason")
                 .fetch()
                 .one()
-                .orElseThrow(() -> new IllegalStateException("Failed to create CONTINUES_FROM relationship"));
+                .orElseThrow(() -> new IllegalStateException("Failed to create PENDING_EVALUATION relationship"));
     }
 
     private String findNodeIdByRequestId(String requestId) {

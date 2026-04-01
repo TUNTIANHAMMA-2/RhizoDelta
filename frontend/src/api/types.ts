@@ -16,7 +16,8 @@ export type EvolutionEdgeType =
   | "CONTINUES_FROM"
   | "CONVERGED_FROM"
   | "MATERIALIZED_FROM"
-  | "CROSS_SYNTHESIZED_FROM";
+  | "CROSS_SYNTHESIZED_FROM"
+  | "PENDING_EVALUATION";
 
 export type SemanticEdgeType = "CONCEPTUAL_OVERLAP" | "RELATES_TO";
 
@@ -66,6 +67,11 @@ export interface EdgeCreatedEvent {
   target: string;
   type: EvolutionEdgeType;
   created_at: string;
+}
+
+export interface EdgeRemovedEvent {
+  source: string;
+  type: string;
 }
 
 export interface DecisionCompleteEvent {

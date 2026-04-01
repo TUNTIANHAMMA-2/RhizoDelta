@@ -49,6 +49,9 @@ public class DecisionAfterCommitListener {
         CompletableFuture.runAsync(
                 () -> writeConsensusEmbedding(event.nodeId(), event.summaryContent(), event.decisionId()),
                 embeddingTaskExecutor);
+        for (UUID contributorId : event.synthesizedFrom()) {
+            publishEdgeRemoved(contributorId, "PENDING_EVALUATION");
+        }
         publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "MERGED_INTO", event.relationshipCreatedAt());
         for (UUID contributorId : event.synthesizedFrom()) {
             publishEdgeCreated(event.nodeId(), contributorId, "SYNTHESIZED_FROM", event.relationshipCreatedAt());
@@ -58,6 +61,9 @@ public class DecisionAfterCommitListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onBranchCompleted(DecisionCommittedEvent.BranchCompleted event) {
+        for (UUID contributorId : event.contributorNodeIds()) {
+            publishEdgeRemoved(contributorId, "PENDING_EVALUATION");
+        }
         publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "BRANCHED_FROM", event.relationshipCreatedAt());
         publishDecisionComplete(event.nodeId(), DecisionType.BRANCH, event.decisionId());
     }
@@ -137,5 +143,11 @@ public class DecisionAfterCommitListener {
         SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
                 sourceNodeId.toString(), targetNodeId.toString(), relationshipType, createdAt.toInstant());
         sseEventService.publish(SseEventType.EDGE_CREATED, payload);
+    }
+
+    private void publishEdgeRemoved(UUID sourceNodeId, String relationshipType) {
+        SseEventService.EdgeRemovedPayload payload = new SseEventService.EdgeRemovedPayload(
+                sourceNodeId.toString(), relationshipType);
+        sseEventService.publish(SseEventType.EDGE_REMOVED, payload);
     }
 }

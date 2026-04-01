@@ -141,6 +141,11 @@ public class ReviewController {
 
     private static BranchDecisionCommand toBranchCommand(ReviewTask task, String operatorId) {
         Map<String, Object> draft = task.draftPayload();
+        List<UUID> contributorNodeIds = List.of();
+        Object postNodeId = draft.get("post_node_id");
+        if (postNodeId != null) {
+            contributorNodeIds = List.of(UUID.fromString(postNodeId.toString()));
+        }
         return new BranchDecisionCommand(
                 requireDraftText(draft, "decision_id"),
                 buildRequestId(requireDraftText(draft, "request_id"), BRANCH_REQUEST_SUFFIX),
@@ -149,7 +154,8 @@ public class ReviewController {
                 requireDraftText(draft, "author_id"),
                 DecisionOperatorType.HUMAN,
                 operatorId,
-                requireDraftText(draft, "reason")
+                requireDraftText(draft, "reason"),
+                contributorNodeIds
         );
     }
 

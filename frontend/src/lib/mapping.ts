@@ -20,6 +20,7 @@ export function toRfNode(dto: GraphNodeDTO): Node {
 export function toRfEdge(dto: GraphEdgeDTO): Edge {
   const relType = dto.type;
   const isBranch = relType === "BRANCHED_FROM";
+  const isPending = relType === "PENDING_EVALUATION";
 
   return {
     id: `${dto.source}-${dto.type}-${dto.target}`,
@@ -31,9 +32,11 @@ export function toRfEdge(dto: GraphEdgeDTO): Edge {
     data: {
       relType,
       createdAt: dto.created_at,
-      routeKind: isBranch ? "branch" : relType === "CONTINUES_FROM" ? "continue" : "vertical",
+      routeKind: isPending ? "pending" : isBranch ? "branch" : relType === "CONTINUES_FROM" ? "continue" : "vertical",
       branchSide: null,
     },
-    style: { stroke: "var(--color-edge-default)", strokeWidth: 1.5 },
+    style: isPending
+      ? { stroke: "var(--color-text-muted)", strokeWidth: 1, strokeDasharray: "6 4" }
+      : { stroke: "var(--color-edge-default)", strokeWidth: 1.5 },
   };
 }

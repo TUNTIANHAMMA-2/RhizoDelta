@@ -4,6 +4,7 @@ import { stripMarkdown } from "../../lib/markdown";
 
 const REL_LABELS: Record<string, string> = {
   CONTINUES_FROM: "Continues from",
+  PENDING_EVALUATION: "Pending evaluation",
   BRANCHED_FROM: "Branched from",
   MERGED_INTO: "Merged into",
   CONVERGED_FROM: "Converged from",
