@@ -46,3 +46,11 @@ langchain4j:
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen3-Embedding-0.6B
       api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+
+# Suppress Tomcat ERROR logs for broken SSE connections (client disconnect).
+# These two loggers only fire when a servlet or error page write fails mid-flight,
+# which is normal for long-lived SSE streams. WARN and above still pass through.
+logging:
+  level:
+    "org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/].[dispatcherServlet]": WARN
+    "org.apache.catalina.core.ContainerBase.[Tomcat].[localhost]": WARN
