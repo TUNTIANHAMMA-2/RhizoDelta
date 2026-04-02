@@ -68,10 +68,7 @@ public class DecisionService {
               synthesized.operator_id = operatorId,
               synthesized.created_at = createdAt,
               synthesized.reason = reason
-            WITH contributor, count(synthesized) AS cnt
-            OPTIONAL MATCH (contributor)-[pending:PENDING_EVALUATION]->()
-            DELETE pending
-            RETURN sum(cnt) AS synthesizedCount
+            RETURN count(synthesized) AS synthesizedCount
             """;
     private static final String UPSERT_BRANCH_NODE_QUERY = """
             MATCH (source:GraphNode {node_id: $sourceNodeId})
@@ -111,13 +108,6 @@ public class DecisionService {
               branched.created_at = $createdAt,
               branched.reason = $reason
             RETURN type(branched) AS relType
-            """;
-    private static final String DELETE_PENDING_EVALUATION_QUERY = """
-            UNWIND $contributorNodeIds AS cid
-            MATCH (contributor:Human_Post:GraphNode {node_id: cid})
-            OPTIONAL MATCH (contributor)-[pending:PENDING_EVALUATION]->()
-            DELETE pending
-            RETURN count(pending) AS deletedCount
             """;
     private static final String UPSERT_INJECT_NODE_QUERY = """
             MATCH (source:GraphNode {node_id: $sourceNodeId})
@@ -293,7 +283,6 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createBranchRelationship(command, relationshipCreatedAt);
-        deletePendingEvaluationEdges(command.contributor_node_ids());
         eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
                 command.contributor_node_ids(), relationshipCreatedAt));
@@ -331,7 +320,6 @@ public class DecisionService {
                 .one()
                 .orElseThrow(() -> new IllegalStateException(
                         "Failed to link branch: existing node " + existingNodeId + " or source " + sourceNodeId + " not found"));
-        deletePendingEvaluationEdges(contributorNodeIds);
         eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
                 decisionId, existingNodeId, sourceNodeId,
                 contributorNodeIds, createdAt));
@@ -506,21 +494,6 @@ public class DecisionService {
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create BRANCHED_FROM relationship"));
-    }
-    private void deletePendingEvaluationEdges(List<UUID> contributorNodeIds) {
-        if (contributorNodeIds == null || contributorNodeIds.isEmpty()) {
-            return;
-        }
-        neo4jClient.query(DELETE_PENDING_EVALUATION_QUERY)
-                .bind(contributorNodeIds.stream().map(UUID::toString).toList()).to("contributorNodeIds")
-                .fetch()
-                .one()
-                .ifPresent(result -> {
-                    long deleted = ((Number) result.get("deletedCount")).longValue();
-                    if (deleted > 0) {
-                        LOGGER.debug("Deleted {} PENDING_EVALUATION edge(s) for contributors {}", deleted, contributorNodeIds);
-                    }
-                });
     }
     private UpsertResult upsertInjectNode(InjectDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);

@@ -65,7 +65,7 @@ class PostReplyUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("PENDING_EVALUATION")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")) )
                 .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .bind(eq("HUMAN")).to(eq("operatorType"))
@@ -73,7 +73,7 @@ class PostReplyUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .bind(eq("user reply")).to(eq("reason"))
                 .fetch()
-                .one()).thenReturn(Optional.of(Map.of("relType", "PENDING_EVALUATION")));
+                .one()).thenReturn(Optional.of(Map.of("relType", "CONTINUES_FROM")));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
 
         HumanPost result = postService.createHumanPost(
@@ -81,7 +81,7 @@ class PostReplyUnitTest {
         ).post();
 
         assertThat(result.getNodeId()).isEqualTo(persistedNodeId);
-        verify(deepStubClient).query(argThat((String query) -> query != null && query.contains("PENDING_EVALUATION")));
+        verify(deepStubClient).query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")));
     }
 
     @Test
@@ -105,9 +105,9 @@ class PostReplyUnitTest {
                 "evt-reply-2"
         ));
 
-        assertThat(sseEventService.findEdge("PENDING_EVALUATION")).isNotNull();
-        assertThat(sseEventService.findEdge("PENDING_EVALUATION").source()).isEqualTo(nodeId.toString());
-        assertThat(sseEventService.findEdge("PENDING_EVALUATION").target()).isEqualTo(targetNodeId);
+        assertThat(sseEventService.findEdge("CONTINUES_FROM")).isNotNull();
+        assertThat(sseEventService.findEdge("CONTINUES_FROM").source()).isEqualTo(nodeId.toString());
+        assertThat(sseEventService.findEdge("CONTINUES_FROM").target()).isEqualTo(targetNodeId);
     }
 
     private static void invokeProcessMessage(PostConsumer consumer, PostEventMessage message) throws Exception {

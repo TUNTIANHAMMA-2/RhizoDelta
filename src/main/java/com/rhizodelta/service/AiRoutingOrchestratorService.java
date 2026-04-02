@@ -87,6 +87,11 @@ public class AiRoutingOrchestratorService {
             createReviewTask(message, post, state);
             return;
         }
+        if (state.sourceNodeId() == null || state.sourceNodeId().isBlank()) {
+            publishStatus(message, post.getNodeId().toString(), "SKIPPED",
+                    null, "no source node — standalone post, skipping decision execution");
+            return;
+        }
         executeDecision(message, post, state);
     }
 

@@ -16,8 +16,7 @@ export type EvolutionEdgeType =
   | "CONTINUES_FROM"
   | "CONVERGED_FROM"
   | "MATERIALIZED_FROM"
-  | "CROSS_SYNTHESIZED_FROM"
-  | "PENDING_EVALUATION";
+  | "CROSS_SYNTHESIZED_FROM";
 
 export type SemanticEdgeType = "CONCEPTUAL_OVERLAP" | "RELATES_TO";
 

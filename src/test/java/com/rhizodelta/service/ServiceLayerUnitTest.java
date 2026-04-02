@@ -129,7 +129,7 @@ class ServiceLayerUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("PENDING_EVALUATION")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")) )
                 .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .bind(eq("HUMAN")).to(eq("operatorType"))
@@ -137,7 +137,7 @@ class ServiceLayerUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .bind(eq("user reply")).to(eq("reason"))
                 .fetch()
-                .one()).thenReturn(Optional.of(Map.of("relType", "PENDING_EVALUATION")));
+                .one()).thenReturn(Optional.of(Map.of("relType", "CONTINUES_FROM")));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
 
         HumanPost result = postService.createHumanPost(

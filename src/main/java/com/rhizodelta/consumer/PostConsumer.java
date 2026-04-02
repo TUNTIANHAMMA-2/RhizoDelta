@@ -146,7 +146,7 @@ public class PostConsumer {
         SseEventService.EdgeCreatedPayload payload = new SseEventService.EdgeCreatedPayload(
                 post.getNodeId().toString(),
                 targetNodeId,
-                "PENDING_EVALUATION",
+                "CONTINUES_FROM",
                 post.getCreatedAt()
         );
         sseEventService.publish(SseEventService.SseEventType.EDGE_CREATED, payload);

@@ -31,7 +31,9 @@ public class NodeQueryService {
     private static final int NO_LIMIT = Integer.MAX_VALUE;
 
     private static final String LINEAGE_QUERY = """
-            MATCH path = (start:GraphNode {node_id: $nodeId})-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM*0..50]->(ancestor)
+            // Stage 1: Physical tree traversal (Human_Post backbone)
+            MATCH path = (start:GraphNode {node_id: $nodeId})
+                         -[:CONTINUES_FROM|BRANCHED_FROM*0..50]->(ancestor)
             WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
@@ -41,7 +43,24 @@ public class NodeQueryService {
             UNWIND (CASE WHEN allRels = [] THEN [NULL] ELSE allRels END) AS rel
             WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
                  [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
-            WITH [node IN filteredNodes | {
+
+            // Stage 2: Attach AI_Consensus nodes hanging off backbone nodes
+            WITH filteredNodes, uniqueRels
+            UNWIND filteredNodes AS bn
+            OPTIONAL MATCH (ai:AI_Consensus)-[mr:MERGED_INTO]->(bn)
+              WHERE NOT coalesce(ai._deleted, false)
+            OPTIONAL MATCH (ai)-[sf:SYNTHESIZED_FROM]->(contributor:GraphNode)
+              WHERE NOT coalesce(contributor._deleted, false)
+            WITH filteredNodes, uniqueRels,
+                 collect(DISTINCT ai) AS aiNodes,
+                 collect(DISTINCT contributor) AS contributorNodes,
+                 collect(DISTINCT mr) AS mergedRels,
+                 collect(DISTINCT sf) AS synthRels
+
+            WITH [node IN (filteredNodes +
+                           [n IN aiNodes WHERE n IS NOT NULL] +
+                           [n IN contributorNodes WHERE n IS NOT NULL])
+                  WHERE NOT coalesce(node._deleted, false) | {
                   nodeId: toString(node.node_id),
                   label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' WHEN 'Result' IN labels(node) THEN 'Result' ELSE 'AI_Consensus' END,
                   content: node.content,
@@ -52,8 +71,11 @@ public class NodeQueryService {
                   hasEmbedding: node.embedding IS NOT NULL,
                   qualityOverall: node.quality_overall
             }] AS nodes,
-                 [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
-                                  AND NOT coalesce(endNode(rel)._deleted, false) | {
+                 [rel IN (uniqueRels +
+                          [r IN mergedRels WHERE r IS NOT NULL] +
+                          [r IN synthRels WHERE r IS NOT NULL])
+                  WHERE NOT coalesce(startNode(rel)._deleted, false)
+                    AND NOT coalesce(endNode(rel)._deleted, false) | {
                   source: toString(startNode(rel).node_id),
                   target: toString(endNode(rel).node_id),
                   type: type(rel),
@@ -63,7 +85,9 @@ public class NodeQueryService {
             """;
 
     private static final String CHILDREN_QUERY = """
-            MATCH path = (start:GraphNode {node_id: $nodeId})<-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM*0..50]-(descendant)
+            // Stage 1: Physical tree traversal (inbound CONTINUES_FROM|BRANCHED_FROM)
+            MATCH path = (start:GraphNode {node_id: $nodeId})
+                         <-[:CONTINUES_FROM|BRANCHED_FROM*0..50]-(descendant)
             WHERE NOT coalesce(start._deleted, false) AND length(path) <= $maxDepth
             WITH collect(nodes(path)) AS nodeLists, collect(relationships(path)) AS relLists
             UNWIND nodeLists AS nodeList
@@ -73,7 +97,39 @@ public class NodeQueryService {
             UNWIND (CASE WHEN allRels = [] THEN [NULL] ELSE allRels END) AS rel
             WITH [node IN uniqueNodes WHERE NOT coalesce(node._deleted, false)] AS filteredNodes,
                  [r IN collect(DISTINCT rel) WHERE r IS NOT NULL] AS uniqueRels
-            WITH [node IN filteredNodes | {
+
+            // Stage 2: Attach AI_Consensus + SYNTHESIZED_FROM edges
+            WITH filteredNodes, uniqueRels
+            UNWIND filteredNodes AS bn
+            OPTIONAL MATCH (ai:AI_Consensus)-[mr:MERGED_INTO]->(bn)
+              WHERE NOT coalesce(ai._deleted, false)
+            OPTIONAL MATCH (ai)-[sf:SYNTHESIZED_FROM]->(contributor:GraphNode)
+              WHERE NOT coalesce(contributor._deleted, false)
+            WITH filteredNodes, uniqueRels,
+                 collect(DISTINCT ai) AS aiNodes,
+                 collect(DISTINCT contributor) AS contributorNodes,
+                 collect(DISTINCT mr) AS mergedRels,
+                 collect(DISTINCT sf) AS synthRels
+
+            // Also attach Result and cross-synth edges from backbone
+            WITH filteredNodes, uniqueRels, aiNodes, contributorNodes, mergedRels, synthRels
+            UNWIND filteredNodes AS bn2
+            OPTIONAL MATCH (res:Result)-[mf:MATERIALIZED_FROM]->(bn2)
+              WHERE NOT coalesce(res._deleted, false)
+            OPTIONAL MATCH (cs:Result)-[csf:CROSS_SYNTHESIZED_FROM]->(res)
+              WHERE NOT coalesce(cs._deleted, false) AND res IS NOT NULL
+            WITH filteredNodes, uniqueRels, aiNodes, contributorNodes, mergedRels, synthRels,
+                 collect(DISTINCT res) AS resNodes,
+                 collect(DISTINCT cs) AS csNodes,
+                 collect(DISTINCT mf) AS matRels,
+                 collect(DISTINCT csf) AS csRels
+
+            WITH [node IN (filteredNodes +
+                           [n IN aiNodes WHERE n IS NOT NULL] +
+                           [n IN contributorNodes WHERE n IS NOT NULL] +
+                           [n IN resNodes WHERE n IS NOT NULL] +
+                           [n IN csNodes WHERE n IS NOT NULL])
+                  WHERE NOT coalesce(node._deleted, false) | {
                   nodeId: toString(node.node_id),
                   label: CASE WHEN 'Human_Post' IN labels(node) THEN 'Human_Post' WHEN 'Result' IN labels(node) THEN 'Result' ELSE 'AI_Consensus' END,
                   content: node.content,
@@ -84,8 +140,13 @@ public class NodeQueryService {
                   hasEmbedding: node.embedding IS NOT NULL,
                   qualityOverall: node.quality_overall
             }] AS nodes,
-                 [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
-                                  AND NOT coalesce(endNode(rel)._deleted, false) | {
+                 [rel IN (uniqueRels +
+                          [r IN mergedRels WHERE r IS NOT NULL] +
+                          [r IN synthRels WHERE r IS NOT NULL] +
+                          [r IN matRels WHERE r IS NOT NULL] +
+                          [r IN csRels WHERE r IS NOT NULL])
+                  WHERE NOT coalesce(startNode(rel)._deleted, false)
+                    AND NOT coalesce(endNode(rel)._deleted, false) | {
                   source: toString(startNode(rel).node_id),
                   target: toString(endNode(rel).node_id),
                   type: type(rel),
@@ -135,7 +196,7 @@ public class NodeQueryService {
     private static final String ROOTS_QUERY = """
             MATCH (n:GraphNode)
             WHERE NOT coalesce(n._deleted, false)
-              AND NOT (n)-[:BRANCHED_FROM|MERGED_INTO|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM]->()
+              AND n.root_id = n.node_id
             WITH n, labels(n) AS nodeLabels
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
