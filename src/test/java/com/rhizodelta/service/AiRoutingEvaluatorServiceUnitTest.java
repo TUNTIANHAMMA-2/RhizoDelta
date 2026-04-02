@@ -1,6 +1,7 @@
 package com.rhizodelta.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rhizodelta.domain.ai.ModelPurpose;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
@@ -21,11 +22,14 @@ class AiRoutingEvaluatorServiceUnitTest {
     @Test
     void shouldParseMergeDecisionAboveThreshold() {
         ChatLanguageModel chatLanguageModel = mock(ChatLanguageModel.class);
+        ModelRouterService modelRouterService = mock(ModelRouterService.class);
+        when(modelRouterService.getModel(ModelPurpose.ROUTING)).thenReturn(chatLanguageModel);
+        when(modelRouterService.resolveModelName(ModelPurpose.ROUTING)).thenReturn("test-model");
         when(chatLanguageModel.generate(anyList())).thenReturn(Response.from(AiMessage.from("""
                 {"action":"MERGE","confidence":0.91,"reason":"same knowledge unit"}
                 """)));
         AiRoutingEvaluatorService service = new AiRoutingEvaluatorService(
-                chatLanguageModel,
+                modelRouterService,
                 new ObjectMapper(),
                 0.65d
         );
@@ -49,11 +53,14 @@ class AiRoutingEvaluatorServiceUnitTest {
     @Test
     void shouldDowngradeLowConfidenceDecisionToReview() {
         ChatLanguageModel chatLanguageModel = mock(ChatLanguageModel.class);
+        ModelRouterService modelRouterService = mock(ModelRouterService.class);
+        when(modelRouterService.getModel(ModelPurpose.ROUTING)).thenReturn(chatLanguageModel);
+        when(modelRouterService.resolveModelName(ModelPurpose.ROUTING)).thenReturn("test-model");
         when(chatLanguageModel.generate(anyList())).thenReturn(Response.from(AiMessage.from("""
                 {"action":"BRANCH","confidence":0.42,"reason":"extends the recalled node"}
                 """)));
         AiRoutingEvaluatorService service = new AiRoutingEvaluatorService(
-                chatLanguageModel,
+                modelRouterService,
                 new ObjectMapper(),
                 0.65d
         );
@@ -70,11 +77,14 @@ class AiRoutingEvaluatorServiceUnitTest {
     @Test
     void shouldRejectUnsupportedAction() {
         ChatLanguageModel chatLanguageModel = mock(ChatLanguageModel.class);
+        ModelRouterService modelRouterService = mock(ModelRouterService.class);
+        when(modelRouterService.getModel(ModelPurpose.ROUTING)).thenReturn(chatLanguageModel);
+        when(modelRouterService.resolveModelName(ModelPurpose.ROUTING)).thenReturn("test-model");
         when(chatLanguageModel.generate(anyList())).thenReturn(Response.from(AiMessage.from("""
                 {"action":"SKIP","confidence":0.91,"reason":"invalid"}
                 """)));
         AiRoutingEvaluatorService service = new AiRoutingEvaluatorService(
-                chatLanguageModel,
+                modelRouterService,
                 new ObjectMapper(),
                 0.65d
         );

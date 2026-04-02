@@ -23,6 +23,9 @@ public final class AiRoutingState extends AgentState {
     public static final String ROUTING_ACTION = "routingAction";
     public static final String REVIEW_REASON = "reviewReason";
     public static final String EXECUTED_NODES = "executedNodes";
+    public static final String RULE_DECISION = "ruleDecision";
+    public static final String SKIP_LLM = "skipLlm";
+    public static final String TOP_SCORE = "topScore";
     private static final String DEFAULT_ACTION = "REVIEW";
     private static final String EMPTY_TEXT = "";
 
@@ -85,6 +88,18 @@ public final class AiRoutingState extends AgentState {
         return value(EXECUTED_NODES, List::of);
     }
 
+    public String ruleDecision() {
+        return value(RULE_DECISION, EMPTY_TEXT);
+    }
+
+    public boolean skipLlm() {
+        return value(SKIP_LLM, false);
+    }
+
+    public double topScore() {
+        return value(TOP_SCORE, 0.0d);
+    }
+
     public static Map<String, Channel<?>> channels() {
         Map<String, Channel<?>> channels = new HashMap<>();
         channels.put(REQUEST_ID, Channels.base(() -> EMPTY_TEXT));
@@ -100,6 +115,9 @@ public final class AiRoutingState extends AgentState {
         channels.put(ROUTING_ACTION, Channels.base(() -> DEFAULT_ACTION));
         channels.put(REVIEW_REASON, Channels.base(() -> EMPTY_TEXT));
         channels.put(EXECUTED_NODES, Channels.appender(java.util.ArrayList::new));
+        channels.put(RULE_DECISION, Channels.base(() -> EMPTY_TEXT));
+        channels.put(SKIP_LLM, Channels.base(() -> false));
+        channels.put(TOP_SCORE, Channels.base(() -> 0.0d));
         return Map.copyOf(channels);
     }
 }

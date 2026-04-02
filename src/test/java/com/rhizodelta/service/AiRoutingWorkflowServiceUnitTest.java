@@ -1,6 +1,7 @@
 package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.AiRoutingState;
+import com.rhizodelta.domain.ai.PreFilterResult;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -13,16 +14,22 @@ import static org.mockito.Mockito.when;
 
 class AiRoutingWorkflowServiceUnitTest {
 
+    private static RuleBasedPreFilterService middleRangePreFilter() {
+        RuleBasedPreFilterService preFilterService = mock(RuleBasedPreFilterService.class);
+        when(preFilterService.evaluate(org.mockito.ArgumentMatchers.anyDouble(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new PreFilterResult("REVIEW", "middle range", false));
+        return preFilterService;
+    }
+
     @Test
     void shouldRouteMergeActionToMergeNode() throws Exception {
         AiRoutingEvaluatorService evaluatorService = mock(AiRoutingEvaluatorService.class);
         PreCommitGuard preCommitGuard = mock(PreCommitGuard.class);
         when(evaluatorService.evaluate(any())).thenReturn(new AiRoutingEvaluatorService.RoutingEvaluation(
-                "MERGE",
-                "same knowledge unit",
-                0.91d
+                "MERGE", "same knowledge unit", 0.91d
         ));
-        AiRoutingWorkflowService service = new AiRoutingWorkflowService(evaluatorService, preCommitGuard);
+        AiRoutingWorkflowService service = new AiRoutingWorkflowService(
+                evaluatorService, middleRangePreFilter(), preCommitGuard);
 
         AiRoutingState state = service.invokeSkeleton(java.util.Map.of(
                         AiRoutingState.REQUEST_ID, "req-merge-1",
@@ -37,6 +44,7 @@ class AiRoutingWorkflowServiceUnitTest {
                 AiRoutingWorkflowService.ENSURE_EMBEDDING,
                 AiRoutingWorkflowService.VECTOR_RECALL,
                 AiRoutingWorkflowService.CONTEXT_PRUNE,
+                AiRoutingWorkflowService.RULE_PRE_FILTER,
                 AiRoutingWorkflowService.LLM_EVALUATE,
                 AiRoutingWorkflowService.REFLECTION_VALIDATE,
                 AiRoutingWorkflowService.PRE_COMMIT_GUARD,
@@ -49,11 +57,10 @@ class AiRoutingWorkflowServiceUnitTest {
         AiRoutingEvaluatorService evaluatorService = mock(AiRoutingEvaluatorService.class);
         PreCommitGuard preCommitGuard = mock(PreCommitGuard.class);
         when(evaluatorService.evaluate(any())).thenReturn(new AiRoutingEvaluatorService.RoutingEvaluation(
-                "REVIEW",
-                "ambiguous candidates",
-                0.52d
+                "REVIEW", "ambiguous candidates", 0.52d
         ));
-        AiRoutingWorkflowService service = new AiRoutingWorkflowService(evaluatorService, preCommitGuard);
+        AiRoutingWorkflowService service = new AiRoutingWorkflowService(
+                evaluatorService, middleRangePreFilter(), preCommitGuard);
 
         AiRoutingState state = service.invokeSkeleton(java.util.Map.of(
                         AiRoutingState.REQUEST_ID, "req-review-1",
@@ -68,6 +75,7 @@ class AiRoutingWorkflowServiceUnitTest {
                 AiRoutingWorkflowService.ENSURE_EMBEDDING,
                 AiRoutingWorkflowService.VECTOR_RECALL,
                 AiRoutingWorkflowService.CONTEXT_PRUNE,
+                AiRoutingWorkflowService.RULE_PRE_FILTER,
                 AiRoutingWorkflowService.LLM_EVALUATE,
                 AiRoutingWorkflowService.REFLECTION_VALIDATE,
                 AiRoutingWorkflowService.PRE_COMMIT_GUARD,
@@ -81,16 +89,15 @@ class AiRoutingWorkflowServiceUnitTest {
         AiRoutingEvaluatorService evaluatorService = mock(AiRoutingEvaluatorService.class);
         PreCommitGuard preCommitGuard = mock(PreCommitGuard.class);
         when(evaluatorService.evaluate(any())).thenReturn(new AiRoutingEvaluatorService.RoutingEvaluation(
-                "MERGE",
-                "same knowledge unit",
-                0.91d
+                "MERGE", "same knowledge unit", 0.91d
         ));
         when(preCommitGuard.evaluate(
                 "source-1",
                 Instant.parse("2026-03-23T00:00:00Z"),
                 "target-1"
         )).thenReturn(new PreCommitGuard.PreCommitGuardResult(true, "source branch advanced during workflow"));
-        AiRoutingWorkflowService service = new AiRoutingWorkflowService(evaluatorService, preCommitGuard);
+        AiRoutingWorkflowService service = new AiRoutingWorkflowService(
+                evaluatorService, middleRangePreFilter(), preCommitGuard);
 
         AiRoutingState state = service.invokeSkeleton(java.util.Map.of(
                         AiRoutingState.REQUEST_ID, "req-stale-1",
@@ -112,16 +119,15 @@ class AiRoutingWorkflowServiceUnitTest {
         AiRoutingEvaluatorService evaluatorService = mock(AiRoutingEvaluatorService.class);
         PreCommitGuard preCommitGuard = mock(PreCommitGuard.class);
         when(evaluatorService.evaluate(any())).thenReturn(new AiRoutingEvaluatorService.RoutingEvaluation(
-                "REVIEW",
-                "needs review",
-                0.50d
+                "REVIEW", "needs review", 0.50d
         ));
         when(preCommitGuard.evaluate(
                 org.mockito.ArgumentMatchers.eq("source-1"),
                 org.mockito.ArgumentMatchers.any(Instant.class),
                 org.mockito.ArgumentMatchers.eq(""))
         ).thenReturn(new PreCommitGuard.PreCommitGuardResult(false, ""));
-        AiRoutingWorkflowService service = new AiRoutingWorkflowService(evaluatorService, preCommitGuard);
+        AiRoutingWorkflowService service = new AiRoutingWorkflowService(
+                evaluatorService, middleRangePreFilter(), preCommitGuard);
 
         AiRoutingState state = service.invokeSkeleton(java.util.Map.of(
                         AiRoutingState.REQUEST_ID, "req-context-1",

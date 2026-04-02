@@ -2,11 +2,11 @@ package com.rhizodelta.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rhizodelta.domain.DecisionCommandValidation;
+import com.rhizodelta.domain.ai.ModelPurpose;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,16 +34,16 @@ public class AiRoutingEvaluatorService {
             Do not wrap the JSON in markdown.
             """;
 
-    private final ChatLanguageModel chatLanguageModel;
+    private final ModelRouterService modelRouterService;
     private final ObjectMapper objectMapper;
     private final double reviewThreshold;
 
     public AiRoutingEvaluatorService(
-            ChatLanguageModel chatLanguageModel,
+            ModelRouterService modelRouterService,
             ObjectMapper objectMapper,
             @Value("${rhizodelta.ai.confidence.review-threshold}") double reviewThreshold
     ) {
-        this.chatLanguageModel = chatLanguageModel;
+        this.modelRouterService = modelRouterService;
         this.objectMapper = objectMapper;
         this.reviewThreshold = reviewThreshold;
     }
@@ -88,7 +88,8 @@ public class AiRoutingEvaluatorService {
     }
 
     private String invokeModel(List<dev.langchain4j.data.message.ChatMessage> messages, String modelName) {
-        Response<AiMessage> response = chatLanguageModel.generate(messages);
+        ChatLanguageModel model = modelRouterService.getModel(ModelPurpose.ROUTING);
+        Response<AiMessage> response = model.generate(messages);
         if (response == null || response.content() == null || response.content().text() == null) {
             throw new IllegalStateException("routing evaluator response content is null");
         }
@@ -164,10 +165,7 @@ public class AiRoutingEvaluatorService {
     }
 
     private String resolveModelName() {
-        if (chatLanguageModel instanceof OpenAiChatModel openAiChatModel) {
-            return openAiChatModel.modelName();
-        }
-        return chatLanguageModel.getClass().getSimpleName();
+        return modelRouterService.resolveModelName(ModelPurpose.ROUTING);
     }
 
     private String previewText(String value) {

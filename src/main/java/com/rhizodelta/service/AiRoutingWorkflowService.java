@@ -1,6 +1,7 @@
 package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.AiRoutingState;
+import com.rhizodelta.domain.ai.PreFilterResult;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphDefinition;
 import org.bsc.langgraph4j.GraphStateException;
@@ -10,6 +11,7 @@ import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +24,7 @@ public class AiRoutingWorkflowService {
     static final String ENSURE_EMBEDDING = "ensure-embedding";
     static final String VECTOR_RECALL = "vector-recall";
     static final String CONTEXT_PRUNE = "context-prune";
+    static final String RULE_PRE_FILTER = "rule-pre-filter";
     static final String LLM_EVALUATE = "llm-evaluate";
     static final String REFLECTION_VALIDATE = "reflection-validate";
     static final String PRE_COMMIT_GUARD = "pre-commit-guard";
@@ -31,13 +34,16 @@ public class AiRoutingWorkflowService {
 
     private final CompiledGraph<AiRoutingState> workflow;
     private final AiRoutingEvaluatorService aiRoutingEvaluatorService;
+    private final RuleBasedPreFilterService ruleBasedPreFilterService;
     private final PreCommitGuard preCommitGuard;
 
     public AiRoutingWorkflowService(
             AiRoutingEvaluatorService aiRoutingEvaluatorService,
+            RuleBasedPreFilterService ruleBasedPreFilterService,
             PreCommitGuard preCommitGuard
     ) throws GraphStateException {
         this.aiRoutingEvaluatorService = aiRoutingEvaluatorService;
+        this.ruleBasedPreFilterService = ruleBasedPreFilterService;
         this.preCommitGuard = preCommitGuard;
         this.workflow = buildWorkflow();
     }
@@ -57,6 +63,7 @@ public class AiRoutingWorkflowService {
         graph.addNode(ENSURE_EMBEDDING, appendNode(ENSURE_EMBEDDING));
         graph.addNode(VECTOR_RECALL, vectorRecall());
         graph.addNode(CONTEXT_PRUNE, contextPrune());
+        graph.addNode(RULE_PRE_FILTER, rulePreFilter());
         graph.addNode(LLM_EVALUATE, llmEvaluate());
         graph.addNode(REFLECTION_VALIDATE, appendNode(REFLECTION_VALIDATE));
         graph.addNode(PRE_COMMIT_GUARD, preCommitGuardNode());
@@ -67,7 +74,11 @@ public class AiRoutingWorkflowService {
         graph.addEdge(LOAD_POST, ENSURE_EMBEDDING);
         graph.addEdge(ENSURE_EMBEDDING, VECTOR_RECALL);
         graph.addEdge(VECTOR_RECALL, CONTEXT_PRUNE);
-        graph.addEdge(CONTEXT_PRUNE, LLM_EVALUATE);
+        graph.addEdge(CONTEXT_PRUNE, RULE_PRE_FILTER);
+        graph.addConditionalEdges(RULE_PRE_FILTER, routeBySkipLlm(), Map.of(
+                "skip", PRE_COMMIT_GUARD,
+                "evaluate", LLM_EVALUATE
+        ));
         graph.addEdge(LLM_EVALUATE, REFLECTION_VALIDATE);
         graph.addEdge(REFLECTION_VALIDATE, PRE_COMMIT_GUARD);
         graph.addConditionalEdges(PRE_COMMIT_GUARD, routeByAction(), Map.of(
@@ -114,6 +125,26 @@ public class AiRoutingWorkflowService {
                     AiRoutingState.SOURCE_NODE_ID, sourceNodeId
             );
         });
+    }
+
+    private AsyncNodeAction<AiRoutingState> rulePreFilter() {
+        return AsyncNodeAction.node_async(state -> {
+            boolean hasCandidates = !state.selectedCandidateNodeIds().isEmpty();
+            PreFilterResult result = ruleBasedPreFilterService.evaluate(state.topScore(), hasCandidates);
+            var output = new HashMap<String, Object>();
+            output.put(AiRoutingState.EXECUTED_NODES, List.of(RULE_PRE_FILTER));
+            output.put(AiRoutingState.RULE_DECISION, result.action());
+            output.put(AiRoutingState.SKIP_LLM, result.skipLlm());
+            if (result.skipLlm()) {
+                output.put(AiRoutingState.ROUTING_ACTION, normalizeAction(result.action()));
+                output.put(AiRoutingState.REVIEW_REASON, result.reason());
+            }
+            return output;
+        });
+    }
+
+    private AsyncEdgeAction<AiRoutingState> routeBySkipLlm() {
+        return state -> CompletableFuture.completedFuture(state.skipLlm() ? "skip" : "evaluate");
     }
 
     private AsyncNodeAction<AiRoutingState> llmEvaluate() {

@@ -30,6 +30,22 @@ rhizodelta:
       max-latency-ms: 30000
     confidence:
       review-threshold: 0.65
+    rules:
+      auto-merge-threshold: 0.9
+      auto-branch-threshold: 0.3
+    models:
+      routing:
+        base-url: https://api.siliconflow.cn/v1
+        model-name: Qwen/Qwen2.5-7B-Instruct
+        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      summary:
+        base-url: https://api.siliconflow.cn/v1
+        model-name: Qwen/Qwen2.5-14B-Instruct
+        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      quality:
+        base-url: https://api.siliconflow.cn/v1
+        model-name: Qwen/Qwen2.5-7B-Instruct
+        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
     sweeper:
       batch-size: 50
       cron: "0 */30 * * * *"

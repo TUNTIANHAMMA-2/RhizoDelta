@@ -2,6 +2,7 @@ package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.AiRoutingState;
 import com.rhizodelta.domain.embedding.PrunedContext;
+import com.rhizodelta.domain.embedding.SimilaritySearchResult;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.domain.review.ReviewTask;
@@ -45,6 +46,12 @@ public class AiRoutingOrchestratorService {
         List<String> candidateNodeIds = prunedContext.selected().stream()
                 .map(result -> result.node_id().toString())
                 .toList();
+        double topScore = prunedContext.selected().stream()
+                .map(SimilaritySearchResult::score)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .max()
+                .orElse(0.0);
         publishStatus(
                 message,
                 post.getNodeId().toString(),
@@ -61,7 +68,8 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.RECALL_CANDIDATE_NODE_IDS, candidateNodeIds,
                         AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, candidateNodeIds,
                         AiRoutingState.ROUTING_CONTEXT, buildRoutingContext(prunedContext),
-                        AiRoutingState.ROUTING_ACTION, "REVIEW"
+                        AiRoutingState.ROUTING_ACTION, "REVIEW",
+                        AiRoutingState.TOP_SCORE, topScore
                 ))
                 .orElseThrow(() -> new IllegalStateException("ai routing workflow returned no state"));
         if ("REVIEW".equals(state.routingAction())) {
