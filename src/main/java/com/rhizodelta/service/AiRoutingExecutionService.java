@@ -1,6 +1,5 @@
 package com.rhizodelta.service;
 
-import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionOperatorType;
 import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.domain.decision.MergeDecisionCommand;
@@ -8,7 +7,6 @@ import com.rhizodelta.domain.node.HumanPost;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -31,7 +29,7 @@ public class AiRoutingExecutionService {
     public RoutingExecutionResult execute(RoutingExecutionCommand command) {
         return switch (command.action()) {
             case "MERGE" -> new RoutingExecutionResult("MERGE", decisionService.executeMerge(toMergeCommand(command)));
-            case "BRANCH" -> new RoutingExecutionResult("BRANCH", decisionService.executeBranch(toBranchCommand(command)));
+            case "BRANCH" -> new RoutingExecutionResult("BRANCH", linkBranch(command));
             default -> throw new IllegalArgumentException("unsupported routing action: " + command.action());
         };
     }
@@ -50,13 +48,11 @@ public class AiRoutingExecutionService {
         );
     }
 
-    private BranchDecisionCommand toBranchCommand(RoutingExecutionCommand command) {
-        return new BranchDecisionCommand(
+    private DecisionResult linkBranch(RoutingExecutionCommand command) {
+        return decisionService.linkBranch(
                 buildDecisionId(command.eventId(), "branch"),
-                buildRequestId(command.requestId(), "branch"),
+                command.post().getNodeId(),
                 UUID.fromString(command.sourceNodeId()),
-                command.post().getContent(),
-                command.post().getAuthorId(),
                 DecisionOperatorType.AGENT,
                 AI_OPERATOR_ID,
                 command.reason(),
@@ -66,10 +62,6 @@ public class AiRoutingExecutionService {
 
     private String buildDecisionId(String eventId, String suffix) {
         return eventId + ":" + suffix.toLowerCase(Locale.ROOT);
-    }
-
-    private String buildRequestId(String requestId, String suffix) {
-        return requestId + ":" + suffix.toLowerCase(Locale.ROOT);
     }
 
     public record RoutingExecutionCommand(

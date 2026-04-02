@@ -1,6 +1,5 @@
 package com.rhizodelta.service;
 
-import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionOperatorType;
 import com.rhizodelta.domain.decision.DecisionResult;
 import com.rhizodelta.domain.decision.MergeDecisionCommand;
@@ -8,10 +7,14 @@ import com.rhizodelta.domain.node.HumanPost;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,13 +59,16 @@ class AiRoutingExecutionServiceUnitTest {
     }
 
     @Test
-    void shouldTranslateBranchActionIntoDecisionCommand() {
+    void shouldLinkExistingNodeAsBranchInsteadOfCreatingNew() {
         DecisionService decisionService = mock(DecisionService.class);
         UUID postNodeId = UUID.randomUUID();
         UUID sourceNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "branch content", "author-2", "req-2");
-        DecisionResult decisionResult = new DecisionResult("evt-2:branch", UUID.randomUUID(), "QUEUED");
-        when(decisionService.executeBranch(any(BranchDecisionCommand.class))).thenReturn(decisionResult);
+        DecisionResult decisionResult = new DecisionResult("evt-2:branch", postNodeId, "QUEUED");
+        when(decisionService.linkBranch(
+                anyString(), eq(postNodeId), eq(sourceNodeId),
+                eq(DecisionOperatorType.AGENT), anyString(), anyString(), anyList()
+        )).thenReturn(decisionResult);
         AiRoutingExecutionService service = new AiRoutingExecutionService(decisionService, "Qwen/Qwen2.5-7B-Instruct");
 
         AiRoutingExecutionService.RoutingExecutionResult result = service.execute(
@@ -76,18 +82,16 @@ class AiRoutingExecutionServiceUnitTest {
                 )
         );
 
-        ArgumentCaptor<BranchDecisionCommand> commandCaptor = ArgumentCaptor.forClass(BranchDecisionCommand.class);
-        verify(decisionService).executeBranch(commandCaptor.capture());
-        BranchDecisionCommand command = commandCaptor.getValue();
-        assertThat(command.decision_id()).isEqualTo("evt-2:branch");
-        assertThat(command.request_id()).isEqualTo("req-2:branch");
-        assertThat(command.source_node_id()).isEqualTo(sourceNodeId);
-        assertThat(command.content()).isEqualTo("branch content");
-        assertThat(command.author_id()).isEqualTo("author-2");
-        assertThat(command.operator_type()).isEqualTo(DecisionOperatorType.AGENT);
-        assertThat(command.operator_id()).isEqualTo("ai-routing-orchestrator");
-        assertThat(command.reason()).isEqualTo("extends the recalled node");
+        verify(decisionService).linkBranch(
+                eq("evt-2:branch"),
+                eq(postNodeId),
+                eq(sourceNodeId),
+                eq(DecisionOperatorType.AGENT),
+                eq("ai-routing-orchestrator"),
+                eq("extends the recalled node"),
+                eq(List.of(postNodeId))
+        );
         assertThat(result.action()).isEqualTo("BRANCH");
-        assertThat(result.decisionResult()).isEqualTo(decisionResult);
+        assertThat(result.decisionResult().node_id()).isEqualTo(postNodeId);
     }
 }

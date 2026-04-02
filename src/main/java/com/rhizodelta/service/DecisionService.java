@@ -2,6 +2,7 @@ package com.rhizodelta.service;
 import com.rhizodelta.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.domain.decision.CrossSynthDecisionCommand;
 import com.rhizodelta.domain.decision.DecisionResult;
+import com.rhizodelta.domain.decision.DecisionOperatorType;
 import com.rhizodelta.domain.decision.ForkDecisionCommand;
 import com.rhizodelta.domain.decision.ForkDecisionResult;
 import com.rhizodelta.domain.decision.InjectDecisionCommand;
@@ -91,6 +92,19 @@ public class DecisionService {
             MATCH (decision:Human_Post {decision_id: $decisionId})
             MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (decision)-[branched:BRANCHED_FROM]->(source)
+            ON CREATE SET
+              branched.operator_type = $operatorType,
+              branched.operator_id = $operatorId,
+              branched.created_at = $createdAt,
+              branched.reason = $reason
+            RETURN type(branched) AS relType
+            """;
+    private static final String LINK_EXISTING_BRANCH_QUERY = """
+            MATCH (existing:Human_Post:GraphNode {node_id: $existingNodeId})
+            WHERE NOT coalesce(existing._deleted, false)
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
+            WHERE NOT coalesce(source._deleted, false)
+            MERGE (existing)-[branched:BRANCHED_FROM]->(source)
             ON CREATE SET
               branched.operator_type = $operatorType,
               branched.operator_id = $operatorId,
@@ -285,6 +299,45 @@ public class DecisionService {
                 command.contributor_node_ids(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
+
+    /**
+     * Links an existing HumanPost as a branch from the source node without creating a new node.
+     * Used by AI routing when the reply post itself should become the branched node.
+     */
+    @Transactional(transactionManager = "transactionManager")
+    public DecisionResult linkBranch(
+            String decisionId,
+            UUID existingNodeId,
+            UUID sourceNodeId,
+            DecisionOperatorType operatorType,
+            String operatorId,
+            String reason,
+            List<UUID> contributorNodeIds
+    ) {
+        Objects.requireNonNull(existingNodeId, "existingNodeId must not be null");
+        validateSourceNodeExists(sourceNodeId);
+        dagIntegrityService.assertNoVersionEvolutionCycle(existingNodeId, sourceNodeId);
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        neo4jClient.query(LINK_EXISTING_BRANCH_QUERY)
+                .bindAll(Map.of(
+                        "existingNodeId", existingNodeId.toString(),
+                        "sourceNodeId", sourceNodeId.toString(),
+                        "operatorType", operatorType.name(),
+                        "operatorId", operatorId,
+                        "createdAt", createdAt,
+                        "reason", reason
+                ))
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Failed to link branch: existing node " + existingNodeId + " or source " + sourceNodeId + " not found"));
+        deletePendingEvaluationEdges(contributorNodeIds);
+        eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
+                decisionId, existingNodeId, sourceNodeId,
+                contributorNodeIds, createdAt));
+        return new DecisionResult(decisionId, existingNodeId, QUEUED_STATUS);
+    }
+
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeInject(InjectDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
