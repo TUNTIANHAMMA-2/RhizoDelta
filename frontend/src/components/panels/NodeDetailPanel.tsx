@@ -215,6 +215,9 @@ export function NodeDetailPanel() {
               <div>node_id: {node.node_id}</div>
               <div>has_embedding: {String(node.has_embedding)}</div>
               {node.operation_id && <div>operation_id: {node.operation_id}</div>}
+              {node.quality_overall != null && (
+                <div>quality_overall: {(node.quality_overall * 100).toFixed(0)}%</div>
+              )}
               {node.label === "AI_Consensus" && (
                 <button
                   onClick={() => {

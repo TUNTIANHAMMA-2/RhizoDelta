@@ -5,6 +5,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import { NodeActionToolbar } from "./NodeActionToolbar";
 import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
+import { QualityBadge } from "./QualityBadge";
 import { stripMarkdown } from "../../lib/markdown";
 
 export const ConsensusNode = memo(function ConsensusNode({ data, selected }: NodeProps) {
@@ -47,7 +48,10 @@ export const ConsensusNode = memo(function ConsensusNode({ data, selected }: Nod
           <div className="node-content-normal">
             <div className="node-header">
               <span>AI Consensus</span>
-              <span>&middot; {new Date(node.created_at).toLocaleDateString()}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {node.quality_overall != null && <QualityBadge qualityOverall={node.quality_overall} />}
+                &middot; {new Date(node.created_at).toLocaleDateString()}
+              </span>
             </div>
             <div className="node-body">
               {plainText}

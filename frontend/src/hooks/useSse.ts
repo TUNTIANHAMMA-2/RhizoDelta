@@ -11,6 +11,7 @@ import type {
   GraphEdgeDTO,
   OrchestrationStatusEvent,
   SummaryGeneratedEvent,
+  QualityScoredEvent,
 } from "../api/types";
 
 const SSE_URL = "/api/events/stream";
@@ -242,6 +243,20 @@ function handleSseEvent(event: SseEvent) {
         break;
       }
       // Refresh the node to get the updated summary_content
+      fetchNode(payload.node_id).then((node) => {
+        graphStore.addNode(node);
+      });
+      break;
+    }
+    case "QUALITY_SCORED": {
+      let payload: QualityScoredEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse QUALITY_SCORED event data:", e);
+        break;
+      }
+      // Refresh the node to get the updated quality score
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
       });

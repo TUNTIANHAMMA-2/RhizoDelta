@@ -49,7 +49,8 @@ public class NodeQueryService {
                   authorId: node.author_id,
                   agentVersion: node.agent_version,
                   createdAt: node.created_at,
-                  hasEmbedding: node.embedding IS NOT NULL
+                  hasEmbedding: node.embedding IS NOT NULL,
+                  qualityOverall: node.quality_overall
             }] AS nodes,
                  [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
                                   AND NOT coalesce(endNode(rel)._deleted, false) | {
@@ -80,7 +81,8 @@ public class NodeQueryService {
                   authorId: node.author_id,
                   agentVersion: node.agent_version,
                   createdAt: node.created_at,
-                  hasEmbedding: node.embedding IS NOT NULL
+                  hasEmbedding: node.embedding IS NOT NULL,
+                  qualityOverall: node.quality_overall
             }] AS nodes,
                  [rel IN uniqueRels WHERE NOT coalesce(startNode(rel)._deleted, false)
                                   AND NOT coalesce(endNode(rel)._deleted, false) | {
@@ -103,7 +105,8 @@ public class NodeQueryService {
                    n.author_id AS authorId,
                    n.agent_version AS agentVersion,
                    n.created_at AS createdAt,
-                   n.embedding IS NOT NULL AS hasEmbedding
+                   n.embedding IS NOT NULL AS hasEmbedding,
+                   n.quality_overall AS qualityOverall
             """;
 
     private static final String NODE_TYPE_QUERY = """
@@ -124,7 +127,8 @@ public class NodeQueryService {
                    source.author_id AS authorId,
                    source.agent_version AS agentVersion,
                    source.created_at AS createdAt,
-                   source.embedding IS NOT NULL AS hasEmbedding
+                   source.embedding IS NOT NULL AS hasEmbedding,
+                   source.quality_overall AS qualityOverall
             ORDER BY createdAt DESC
             """;
 
@@ -140,7 +144,8 @@ public class NodeQueryService {
                    n.author_id AS authorId,
                    n.agent_version AS agentVersion,
                    n.created_at AS createdAt,
-                   n.embedding IS NOT NULL AS hasEmbedding
+                   n.embedding IS NOT NULL AS hasEmbedding,
+                   n.quality_overall AS qualityOverall
             ORDER BY createdAt DESC
             LIMIT $limit
             """;
@@ -290,7 +295,8 @@ public class NodeQueryService {
                 (String) record.get("authorId"),
                 (String) record.get("agentVersion"),
                 toInstant(record.get("createdAt")),
-                toBoolean(record.get("hasEmbedding"))
+                toBoolean(record.get("hasEmbedding")),
+                toNullableDouble(record.get("qualityOverall"))
         );
     }
 
@@ -463,7 +469,8 @@ public class NodeQueryService {
                 (String) entry.get("authorId"),
                 (String) entry.get("agentVersion"),
                 toInstant(entry.get("createdAt")),
-                toBoolean(entry.get("hasEmbedding"))
+                toBoolean(entry.get("hasEmbedding")),
+                toNullableDouble(entry.get("qualityOverall"))
         );
     }
 
@@ -491,6 +498,13 @@ public class NodeQueryService {
 
     private static boolean toBoolean(Object value) {
         return Boolean.TRUE.equals(value);
+    }
+
+    private static Double toNullableDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return null;
     }
 
     private static Instant toInstant(Object value) {
@@ -532,6 +546,14 @@ public class NodeQueryService {
             String authorId,
             String agentVersion,
             Instant createdAt,
-            boolean hasEmbedding) {
+            boolean hasEmbedding,
+            Double qualityOverall) {
+
+        public LineageNode(
+                String nodeId, String label, String content, String summaryContent,
+                String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding
+        ) {
+            this(nodeId, label, content, summaryContent, authorId, agentVersion, createdAt, hasEmbedding, null);
+        }
     }
 }

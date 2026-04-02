@@ -5,6 +5,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import { NodeActionToolbar } from "./NodeActionToolbar";
 import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
+import { QualityBadge } from "./QualityBadge";
 import { stripMarkdown } from "../../lib/markdown";
 
 export const HumanPostNode = memo(function HumanPostNode({ data, selected }: NodeProps) {
@@ -50,7 +51,10 @@ export const HumanPostNode = memo(function HumanPostNode({ data, selected }: Nod
           <div className="node-content-normal">
             <div className="node-header">
               <span>{node.author_id ?? "Anonymous"}</span>
-              <span>{new Date(node.created_at).toLocaleDateString()}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {node.quality_overall != null && <QualityBadge qualityOverall={node.quality_overall} />}
+                {new Date(node.created_at).toLocaleDateString()}
+              </span>
             </div>
             <div className="node-body">
               {plainText}

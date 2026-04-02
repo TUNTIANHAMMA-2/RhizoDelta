@@ -28,6 +28,9 @@ rhizodelta:
     summary:
       enabled: true
       max-source-tokens: 4096
+    quality:
+      enabled: true
+      min-content-length: 20
     budget:
       max-prompt-tokens: 8192
       max-latency-ms: 30000

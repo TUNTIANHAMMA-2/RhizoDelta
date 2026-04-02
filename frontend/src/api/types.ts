@@ -40,6 +40,7 @@ export interface GraphNodeDTO {
   operation_id: string | null;
   created_at: string;
   has_embedding: boolean;
+  quality_overall?: number | null;
 }
 
 export interface GraphEdgeDTO {
@@ -85,6 +86,16 @@ export interface SummaryGeneratedEvent {
   summary: string;
   source_count: number;
   model_used: string;
+}
+
+export interface QualityScoredEvent {
+  node_id: string;
+  quality_overall: number;
+  quality_relevance: number;
+  quality_density: number;
+  quality_argumentation: number;
+  quality_community_value: number;
+  reason: string;
 }
 
 export interface DecisionExplanation {

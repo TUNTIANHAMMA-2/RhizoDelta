@@ -1,5 +1,6 @@
 package com.rhizodelta.api;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.domain.association.AssociationInfo;
 import com.rhizodelta.domain.embedding.EmbeddingWriteRequest;
@@ -151,7 +152,8 @@ public class NodeController {
                 node.authorId(),
                 node.agentVersion(),
                 node.createdAt(),
-                node.hasEmbedding()
+                node.hasEmbedding(),
+                node.qualityOverall()
         );
     }
 
@@ -186,6 +188,7 @@ public class NodeController {
     ) {
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record NodePayload(
             @JsonProperty("node_id") String nodeId,
             @JsonProperty("label") String label,
@@ -194,7 +197,8 @@ public class NodeController {
             @JsonProperty("author_id") String authorId,
             @JsonProperty("agent_version") String agentVersion,
             @JsonProperty("created_at") Instant createdAt,
-            @JsonProperty("has_embedding") boolean hasEmbedding
+            @JsonProperty("has_embedding") boolean hasEmbedding,
+            @JsonProperty("quality_overall") Double qualityOverall
     ) {
     }
 }

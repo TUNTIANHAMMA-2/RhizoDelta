@@ -1,12 +1,15 @@
 package com.rhizodelta.consumer;
 
 import com.rhizodelta.config.RabbitMqConfig;
+import com.rhizodelta.domain.ai.QualityEvaluationCommand;
+import com.rhizodelta.domain.ai.QualityScore;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.domain.post.PostEventMessage;
 import com.rhizodelta.service.AiRoutingOrchestratorService;
 import com.rhizodelta.service.EmbeddingModelService;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.PostService;
+import com.rhizodelta.service.QualityAgentService;
 import com.rhizodelta.service.SseEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +32,9 @@ public class PostConsumer {
     private final EmbeddingService embeddingService;
     private final SseEventService sseEventService;
     private AiRoutingOrchestratorService aiRoutingOrchestratorService;
+    private QualityAgentService qualityAgentService;
+    private boolean qualityEnabled = true;
+    private int qualityMinContentLength = 20;
     private Executor embeddingTaskExecutor = Runnable::run;
     private Executor routingTaskExecutor = Runnable::run;
 
@@ -64,6 +70,21 @@ public class PostConsumer {
         this.aiRoutingOrchestratorService = aiRoutingOrchestratorService;
     }
 
+    @Autowired(required = false)
+    public void setQualityAgentService(QualityAgentService qualityAgentService) {
+        this.qualityAgentService = qualityAgentService;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${rhizodelta.ai.quality.enabled:true}")
+    public void setQualityEnabled(boolean qualityEnabled) {
+        this.qualityEnabled = qualityEnabled;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${rhizodelta.ai.quality.min-content-length:20}")
+    public void setQualityMinContentLength(int qualityMinContentLength) {
+        this.qualityMinContentLength = qualityMinContentLength;
+    }
+
     private void processMessage(PostEventMessage message) {
         PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
                 message.requestId(),
@@ -78,6 +99,7 @@ public class PostConsumer {
         }
         HumanPost post = result.post();
         CompletableFuture.runAsync(() -> writeEmbedding(message, post), embeddingTaskExecutor);
+        scheduleQualityEvaluation(post);
         publishNodeCreated(post);
         publishReplyEdge(post, message.targetNodeId());
         scheduleRouting(message, post);
@@ -149,6 +171,34 @@ public class PostConsumer {
                 authorId
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
+    }
+
+    private void scheduleQualityEvaluation(HumanPost post) {
+        if (!qualityEnabled || qualityAgentService == null) {
+            return;
+        }
+        String content = post.getContent();
+        if (content == null || content.length() < qualityMinContentLength) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                QualityScore score = qualityAgentService.evaluate(new QualityEvaluationCommand(
+                        post.getNodeId(), content, "", ""));
+                SseEventService.QualityScoredPayload payload = new SseEventService.QualityScoredPayload(
+                        post.getNodeId().toString(),
+                        score.overall(),
+                        score.relevance(),
+                        score.density(),
+                        score.argumentation(),
+                        score.communityValue(),
+                        score.reason()
+                );
+                sseEventService.publish(SseEventService.SseEventType.QUALITY_SCORED, payload);
+            } catch (Exception e) {
+                LOGGER.error("Quality evaluation failed for post node_id={}", post.getNodeId(), e);
+            }
+        }, embeddingTaskExecutor);
     }
 
     private void scheduleRouting(PostEventMessage message, HumanPost post) {

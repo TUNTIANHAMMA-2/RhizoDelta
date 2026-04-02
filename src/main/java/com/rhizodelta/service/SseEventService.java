@@ -129,7 +129,8 @@ public class SseEventService {
         EDGE_REMOVED,
         DECISION_COMPLETE,
         ORCHESTRATION_STATUS,
-        SUMMARY_GENERATED
+        SUMMARY_GENERATED,
+        QUALITY_SCORED
     }
 
     public record NodeCreatedPayload(
@@ -189,6 +190,17 @@ public class SseEventService {
             @JsonProperty("summary") String summary,
             @JsonProperty("source_count") int sourceCount,
             @JsonProperty("model_used") String modelUsed
+    ) {
+    }
+
+    public record QualityScoredPayload(
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("quality_overall") double qualityOverall,
+            @JsonProperty("quality_relevance") double qualityRelevance,
+            @JsonProperty("quality_density") double qualityDensity,
+            @JsonProperty("quality_argumentation") double qualityArgumentation,
+            @JsonProperty("quality_community_value") double qualityCommunityValue,
+            @JsonProperty("reason") String reason
     ) {
     }
 }
