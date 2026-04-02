@@ -72,6 +72,17 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.TOP_SCORE, topScore
                 ))
                 .orElseThrow(() -> new IllegalStateException("ai routing workflow returned no state"));
+        // Publish reflection status if LLM path was taken
+        if (!state.skipLlm()) {
+            String explanationJson = state.decisionExplanation();
+            if (!explanationJson.isBlank()) {
+                String reflectionStatus = state.reflectionCount() >= 2 ? "REFLECTION_EXHAUSTED"
+                        : state.reflectionCount() > 0 ? "REFLECTION_REVISED"
+                        : "REFLECTION_CONFIRMED";
+                publishStatusWithExplanation(message, post.getNodeId().toString(), reflectionStatus, explanationJson,
+                        "reflection completed: " + reflectionStatus.toLowerCase().replace('_', ' '));
+            }
+        }
         if ("REVIEW".equals(state.routingAction())) {
             createReviewTask(message, post, state);
             return;
@@ -95,6 +106,27 @@ public class AiRoutingOrchestratorService {
                 reviewId,
                 null,
                 message.authorId()
+        );
+        sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
+    }
+
+    private void publishStatusWithExplanation(
+            PostEventMessage message,
+            String postNodeId,
+            String status,
+            String explanation,
+            String statusMessage
+    ) {
+        SseEventService.OrchestrationStatusPayload payload = new SseEventService.OrchestrationStatusPayload(
+                message.requestId(),
+                message.eventId(),
+                postNodeId,
+                status,
+                statusMessage,
+                null,
+                null,
+                message.authorId(),
+                explanation
         );
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }

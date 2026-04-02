@@ -168,8 +168,16 @@ public class SseEventService {
             @JsonProperty("message") String message,
             @JsonProperty("review_id") String reviewId,
             @JsonProperty("decision_id") String decisionId,
-            @JsonProperty("author_id") String authorId
+            @JsonProperty("author_id") String authorId,
+            @JsonProperty("explanation") String explanation
     ) {
+        public OrchestrationStatusPayload(
+                String requestId, String eventId, String postNodeId,
+                String status, String message, String reviewId,
+                String decisionId, String authorId
+        ) {
+            this(requestId, eventId, postNodeId, status, message, reviewId, decisionId, authorId, null);
+        }
     }
 
     public record SseEventMessage(String origin, String type, Object payload) {

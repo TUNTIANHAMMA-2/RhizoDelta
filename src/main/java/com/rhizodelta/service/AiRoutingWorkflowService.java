@@ -1,13 +1,17 @@
 package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.AiRoutingState;
+import com.rhizodelta.domain.ai.DecisionExplanation;
 import com.rhizodelta.domain.ai.PreFilterResult;
+import com.rhizodelta.domain.ai.ReflectionResult;
+import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphDefinition;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.action.AsyncEdgeAction;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -36,15 +40,21 @@ public class AiRoutingWorkflowService {
     private final AiRoutingEvaluatorService aiRoutingEvaluatorService;
     private final RuleBasedPreFilterService ruleBasedPreFilterService;
     private final PreCommitGuard preCommitGuard;
+    private final ReflectionCriticService reflectionCriticService;
+    private final int maxReflectionAttempts;
 
     public AiRoutingWorkflowService(
             AiRoutingEvaluatorService aiRoutingEvaluatorService,
             RuleBasedPreFilterService ruleBasedPreFilterService,
-            PreCommitGuard preCommitGuard
+            PreCommitGuard preCommitGuard,
+            ReflectionCriticService reflectionCriticService,
+            @Value("${rhizodelta.ai.reflection.max-attempts:2}") int maxReflectionAttempts
     ) throws GraphStateException {
         this.aiRoutingEvaluatorService = aiRoutingEvaluatorService;
         this.ruleBasedPreFilterService = ruleBasedPreFilterService;
         this.preCommitGuard = preCommitGuard;
+        this.reflectionCriticService = reflectionCriticService;
+        this.maxReflectionAttempts = maxReflectionAttempts;
         this.workflow = buildWorkflow();
     }
 
@@ -65,7 +75,7 @@ public class AiRoutingWorkflowService {
         graph.addNode(CONTEXT_PRUNE, contextPrune());
         graph.addNode(RULE_PRE_FILTER, rulePreFilter());
         graph.addNode(LLM_EVALUATE, llmEvaluate());
-        graph.addNode(REFLECTION_VALIDATE, appendNode(REFLECTION_VALIDATE));
+        graph.addNode(REFLECTION_VALIDATE, reflectionValidate());
         graph.addNode(PRE_COMMIT_GUARD, preCommitGuardNode());
         graph.addNode(EXECUTE_MERGE, appendNode(EXECUTE_MERGE));
         graph.addNode(EXECUTE_BRANCH, appendNode(EXECUTE_BRANCH));
@@ -80,7 +90,11 @@ public class AiRoutingWorkflowService {
                 "evaluate", LLM_EVALUATE
         ));
         graph.addEdge(LLM_EVALUATE, REFLECTION_VALIDATE);
-        graph.addEdge(REFLECTION_VALIDATE, PRE_COMMIT_GUARD);
+        graph.addConditionalEdges(REFLECTION_VALIDATE, routeByReflection(), Map.of(
+                "confirmed", PRE_COMMIT_GUARD,
+                "retry", LLM_EVALUATE,
+                "exhausted", PRE_COMMIT_GUARD
+        ));
         graph.addConditionalEdges(PRE_COMMIT_GUARD, routeByAction(), Map.of(
                 "MERGE", EXECUTE_MERGE,
                 "BRANCH", EXECUTE_BRANCH,
@@ -89,7 +103,9 @@ public class AiRoutingWorkflowService {
         graph.addEdge(EXECUTE_MERGE, GraphDefinition.END);
         graph.addEdge(EXECUTE_BRANCH, GraphDefinition.END);
         graph.addEdge(CREATE_REVIEW, GraphDefinition.END);
-        return graph.compile();
+        return graph.compile(CompileConfig.builder()
+                .recursionLimit(25 + maxReflectionAttempts * 2)
+                .build());
     }
 
     private AsyncNodeAction<AiRoutingState> loadPost() {
@@ -153,15 +169,84 @@ public class AiRoutingWorkflowService {
                     new AiRoutingEvaluatorService.RoutingEvaluationCommand(
                             state.postContent(),
                             state.routingContext(),
-                            state.targetNodeId()
+                            state.targetNodeId(),
+                            state.criticFeedback()
                     )
             );
-            return Map.of(
-                    AiRoutingState.EXECUTED_NODES, List.of(LLM_EVALUATE),
-                    AiRoutingState.ROUTING_ACTION, normalizeAction(evaluation.action()),
-                    AiRoutingState.REVIEW_REASON, evaluation.reason()
-            );
+            var output = new HashMap<String, Object>();
+            output.put(AiRoutingState.EXECUTED_NODES, List.of(LLM_EVALUATE));
+            output.put(AiRoutingState.ROUTING_ACTION, normalizeAction(evaluation.action()));
+            output.put(AiRoutingState.REVIEW_REASON, evaluation.reason());
+            // Store initial action/confidence on first evaluation (reflectionCount == 0)
+            if (state.reflectionCount() == 0) {
+                output.put(AiRoutingState.INITIAL_ACTION, normalizeAction(evaluation.action()));
+                output.put(AiRoutingState.INITIAL_CONFIDENCE, evaluation.confidence());
+            }
+            return output;
         });
+    }
+
+    private AsyncNodeAction<AiRoutingState> reflectionValidate() {
+        return AsyncNodeAction.node_async(state -> {
+            ReflectionResult result = reflectionCriticService.critique(
+                    state.routingAction(),
+                    state.initialConfidence() > 0 ? state.initialConfidence() : 0.5,
+                    state.reviewReason(),
+                    state.postContent(),
+                    state.routingContext()
+            );
+
+            var output = new HashMap<String, Object>();
+            output.put(AiRoutingState.EXECUTED_NODES, List.of(REFLECTION_VALIDATE));
+
+            if (result.confirmed()) {
+                DecisionExplanation explanation = new DecisionExplanation(
+                        state.routingAction(),
+                        result.revisedConfidence(),
+                        state.reviewReason(),
+                        state.routingContext(),
+                        result.criticReason()
+                );
+                output.put(AiRoutingState.DECISION_EXPLANATION, serializeExplanation(explanation));
+                return output;
+            }
+
+            int currentCount = state.reflectionCount() + 1;
+            output.put(AiRoutingState.REFLECTION_COUNT, currentCount);
+
+            if (currentCount >= maxReflectionAttempts) {
+                // Exhausted — fall back to REVIEW
+                output.put(AiRoutingState.ROUTING_ACTION, "REVIEW");
+                output.put(AiRoutingState.REVIEW_REASON, "reflection exhausted after " + currentCount + " attempts: " + result.criticReason());
+                DecisionExplanation explanation = new DecisionExplanation(
+                        "REVIEW",
+                        result.revisedConfidence(),
+                        "reflection exhausted",
+                        state.routingContext(),
+                        result.criticReason()
+                );
+                output.put(AiRoutingState.DECISION_EXPLANATION, serializeExplanation(explanation));
+                return output;
+            }
+
+            // Retry — feed critic reason back to LLM
+            output.put(AiRoutingState.CRITIC_FEEDBACK, result.criticReason());
+            return output;
+        });
+    }
+
+    private AsyncEdgeAction<AiRoutingState> routeByReflection() {
+        return state -> {
+            String explanation = state.decisionExplanation();
+            if (!explanation.isBlank()) {
+                // Has explanation means either confirmed or exhausted
+                if ("REVIEW".equals(state.routingAction()) && state.reflectionCount() >= maxReflectionAttempts) {
+                    return CompletableFuture.completedFuture("exhausted");
+                }
+                return CompletableFuture.completedFuture("confirmed");
+            }
+            return CompletableFuture.completedFuture("retry");
+        };
     }
 
     private AsyncNodeAction<AiRoutingState> createReview() {
@@ -230,5 +315,26 @@ public class AiRoutingWorkflowService {
             return Instant.now();
         }
         return workflowStartedAt;
+    }
+
+    private String serializeExplanation(DecisionExplanation explanation) {
+        return "{\"action\":\"%s\",\"confidence\":%.2f,\"reason\":\"%s\",\"candidateComparison\":\"%s\",\"reflectionSummary\":\"%s\"}".formatted(
+                explanation.action(),
+                explanation.confidence(),
+                escapeJson(explanation.reason()),
+                escapeJson(truncate(explanation.candidateComparison(), 500)),
+                escapeJson(explanation.reflectionSummary())
+        );
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) return "";
+        if (value.length() <= maxLength) return value;
+        return value.substring(0, maxLength) + "...";
     }
 }

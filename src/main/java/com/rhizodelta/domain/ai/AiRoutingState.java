@@ -26,6 +26,11 @@ public final class AiRoutingState extends AgentState {
     public static final String RULE_DECISION = "ruleDecision";
     public static final String SKIP_LLM = "skipLlm";
     public static final String TOP_SCORE = "topScore";
+    public static final String REFLECTION_COUNT = "reflectionCount";
+    public static final String DECISION_EXPLANATION = "decisionExplanation";
+    public static final String INITIAL_ACTION = "initialAction";
+    public static final String INITIAL_CONFIDENCE = "initialConfidence";
+    public static final String CRITIC_FEEDBACK = "criticFeedback";
     private static final String DEFAULT_ACTION = "REVIEW";
     private static final String EMPTY_TEXT = "";
 
@@ -100,6 +105,26 @@ public final class AiRoutingState extends AgentState {
         return value(TOP_SCORE, 0.0d);
     }
 
+    public int reflectionCount() {
+        return value(REFLECTION_COUNT, 0);
+    }
+
+    public String decisionExplanation() {
+        return value(DECISION_EXPLANATION, EMPTY_TEXT);
+    }
+
+    public String initialAction() {
+        return value(INITIAL_ACTION, EMPTY_TEXT);
+    }
+
+    public double initialConfidence() {
+        return value(INITIAL_CONFIDENCE, 0.0d);
+    }
+
+    public String criticFeedback() {
+        return value(CRITIC_FEEDBACK, EMPTY_TEXT);
+    }
+
     public static Map<String, Channel<?>> channels() {
         Map<String, Channel<?>> channels = new HashMap<>();
         channels.put(REQUEST_ID, Channels.base(() -> EMPTY_TEXT));
@@ -118,6 +143,11 @@ public final class AiRoutingState extends AgentState {
         channels.put(RULE_DECISION, Channels.base(() -> EMPTY_TEXT));
         channels.put(SKIP_LLM, Channels.base(() -> false));
         channels.put(TOP_SCORE, Channels.base(() -> 0.0d));
+        channels.put(REFLECTION_COUNT, Channels.base(() -> 0));
+        channels.put(DECISION_EXPLANATION, Channels.base(() -> EMPTY_TEXT));
+        channels.put(INITIAL_ACTION, Channels.base(() -> EMPTY_TEXT));
+        channels.put(INITIAL_CONFIDENCE, Channels.base(() -> 0.0d));
+        channels.put(CRITIC_FEEDBACK, Channels.base(() -> EMPTY_TEXT));
         return Map.copyOf(channels);
     }
 }

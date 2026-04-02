@@ -52,7 +52,7 @@ public class AiRoutingEvaluatorService {
         String modelName = resolveModelName();
         String postContent = DecisionCommandValidation.requireText(command.postContent(), "post_content");
         List<dev.langchain4j.data.message.ChatMessage> messages =
-                buildMessages(postContent, command.routingContext(), command.targetNodeId());
+                buildMessages(postContent, command.routingContext(), command.targetNodeId(), command.criticFeedback());
         LOGGER.info(
                 "AI routing evaluator invoking chat model={} target_node_id={} has_routing_context={} message_count={}",
                 modelName,
@@ -74,7 +74,8 @@ public class AiRoutingEvaluatorService {
     private List<dev.langchain4j.data.message.ChatMessage> buildMessages(
             String postContent,
             String routingContext,
-            String targetNodeId
+            String targetNodeId,
+            String criticFeedback
     ) {
         String userPrompt = """
                 target_node_id: %s
@@ -84,6 +85,10 @@ public class AiRoutingEvaluatorService {
                 recalled_context:
                 %s
                 """.formatted(blankToEmpty(targetNodeId), postContent, blankToEmpty(routingContext));
+        if (criticFeedback != null && !criticFeedback.isBlank()) {
+            userPrompt += "\nPrevious critic feedback: " + criticFeedback
+                    + "\nPlease reconsider your decision taking this feedback into account.\n";
+        }
         return List.of(SystemMessage.from(SYSTEM_PROMPT), UserMessage.from(userPrompt));
     }
 
@@ -179,8 +184,12 @@ public class AiRoutingEvaluatorService {
     public record RoutingEvaluationCommand(
             String postContent,
             String routingContext,
-            String targetNodeId
+            String targetNodeId,
+            String criticFeedback
     ) {
+        public RoutingEvaluationCommand(String postContent, String routingContext, String targetNodeId) {
+            this(postContent, routingContext, targetNodeId, "");
+        }
     }
 
     public record RoutingEvaluation(

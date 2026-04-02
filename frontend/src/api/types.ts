@@ -80,6 +80,14 @@ export interface DecisionCompleteEvent {
   node_id: string;
 }
 
+export interface DecisionExplanation {
+  action: string;
+  confidence: number;
+  reason: string;
+  candidateComparison: string;
+  reflectionSummary: string;
+}
+
 export interface OrchestrationStatusEvent {
   request_id: string;
   event_id: string;
@@ -87,6 +95,7 @@ export interface OrchestrationStatusEvent {
   status: string;
   message: string;
   review_id?: string | null;
+  explanation?: string | null;
 }
 
 // ────────────────────── 发帖 ──────────────────────

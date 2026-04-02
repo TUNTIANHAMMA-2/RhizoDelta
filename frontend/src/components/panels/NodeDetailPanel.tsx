@@ -5,6 +5,8 @@ import { ProvenancePanel } from "./ProvenancePanel";
 import { AssociationPanel } from "./AssociationPanel";
 import { AuditPanel } from "./AuditPanel";
 import { MarkdownViewer } from "../editor/MarkdownViewer";
+import { DecisionCard } from "./DecisionCard";
+import type { DecisionExplanation } from "../../api/types";
 
 const TABS: { id: NodeTab; label: string }[] = [
   { id: "details", label: "详情" },
@@ -27,6 +29,10 @@ const ORCHESTRATION_STATUS_LABELS: Record<string, string> = {
   MERGE_QUEUED: "AI 已判定并入共识",
   BRANCH_QUEUED: "AI 已判定分出新支线",
   REVIEW_PENDING: "等待人工复核",
+  REFLECTION_STARTED: "AI 正在反思决策",
+  REFLECTION_CONFIRMED: "AI 反思已确认决策",
+  REFLECTION_REVISED: "AI 反思后修正了决策",
+  REFLECTION_EXHAUSTED: "AI 反思次数已耗尽，转为人工复核",
   FAILED: "处理失败",
 };
 
@@ -46,6 +52,15 @@ export function NodeDetailPanel() {
   const statusLabel = orchestrationStatus
     ? ORCHESTRATION_STATUS_LABELS[orchestrationStatus.status] ?? orchestrationStatus.status
     : null;
+
+  let parsedExplanation: DecisionExplanation | null = null;
+  if (orchestrationStatus?.explanation) {
+    try {
+      parsedExplanation = JSON.parse(orchestrationStatus.explanation) as DecisionExplanation;
+    } catch {
+      // ignore parse errors
+    }
+  }
 
   return (
     <aside
@@ -225,6 +240,7 @@ export function NodeDetailPanel() {
                   </div>
                 )}
               </div>
+              {parsedExplanation && <DecisionCard explanation={parsedExplanation} />}
             </div>
           </>
         )}

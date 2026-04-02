@@ -95,4 +95,36 @@ class AiRoutingEvaluatorServiceUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("unsupported routing action");
     }
+
+    @Test
+    void shouldAppendCriticFeedbackToPrompt() {
+        ChatLanguageModel chatLanguageModel = mock(ChatLanguageModel.class);
+        ModelRouterService modelRouterService = mock(ModelRouterService.class);
+        when(modelRouterService.getModel(ModelPurpose.ROUTING)).thenReturn(chatLanguageModel);
+        when(modelRouterService.resolveModelName(ModelPurpose.ROUTING)).thenReturn("test-model");
+        when(chatLanguageModel.generate(anyList())).thenReturn(Response.from(AiMessage.from("""
+                {"action":"BRANCH","confidence":0.80,"reason":"diverges on closer look"}
+                """)));
+        AiRoutingEvaluatorService service = new AiRoutingEvaluatorService(
+                modelRouterService,
+                new ObjectMapper(),
+                0.65d
+        );
+
+        AiRoutingEvaluatorService.RoutingEvaluation evaluation = service.evaluate(
+                new AiRoutingEvaluatorService.RoutingEvaluationCommand(
+                        "post content",
+                        "context",
+                        "target-1",
+                        "candidates diverge too much for merge"
+                )
+        );
+
+        assertThat(evaluation.action()).isEqualTo("BRANCH");
+        ArgumentCaptor<List> messagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(chatLanguageModel).generate(messagesCaptor.capture());
+        String messagesText = messagesCaptor.getValue().toString();
+        assertThat(messagesText).contains("Previous critic feedback");
+        assertThat(messagesText).contains("candidates diverge too much for merge");
+    }
 }
