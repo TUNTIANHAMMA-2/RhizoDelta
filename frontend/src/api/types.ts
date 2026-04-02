@@ -80,6 +80,13 @@ export interface DecisionCompleteEvent {
   node_id: string;
 }
 
+export interface SummaryGeneratedEvent {
+  node_id: string;
+  summary: string;
+  source_count: number;
+  model_used: string;
+}
+
 export interface DecisionExplanation {
   action: string;
   confidence: number;

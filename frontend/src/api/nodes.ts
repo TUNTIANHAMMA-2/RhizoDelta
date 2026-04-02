@@ -54,8 +54,14 @@ export const fetchAssociations = (
 export const writeEmbedding = (id: string, body: EmbeddingWriteRequest) =>
   request<{ node_id: string; dimension: number }>(
     `/api/nodes/${id}/embedding`,
-    { 
+    {
       method: "PUT",
       body: JSON.stringify(body),
     },
+  );
+
+export const summarizeNode = (id: string) =>
+  request<{ summary: string; source_count: number; model_used: string }>(
+    `/api/nodes/${id}/summarize`,
+    { method: "POST" },
   );

@@ -128,7 +128,8 @@ public class SseEventService {
         EDGE_CREATED,
         EDGE_REMOVED,
         DECISION_COMPLETE,
-        ORCHESTRATION_STATUS
+        ORCHESTRATION_STATUS,
+        SUMMARY_GENERATED
     }
 
     public record NodeCreatedPayload(
@@ -181,5 +182,13 @@ public class SseEventService {
     }
 
     public record SseEventMessage(String origin, String type, Object payload) {
+    }
+
+    public record SummaryGeneratedPayload(
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("summary") String summary,
+            @JsonProperty("source_count") int sourceCount,
+            @JsonProperty("model_used") String modelUsed
+    ) {
     }
 }

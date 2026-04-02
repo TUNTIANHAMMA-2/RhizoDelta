@@ -25,6 +25,9 @@ rhizodelta:
       max-provenance: 5
     reflection:
       max-attempts: 2
+    summary:
+      enabled: true
+      max-source-tokens: 4096
     budget:
       max-prompt-tokens: 8192
       max-latency-ms: 30000

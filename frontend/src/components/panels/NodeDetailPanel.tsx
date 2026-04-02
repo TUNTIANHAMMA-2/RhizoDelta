@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useUiStore, type NodeTab } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { useSseStore } from "../../stores/sseStore";
@@ -6,6 +7,7 @@ import { AssociationPanel } from "./AssociationPanel";
 import { AuditPanel } from "./AuditPanel";
 import { MarkdownViewer } from "../editor/MarkdownViewer";
 import { DecisionCard } from "./DecisionCard";
+import { summarizeNode } from "../../api/nodes";
 import type { DecisionExplanation } from "../../api/types";
 
 const TABS: { id: NodeTab; label: string }[] = [
@@ -43,6 +45,7 @@ export function NodeDetailPanel() {
   const setActiveTab = useUiStore((s) => s.setActiveNodeTab);
   const nodes = useGraphStore((s) => s.nodes);
   const orchestrationStatuses = useSseStore((s) => s.orchestrationStatuses);
+  const [summarizing, setSummarizing] = useState(false);
 
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
@@ -212,6 +215,30 @@ export function NodeDetailPanel() {
               <div>node_id: {node.node_id}</div>
               <div>has_embedding: {String(node.has_embedding)}</div>
               {node.operation_id && <div>operation_id: {node.operation_id}</div>}
+              {node.label === "AI_Consensus" && (
+                <button
+                  onClick={() => {
+                    setSummarizing(true);
+                    summarizeNode(node.node_id)
+                      .then(() => setSummarizing(false))
+                      .catch(() => setSummarizing(false));
+                  }}
+                  disabled={summarizing}
+                  style={{
+                    marginTop: "var(--space-2)",
+                    padding: "var(--space-1) var(--space-3)",
+                    fontSize: "var(--font-size-xs)",
+                    cursor: summarizing ? "not-allowed" : "pointer",
+                    background: "var(--color-bg-secondary)",
+                    border: "1px solid var(--color-border-default)",
+                    borderRadius: "var(--radius-md, 4px)",
+                    color: "var(--color-text-primary)",
+                    opacity: summarizing ? 0.6 : 1,
+                  }}
+                >
+                  {summarizing ? "生成中..." : "生成摘要"}
+                </button>
+              )}
               
               <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--color-border-default)" }}>
                 <div style={{ fontWeight: 600, marginBottom: "var(--space-2)", fontSize: "var(--font-size-sm)" }}>编排状态</div>

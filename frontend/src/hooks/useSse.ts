@@ -10,6 +10,7 @@ import type {
   DecisionCompleteEvent,
   GraphEdgeDTO,
   OrchestrationStatusEvent,
+  SummaryGeneratedEvent,
 } from "../api/types";
 
 const SSE_URL = "/api/events/stream";
@@ -230,6 +231,20 @@ function handleSseEvent(event: SseEvent) {
         break;
       }
       useSseStore.getState().setOrchestrationStatus(payload);
+      break;
+    }
+    case "SUMMARY_GENERATED": {
+      let payload: SummaryGeneratedEvent;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (e) {
+        console.error("Failed to parse SUMMARY_GENERATED event data:", e);
+        break;
+      }
+      // Refresh the node to get the updated summary_content
+      fetchNode(payload.node_id).then((node) => {
+        graphStore.addNode(node);
+      });
       break;
     }
   }

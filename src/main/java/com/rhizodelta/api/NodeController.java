@@ -6,10 +6,12 @@ import com.rhizodelta.domain.embedding.EmbeddingWriteRequest;
 import com.rhizodelta.domain.embedding.EmbeddingWriteResult;
 import com.rhizodelta.domain.embedding.SimilaritySearchRequest;
 import com.rhizodelta.domain.embedding.SimilaritySearchResult;
+import com.rhizodelta.domain.ai.SummaryResult;
 import com.rhizodelta.service.AssociationService;
 import com.rhizodelta.domain.association.AssociationType;
 import com.rhizodelta.service.EmbeddingService;
 import com.rhizodelta.service.NodeQueryService;
+import com.rhizodelta.service.SummaryAgentService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,15 +31,18 @@ public class NodeController {
     private final NodeQueryService nodeQueryService;
     private final AssociationService associationService;
     private final EmbeddingService embeddingService;
+    private final SummaryAgentService summaryAgentService;
 
     public NodeController(
             NodeQueryService nodeQueryService,
             AssociationService associationService,
-            EmbeddingService embeddingService
+            EmbeddingService embeddingService,
+            SummaryAgentService summaryAgentService
     ) {
         this.nodeQueryService = nodeQueryService;
         this.associationService = associationService;
         this.embeddingService = embeddingService;
+        this.summaryAgentService = summaryAgentService;
     }
 
     @GetMapping("/roots")
@@ -128,6 +133,13 @@ public class NodeController {
         UUID nodeId = parseUuid(id);
         List<AssociationInfo> associations = associationService.findAssociationsByNodeId(nodeId, type, limit);
         return ApiResponse.ok(associations);
+    }
+
+    @PostMapping("/{id}/summarize")
+    public ApiResponse<SummaryResult> summarize(@PathVariable("id") String id) {
+        UUID nodeId = parseUuid(id);
+        SummaryResult result = summaryAgentService.generate(nodeId);
+        return ApiResponse.ok(result);
     }
 
     private NodePayload fromLineageNode(NodeQueryService.LineageNode node) {
