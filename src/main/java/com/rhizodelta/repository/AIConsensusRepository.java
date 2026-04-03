@@ -34,4 +34,13 @@ public interface AIConsensusRepository extends ImmutableNeo4jRepository<AIConsen
             ORDER BY source.created_at DESC
             """)
     List<HumanPost> findProvenance(@Param("nodeId") UUID nodeId);
+
+    @Query("""
+            MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:MERGED_INTO]->(target:GraphNode)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(target._deleted, false)
+            RETURN toString(target.node_id)
+            LIMIT 1
+            """)
+    Optional<String> findMergedIntoTargetId(@Param("nodeId") UUID nodeId);
 }

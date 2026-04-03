@@ -68,4 +68,13 @@ public sealed interface DecisionCommittedEvent {
             OffsetDateTime relationshipCreatedAt
     ) implements DecisionCommittedEvent {
     }
+
+    record MergeAppended(
+            String decisionId,
+            UUID nodeId,
+            UUID sourceNodeId,
+            List<UUID> synthesizedFrom,
+            OffsetDateTime relationshipCreatedAt
+    ) implements DecisionCommittedEvent {
+    }
 }

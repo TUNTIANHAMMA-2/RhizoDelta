@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +23,7 @@ public class AiRoutingOrchestratorService {
     private final AiRoutingExecutionService aiRoutingExecutionService;
     private final ReviewTaskService reviewTaskService;
     private final SseEventService sseEventService;
+    private final BranchContextService branchContextService;
     private final String agentVersion;
 
     public AiRoutingOrchestratorService(
@@ -30,6 +32,7 @@ public class AiRoutingOrchestratorService {
             AiRoutingExecutionService aiRoutingExecutionService,
             ReviewTaskService reviewTaskService,
             SseEventService sseEventService,
+            BranchContextService branchContextService,
             @Value("${langchain4j.open-ai.chat-model.model-name}") String agentVersion
     ) {
         this.workflowService = workflowService;
@@ -37,6 +40,7 @@ public class AiRoutingOrchestratorService {
         this.aiRoutingExecutionService = aiRoutingExecutionService;
         this.reviewTaskService = reviewTaskService;
         this.sseEventService = sseEventService;
+        this.branchContextService = branchContextService;
         this.agentVersion = agentVersion;
     }
 
@@ -59,6 +63,17 @@ public class AiRoutingOrchestratorService {
                 null,
                 "selected candidates=" + prunedContext.selected().size()
         );
+        // Enrich routing context with branch ancestors, consensus, and siblings
+        String routingContext = buildRoutingContext(prunedContext);
+        if (!candidateNodeIds.isEmpty()) {
+            UUID topCandidate = prunedContext.selected().get(0).node_id();
+            BranchContextService.BranchContext branchCtx =
+                    branchContextService.buildContext(topCandidate, post.getNodeId());
+            String branchContextText = branchContextService.formatForRouting(branchCtx);
+            if (!branchContextText.isEmpty()) {
+                routingContext = routingContext + "\n" + branchContextText;
+            }
+        }
         AiRoutingState state = workflowService.invokeSkeleton(Map.of(
                         AiRoutingState.REQUEST_ID, message.requestId(),
                         AiRoutingState.EVENT_ID, message.eventId(),
@@ -67,7 +82,7 @@ public class AiRoutingOrchestratorService {
                         AiRoutingState.TARGET_NODE_ID, message.targetNodeId() == null ? "" : message.targetNodeId(),
                         AiRoutingState.RECALL_CANDIDATE_NODE_IDS, candidateNodeIds,
                         AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, candidateNodeIds,
-                        AiRoutingState.ROUTING_CONTEXT, buildRoutingContext(prunedContext),
+                        AiRoutingState.ROUTING_CONTEXT, routingContext,
                         AiRoutingState.ROUTING_ACTION, "REVIEW",
                         AiRoutingState.TOP_SCORE, topScore
                 ))

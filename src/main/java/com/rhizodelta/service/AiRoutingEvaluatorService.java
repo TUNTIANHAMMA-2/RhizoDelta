@@ -29,6 +29,16 @@ public class AiRoutingEvaluatorService {
             - MERGE: only when the new post is materially the same knowledge unit as one recalled candidate and should join that lineage directly.
             - BRANCH: only when the new post is related to a recalled candidate but must remain an independent node because it diverges, extends, or preserves a separate thread.
             - REVIEW: use whenever evidence is missing, multiple candidates compete, the boundary is ambiguous, or confidence is low.
+
+            The recalled context may contain:
+            - Candidate nodes with their similarity scores.
+            - Branch ancestor chain showing the discussion lineage leading to the source node.
+            - Existing consensus summaries already attached to the source node.
+            - Sibling replies from other users on the same source node.
+
+            Use the ancestor chain and consensus to understand what topic the branch is discussing.
+            Use sibling replies to judge whether the new post adds unique value or duplicates existing contributions.
+
             You must return JSON only with this schema:
             {"action":"MERGE|BRANCH|REVIEW","confidence":0.0,"reason":"short explanation"}
             Do not wrap the JSON in markdown.

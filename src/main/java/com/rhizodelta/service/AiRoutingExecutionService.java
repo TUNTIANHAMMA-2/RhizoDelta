@@ -28,7 +28,11 @@ public class AiRoutingExecutionService {
 
     public RoutingExecutionResult execute(RoutingExecutionCommand command) {
         return switch (command.action()) {
-            case "MERGE" -> new RoutingExecutionResult("MERGE", decisionService.executeMerge(toMergeCommand(command)));
+            case "MERGE" -> {
+                DecisionService.MergeOrAppendResult result =
+                        decisionService.mergeOrAppend(toMergeCommand(command));
+                yield new RoutingExecutionResult("MERGE", result.decisionResult());
+            }
             case "BRANCH" -> new RoutingExecutionResult("BRANCH", linkBranch(command));
             default -> throw new IllegalArgumentException("unsupported routing action: " + command.action());
         };

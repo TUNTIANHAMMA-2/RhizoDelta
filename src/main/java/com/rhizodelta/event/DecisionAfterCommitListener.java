@@ -107,6 +107,14 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.JOIN, event.decisionId());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onMergeAppended(DecisionCommittedEvent.MergeAppended event) {
+        for (UUID contributorId : event.synthesizedFrom()) {
+            publishEdgeCreated(event.nodeId(), contributorId, "SYNTHESIZED_FROM", event.relationshipCreatedAt());
+        }
+        publishDecisionComplete(event.nodeId(), DecisionType.MERGE, event.decisionId());
+    }
+
     private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
         try {
             List<Float> vector = embeddingModelService.embed(summaryContent);

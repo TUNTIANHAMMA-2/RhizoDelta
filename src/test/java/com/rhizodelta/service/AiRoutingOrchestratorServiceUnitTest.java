@@ -30,12 +30,14 @@ class AiRoutingOrchestratorServiceUnitTest {
         AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
         ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
         SseEventService sseEventService = mock(SseEventService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
         AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
                 workflowService,
                 routingRecallService,
                 aiRoutingExecutionService,
                 reviewTaskService,
                 sseEventService,
+                branchContextService,
                 "gpt-4o-test"
         );
         UUID postNodeId = UUID.randomUUID();
@@ -62,6 +64,9 @@ class AiRoutingOrchestratorServiceUnitTest {
                 false,
                 0
         ));
+        when(branchContextService.buildContext(any(), any())).thenReturn(
+                new BranchContextService.BranchContext(List.of(), List.of(), List.of()));
+        when(branchContextService.formatForRouting(any())).thenReturn("");
         when(workflowService.invokeSkeleton(any())).thenReturn(Optional.of(new AiRoutingState(Map.of(
                 AiRoutingState.REQUEST_ID, "req-1",
                 AiRoutingState.EVENT_ID, "evt-1",
@@ -122,12 +127,14 @@ class AiRoutingOrchestratorServiceUnitTest {
         AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
         ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
         SseEventService sseEventService = mock(SseEventService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
         AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
                 workflowService,
                 routingRecallService,
                 aiRoutingExecutionService,
                 reviewTaskService,
                 sseEventService,
+                branchContextService,
                 "gpt-4o-test"
         );
         UUID postNodeId = UUID.randomUUID();
@@ -139,6 +146,9 @@ class AiRoutingOrchestratorServiceUnitTest {
                 false,
                 0
         ));
+        when(branchContextService.buildContext(any(), any())).thenReturn(
+                new BranchContextService.BranchContext(List.of(), List.of(), List.of()));
+        when(branchContextService.formatForRouting(any())).thenReturn("");
         when(workflowService.invokeSkeleton(any())).thenReturn(Optional.of(new AiRoutingState(Map.of(
                 AiRoutingState.REQUEST_ID, "req-1",
                 AiRoutingState.EVENT_ID, "evt-1",

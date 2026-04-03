@@ -33,6 +33,68 @@ public class DecisionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
     private static final String QUEUED_STATUS = "QUEUED";
     private record UpsertResult(UUID nodeId, boolean created) {}
+
+    public record MergeOrAppendResult(
+            DecisionResult decisionResult,
+            boolean appended
+    ) {}
+
+    private static final String ATOMIC_MERGE_OR_APPEND_QUERY = """
+            MATCH (source:GraphNode {node_id: $sourceNodeId})
+            WHERE NOT coalesce(source._deleted, false)
+            SET source._merge_seq = coalesce(source._merge_seq, 0) + 1
+
+            WITH source
+            OPTIONAL MATCH (existing:AI_Consensus)-[:MERGED_INTO]->(source)
+              WHERE NOT coalesce(existing._deleted, false)
+            WITH source, existing
+            ORDER BY existing.created_at DESC
+            LIMIT 1
+
+            WITH source, existing,
+                 CASE WHEN existing IS NOT NULL THEN true ELSE false END AS appended
+
+            FOREACH (_ IN CASE WHEN existing IS NULL THEN [1] ELSE [] END |
+              CREATE (newAi:AI_Consensus:GraphNode {
+                node_id: $newNodeId,
+                decision_id: $decisionId,
+                summary_content: $summaryContent,
+                agent_version: $agentVersion,
+                request_id: $requestId,
+                root_id: coalesce(source.root_id, source.node_id),
+                created_at: $createdAt,
+                embedding: null
+              })
+              CREATE (newAi)-[:MERGED_INTO {
+                operator_type: $operatorType,
+                operator_id: $operatorId,
+                created_at: $createdAt,
+                reason: $reason
+              }]->(source)
+            )
+
+            WITH source, appended
+            MATCH (consensus:AI_Consensus)-[:MERGED_INTO]->(source)
+              WHERE NOT coalesce(consensus._deleted, false)
+            WITH consensus, appended
+            ORDER BY consensus.created_at ASC
+            LIMIT 1
+
+            WITH consensus, appended
+            UNWIND $contributorNodeIds AS cid
+            MATCH (contributor:Human_Post:GraphNode {node_id: cid})
+              WHERE NOT coalesce(contributor._deleted, false)
+            MERGE (consensus)-[s:SYNTHESIZED_FROM]->(contributor)
+            ON CREATE SET
+              s.operator_type = $operatorType,
+              s.operator_id = $operatorId,
+              s.created_at = $createdAt,
+              s.reason = $reason,
+              s.decision_id = $decisionId
+            RETURN toString(consensus.node_id) AS nodeId,
+                   appended,
+                   count(s) AS synthesizedCount
+            """;
     private static final String UPSERT_MERGE_NODE_QUERY = """
             MATCH (source:GraphNode {node_id: $sourceNodeId})
             MERGE (decision:AI_Consensus {decision_id: $decisionId})
@@ -272,6 +334,57 @@ public class DecisionService {
                 command.synthesized_from(), command.summary_content(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
+
+    @Transactional(transactionManager = "transactionManager")
+    public MergeOrAppendResult mergeOrAppend(MergeDecisionCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        validateSourceNodeExists(command.source_node_id());
+        validateSynthesizedFromNodes(command.synthesized_from());
+
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        UUID newNodeId = UUID.randomUUID();
+
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("sourceNodeId", command.source_node_id().toString());
+        params.put("newNodeId", newNodeId.toString());
+        params.put("decisionId", command.decision_id());
+        params.put("summaryContent", command.summary_content());
+        params.put("agentVersion", command.agent_version());
+        params.put("requestId", command.request_id());
+        params.put("createdAt", createdAt);
+        params.put("operatorType", command.operator_type().name());
+        params.put("operatorId", command.operator_id());
+        params.put("reason", command.reason());
+        params.put("contributorNodeIds", command.synthesized_from().stream().map(UUID::toString).toList());
+
+        Map<String, Object> result = neo4jClient.query(ATOMIC_MERGE_OR_APPEND_QUERY)
+                .bindAll(params)
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Atomic merge-or-append query returned no result for source " + command.source_node_id()));
+
+        UUID consensusNodeId = UUID.fromString((String) result.get("nodeId"));
+        boolean appended = Boolean.TRUE.equals(result.get("appended"));
+
+        LOGGER.info("mergeOrAppend completed: consensus={} appended={} source={} contributors={}",
+                consensusNodeId, appended, command.source_node_id(), command.synthesized_from().size());
+
+        if (appended) {
+            eventPublisher.publishEvent(new DecisionCommittedEvent.MergeAppended(
+                    command.decision_id(), consensusNodeId, command.source_node_id(),
+                    command.synthesized_from(), createdAt));
+        } else {
+            dagIntegrityService.assertNoVersionEvolutionCycle(consensusNodeId, command.source_node_id());
+            eventPublisher.publishEvent(new DecisionCommittedEvent.MergeCompleted(
+                    command.decision_id(), consensusNodeId, command.source_node_id(),
+                    command.synthesized_from(), command.summary_content(), createdAt));
+        }
+
+        DecisionResult decisionResult = new DecisionResult(command.decision_id(), consensusNodeId, QUEUED_STATUS);
+        return new MergeOrAppendResult(decisionResult, appended);
+    }
+
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeBranch(BranchDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");

@@ -23,6 +23,8 @@ rhizodelta:
       max-lineage-depth: 2
       max-children-depth: 1
       max-provenance: 5
+      max-ancestor-depth: 5
+      max-sibling-count: 5
     reflection:
       max-attempts: 2
     summary:

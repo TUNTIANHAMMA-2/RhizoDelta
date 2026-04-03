@@ -4,6 +4,7 @@ import com.rhizodelta.domain.ai.ModelPurpose;
 import com.rhizodelta.domain.ai.SummaryResult;
 import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
+import com.rhizodelta.repository.HumanPostRepository;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
@@ -43,6 +44,8 @@ class SummaryAgentServiceUnitTest {
         AIConsensusRepository aiConsensusRepo = mock(AIConsensusRepository.class);
         EmbeddingModelService embeddingModelService = mock(EmbeddingModelService.class);
         EmbeddingService embeddingService = mock(EmbeddingService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
+        HumanPostRepository humanPostRepository = mock(HumanPostRepository.class);
         ChatLanguageModel chatModel = mock(ChatLanguageModel.class);
 
         when(modelRouter.getModel(ModelPurpose.SUMMARY)).thenReturn(chatModel);
@@ -52,12 +55,14 @@ class SummaryAgentServiceUnitTest {
         HumanPost source2 = HumanPost.create(UUID.randomUUID(), "Second source content", "author2", "req2");
         when(aiConsensusRepo.findProvenance(nodeId)).thenReturn(List.of(source1, source2));
         when(aiConsensusRepo.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepo.findMergedIntoTargetId(nodeId)).thenReturn(Optional.empty());
         when(chatModel.generate(anyList())).thenReturn(
                 Response.from(AiMessage.from("Combined summary of both sources.")));
         when(embeddingModelService.embed(anyString())).thenReturn(List.of(0.1f, 0.2f));
 
         SummaryAgentService service = new SummaryAgentService(
-                modelRouter, aiConsensusRepo, mockNeo4jClient(), embeddingModelService, embeddingService, 4096);
+                modelRouter, aiConsensusRepo, mockNeo4jClient(), embeddingModelService, embeddingService,
+                branchContextService, humanPostRepository, 4096);
 
         SummaryResult result = service.generate(nodeId);
 
@@ -73,10 +78,13 @@ class SummaryAgentServiceUnitTest {
         AIConsensusRepository aiConsensusRepo = mock(AIConsensusRepository.class);
         EmbeddingModelService embeddingModelService = mock(EmbeddingModelService.class);
         EmbeddingService embeddingService = mock(EmbeddingService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
+        HumanPostRepository humanPostRepository = mock(HumanPostRepository.class);
         when(aiConsensusRepo.findProvenance(nodeId)).thenReturn(List.of());
 
         SummaryAgentService service = new SummaryAgentService(
-                modelRouter, aiConsensusRepo, mockNeo4jClient(), embeddingModelService, embeddingService, 4096);
+                modelRouter, aiConsensusRepo, mockNeo4jClient(), embeddingModelService, embeddingService,
+                branchContextService, humanPostRepository, 4096);
 
         assertThatThrownBy(() -> service.generate(nodeId))
                 .isInstanceOf(IllegalStateException.class)

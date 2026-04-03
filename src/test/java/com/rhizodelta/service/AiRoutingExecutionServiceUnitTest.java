@@ -28,7 +28,8 @@ class AiRoutingExecutionServiceUnitTest {
         UUID sourceNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "merged content", "author-1", "req-1");
         DecisionResult decisionResult = new DecisionResult("evt-1:merge", UUID.randomUUID(), "QUEUED");
-        when(decisionService.executeMerge(any(MergeDecisionCommand.class))).thenReturn(decisionResult);
+        when(decisionService.mergeOrAppend(any(MergeDecisionCommand.class)))
+                .thenReturn(new DecisionService.MergeOrAppendResult(decisionResult, false));
         AiRoutingExecutionService service = new AiRoutingExecutionService(decisionService, "Qwen/Qwen2.5-7B-Instruct");
 
         AiRoutingExecutionService.RoutingExecutionResult result = service.execute(
@@ -43,7 +44,7 @@ class AiRoutingExecutionServiceUnitTest {
         );
 
         ArgumentCaptor<MergeDecisionCommand> commandCaptor = ArgumentCaptor.forClass(MergeDecisionCommand.class);
-        verify(decisionService).executeMerge(commandCaptor.capture());
+        verify(decisionService).mergeOrAppend(commandCaptor.capture());
         MergeDecisionCommand command = commandCaptor.getValue();
         assertThat(command.decision_id()).isEqualTo("evt-1:merge");
         assertThat(command.request_id()).isEqualTo("req-1");
