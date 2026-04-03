@@ -197,6 +197,10 @@ public class NodeQueryService {
             MATCH (n:GraphNode)
             WHERE NOT coalesce(n._deleted, false)
               AND n.root_id = n.node_id
+              AND NOT EXISTS {
+                MATCH (n)<-[:SYNTHESIZED_FROM]-(ai:AI_Consensus)-[:MERGED_INTO]->(target)
+                WHERE target.node_id <> n.node_id AND NOT coalesce(ai._deleted, false)
+              }
             WITH n, labels(n) AS nodeLabels
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
