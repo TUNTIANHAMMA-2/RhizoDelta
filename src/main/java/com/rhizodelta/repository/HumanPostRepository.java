@@ -38,6 +38,15 @@ public interface HumanPostRepository extends ImmutableNeo4jRepository<HumanPost,
 
     List<HumanPost> findAllByNodeIdIn(Collection<UUID> nodeIds);
 
+    /** Lightweight projection: returns only content strings, avoiding embedding deserialization. */
+    @Query("""
+            MATCH (post:Human_Post)
+            WHERE post.node_id IN $nodeIds
+              AND NOT coalesce(post._deleted, false)
+            RETURN post.content
+            """)
+    List<String> findContentsByNodeIdIn(@Param("nodeIds") Collection<UUID> nodeIds);
+
     @Query("""
             MATCH (consensus:AI_Consensus {node_id: $consensusNodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
             WHERE NOT coalesce(consensus._deleted, false)

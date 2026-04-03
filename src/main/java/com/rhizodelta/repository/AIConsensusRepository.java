@@ -43,4 +43,31 @@ public interface AIConsensusRepository extends ImmutableNeo4jRepository<AIConsen
             LIMIT 1
             """)
     Optional<String> findMergedIntoTargetId(@Param("nodeId") UUID nodeId);
+
+    /** Lightweight projection: returns only the summary text, avoiding embedding deserialization. */
+    @Query("""
+            MATCH (ai:AI_Consensus {node_id: $nodeId})
+            WHERE NOT coalesce(ai._deleted, false)
+            RETURN ai.summary_content
+            """)
+    Optional<String> findSummaryContentByNodeId(@Param("nodeId") UUID nodeId);
+
+    /** Lightweight count: avoids loading full HumanPost entities with embeddings. */
+    @Query("""
+            MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(source._deleted, false)
+            RETURN count(source)
+            """)
+    long countProvenanceByNodeId(@Param("nodeId") UUID nodeId);
+
+    /** Lightweight projection: returns only content strings, avoiding embedding deserialization. */
+    @Query("""
+            MATCH (consensus:AI_Consensus {node_id: $nodeId})-[:SYNTHESIZED_FROM]->(source:Human_Post)
+            WHERE NOT coalesce(consensus._deleted, false)
+              AND NOT coalesce(source._deleted, false)
+            RETURN source.content
+            ORDER BY source.created_at DESC
+            """)
+    List<String> findProvenanceContents(@Param("nodeId") UUID nodeId);
 }

@@ -2,7 +2,6 @@ package com.rhizodelta.service;
 
 import com.rhizodelta.domain.ai.ModelPurpose;
 import com.rhizodelta.domain.ai.SummaryResult;
-import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import dev.langchain4j.data.message.AiMessage;
@@ -51,10 +50,8 @@ class SummaryAgentServiceUnitTest {
         when(modelRouter.getModel(ModelPurpose.SUMMARY)).thenReturn(chatModel);
         when(modelRouter.resolveModelName(ModelPurpose.SUMMARY)).thenReturn("test-summary-model");
 
-        HumanPost source1 = HumanPost.create(UUID.randomUUID(), "First source content", "author1", "req1");
-        HumanPost source2 = HumanPost.create(UUID.randomUUID(), "Second source content", "author2", "req2");
-        when(aiConsensusRepo.findProvenance(nodeId)).thenReturn(List.of(source1, source2));
-        when(aiConsensusRepo.findActiveByNodeId(nodeId)).thenReturn(Optional.empty());
+        when(aiConsensusRepo.findProvenanceContents(nodeId)).thenReturn(List.of("First source content", "Second source content"));
+        when(aiConsensusRepo.findSummaryContentByNodeId(nodeId)).thenReturn(Optional.empty());
         when(aiConsensusRepo.findMergedIntoTargetId(nodeId)).thenReturn(Optional.empty());
         when(chatModel.generate(anyList())).thenReturn(
                 Response.from(AiMessage.from("Combined summary of both sources.")));
@@ -80,7 +77,7 @@ class SummaryAgentServiceUnitTest {
         EmbeddingService embeddingService = mock(EmbeddingService.class);
         BranchContextService branchContextService = mock(BranchContextService.class);
         HumanPostRepository humanPostRepository = mock(HumanPostRepository.class);
-        when(aiConsensusRepo.findProvenance(nodeId)).thenReturn(List.of());
+        when(aiConsensusRepo.findProvenanceContents(nodeId)).thenReturn(List.of());
 
         SummaryAgentService service = new SummaryAgentService(
                 modelRouter, aiConsensusRepo, mockNeo4jClient(), embeddingModelService, embeddingService,

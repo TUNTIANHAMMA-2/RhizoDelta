@@ -3,7 +3,6 @@ package com.rhizodelta.service;
 import com.rhizodelta.domain.ai.ModelPurpose;
 import com.rhizodelta.domain.ai.SummaryRequest;
 import com.rhizodelta.domain.ai.SummaryResult;
-import com.rhizodelta.domain.node.HumanPost;
 import com.rhizodelta.repository.AIConsensusRepository;
 import com.rhizodelta.repository.HumanPostRepository;
 import dev.langchain4j.data.message.AiMessage;
@@ -22,7 +21,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class SummaryAgentService {
@@ -85,19 +83,15 @@ public class SummaryAgentService {
     public SummaryResult generate(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
 
-        List<HumanPost> sources = aiConsensusRepository.findProvenance(nodeId);
-        if (sources.isEmpty()) {
+        List<String> sourceContents = aiConsensusRepository.findProvenanceContents(nodeId).stream()
+                .filter(Objects::nonNull)
+                .toList();
+        if (sourceContents.isEmpty()) {
             throw new IllegalStateException("no source posts found for node " + nodeId);
         }
 
-        String existingSummary = aiConsensusRepository.findActiveByNodeId(nodeId)
-                .map(c -> c.getSummaryContent())
+        String existingSummary = aiConsensusRepository.findSummaryContentByNodeId(nodeId)
                 .orElse(null);
-
-        List<String> sourceContents = sources.stream()
-                .map(HumanPost::getContent)
-                .filter(Objects::nonNull)
-                .toList();
 
         // Build branch context for the MERGED_INTO target
         String branchContext = buildBranchContextForConsensus(nodeId);
@@ -120,19 +114,16 @@ public class SummaryAgentService {
         Objects.requireNonNull(consensusNodeId, "consensusNodeId must not be null");
         Objects.requireNonNull(newContributorIds, "newContributorIds must not be null");
 
-        // 1. Read existing summary
-        String oldSummary = aiConsensusRepository.findActiveByNodeId(consensusNodeId)
-                .map(c -> c.getSummaryContent())
+        // 1. Read existing summary (lightweight — no embedding deserialization)
+        String oldSummary = aiConsensusRepository.findSummaryContentByNodeId(consensusNodeId)
                 .orElse(null);
         if (oldSummary == null || oldSummary.isBlank()) {
             LOGGER.warn("No existing summary for consensus={}, falling back to full generate", consensusNodeId);
             return generate(consensusNodeId);
         }
 
-        // 2. Fetch only the new contributor contents (not the full provenance)
-        List<HumanPost> newContributors = humanPostRepository.findAllByNodeIdIn(newContributorIds);
-        List<String> newContents = newContributors.stream()
-                .map(HumanPost::getContent)
+        // 2. Fetch only the new contributor contents (lightweight — no embedding deserialization)
+        List<String> newContents = humanPostRepository.findContentsByNodeIdIn(newContributorIds).stream()
                 .filter(Objects::nonNull)
                 .toList();
         if (newContents.isEmpty()) {
@@ -186,8 +177,8 @@ public class SummaryAgentService {
         writeSummary(consensusNodeId, summary);
         updateEmbedding(consensusNodeId, summary);
 
-        // sourceCount = total provenance, not just new
-        int totalSources = aiConsensusRepository.findProvenance(consensusNodeId).size();
+        // sourceCount = total provenance, not just new (lightweight count)
+        int totalSources = (int) aiConsensusRepository.countProvenanceByNodeId(consensusNodeId);
         LOGGER.info("Incremental summary completed consensus={} summary_length={}", consensusNodeId, summary.length());
         return new SummaryResult(summary, totalSources, modelName);
     }
