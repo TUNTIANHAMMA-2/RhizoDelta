@@ -1,15 +1,20 @@
 package com.rhizodelta.api;
 
+import com.rhizodelta.ai.shared.service.EmbeddingModelService;
+import com.rhizodelta.ai.summary.service.SummaryAgentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.Neo4jContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -24,6 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@ActiveProfiles("test")
+@TestPropertySource(properties = {
+        "rhizodelta.jwt.secret=test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing",
+        "langchain4j.open-ai.chat-model.api-key=test-chat-key",
+        "langchain4j.open-ai.embedding-model.api-key=test-embedding-key"
+})
 class AuditQueryIntegrationTest {
     @Container
     static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5")
@@ -41,6 +52,12 @@ class AuditQueryIntegrationTest {
 
     @Autowired
     private Neo4jClient neo4jClient;
+
+    @MockBean
+    private SummaryAgentService summaryAgentService;
+
+    @MockBean
+    private EmbeddingModelService embeddingModelService;
 
     @BeforeEach
     void cleanDatabase() {

@@ -1,7 +1,7 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.consumer.PostConsumer;
-import com.rhizodelta.domain.post.PostEventMessage;
+import com.rhizodelta.infrastructure.messaging.consumer.PostConsumer;
+import com.rhizodelta.infrastructure.messaging.message.PostEventMessage;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;

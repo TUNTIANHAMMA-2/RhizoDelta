@@ -1,10 +1,11 @@
 package com.rhizodelta.api;
 
-import com.rhizodelta.config.JwtAuthenticationFilter;
-import com.rhizodelta.config.SecurityConfig;
-import com.rhizodelta.service.AssociationService;
-import com.rhizodelta.service.EmbeddingService;
-import com.rhizodelta.service.NodeQueryService;
+import com.rhizodelta.infrastructure.security.config.SecurityConfig;
+import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
+import com.rhizodelta.ai.context.service.EmbeddingService;
+import com.rhizodelta.core.service.AssociationService;
+import com.rhizodelta.query.api.NodeQueryController;
+import com.rhizodelta.query.service.NodeQueryService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(NodeController.class)
+@WebMvcTest(NodeQueryController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 @TestPropertySource(properties = "rhizodelta.jwt.secret=test-jwt-secret-key-that-is-at-least-256-bits-long-for-hmac-sha256-signing")
 class JwtAuthenticationIntegrationTest {
