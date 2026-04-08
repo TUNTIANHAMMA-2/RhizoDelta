@@ -37,15 +37,15 @@
 
 /* ── 节点通用动画容器 ── */
 .node-base {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-default);
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   box-sizing: border-box;
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition:
     background var(--transition-fast),
     box-shadow var(--transition-fast),
@@ -53,21 +53,47 @@
 }
 
 .node-base:hover {
-  background: var(--color-bg-primary);
-  box-shadow: var(--shadow-md), 0 0 0 1px var(--color-border-focus);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-border-focus), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   border-color: var(--color-border-focus);
 }
 
 .node-base.selected {
-  background: var(--color-bg-primary);
-  box-shadow: var(--shadow-node-selected);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-node-selected), 0 8px 24px rgba(59, 130, 246, 0.15);
   border-color: var(--color-border-focus);
 }
 
-/* 节点类型色 */
-.node-human { border-left: 4px solid var(--color-node-human); }
-.node-consensus { border-left: 4px solid var(--color-node-consensus); }
-.node-result { border-left: 4px solid var(--color-node-result); }
+/* 节点类型色：用纯净清爽的细描边代替粗线条和渐变光斑 */
+.node-human {
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+.node-consensus {
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+.node-result {
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+/* 微观圆点 (mini/micro)：极简纯色外观 */
+.node-micro.node-human, .node-mini.node-human {
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-node-human);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
+}
+.node-micro.node-consensus, .node-mini.node-consensus {
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-node-consensus);
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.15);
+}
+.node-micro.node-result, .node-mini.node-result {
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-node-result);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
+}
 
 /* ── 缩放状态 (Zoom States) ── */
 .node-micro {
@@ -158,10 +184,28 @@
   stroke-width: 1.5px;
   stroke: var(--color-edge-default);
   transition: stroke-width 120ms ease, stroke 120ms ease;
+  fill: none;
 }
 .version-edge-group:hover .edge-path {
   stroke-width: 2.5px;
   stroke: var(--color-text-secondary);
+}
+
+/* 能量流转光效 (克制的流动感) */
+.edge-path--flow {
+  stroke-dasharray: 6 18;
+  animation: root-edge-flow 30s linear infinite;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+}
+
+@keyframes root-edge-flow {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 /* ── 节点悬停：关联边信息 ── */
