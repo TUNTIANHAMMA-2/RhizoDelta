@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class Neo4jDeploymentConfigTest {
     private static final Path APPLICATION_YAML_PATH = Path.of("src/main/resources/application.yml");
-    private static final Path APPLICATION_LOCAL_YAML_PATH = Path.of("src/main/resources/application-local.yml");
+    private static final Path APPLICATION_EXAMPLE_YAML_PATH = Path.of("src/main/resources/application.yml.example");
+    private static final Path ENV_EXAMPLE_PATH = Path.of(".env.example");
     private static final Path COMPOSE_YAML_PATH = Path.of("docker-compose.yml");
     // Matches both ${VAR} and ${VAR:default}
     private static final Pattern APP_PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{([A-Z0-9_]+)(?::([^}]+))?}");
@@ -37,29 +38,22 @@ class Neo4jDeploymentConfigTest {
         Map<String, Object> root = loadYaml(COMPOSE_YAML_PATH);
         Object rawValue = findByPath(root, "services.neo4j.environment.NEO4J_AUTH");
         assertThat(rawValue).isNotNull();
+        Matcher matcher = APP_PLACEHOLDER_PATTERN.matcher(String.valueOf(rawValue));
+        assertThat(matcher.matches()).isTrue();
+        assertThat(matcher.group(1)).isEqualTo("NEO4J_AUTH");
     }
 
     @Test
-    void localProfileInfrastructureSettingsShouldReferenceEnvVars() throws Exception {
-        Placeholder neo4jUri = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.uri");
-        Placeholder neo4jUsername = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.authentication.username");
-        Placeholder neo4jPassword = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.authentication.password");
-        Placeholder rabbitHost = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.host");
-        Placeholder rabbitPort = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.port");
-        Placeholder rabbitUsername = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.username");
-        Placeholder rabbitPassword = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.password");
-        Placeholder redisHost = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.data.redis.host");
-        Placeholder redisPort = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.data.redis.port");
+    void versionedNeo4jTemplatesShouldDocumentSharedEnvVars() throws Exception {
+        Placeholder exampleUri = extractPlaceholder(APPLICATION_EXAMPLE_YAML_PATH, "spring.neo4j.uri");
+        Placeholder exampleUsername = extractPlaceholder(APPLICATION_EXAMPLE_YAML_PATH, "spring.neo4j.authentication.username");
+        Placeholder examplePassword = extractPlaceholder(APPLICATION_EXAMPLE_YAML_PATH, "spring.neo4j.authentication.password");
+        Map<String, String> envExample = loadEnvExample(ENV_EXAMPLE_PATH);
 
-        assertThat(neo4jUri.key()).isEqualTo("NEO4J_URI");
-        assertThat(neo4jUsername.key()).isEqualTo("NEO4J_USERNAME");
-        assertThat(neo4jPassword.key()).isEqualTo("NEO4J_PASSWORD");
-        assertThat(rabbitHost.key()).isEqualTo("RABBITMQ_HOST");
-        assertThat(rabbitPort.key()).isEqualTo("RABBITMQ_PORT");
-        assertThat(rabbitUsername.key()).isEqualTo("RABBITMQ_DEFAULT_USER");
-        assertThat(rabbitPassword.key()).isEqualTo("RABBITMQ_DEFAULT_PASS");
-        assertThat(redisHost.key()).isEqualTo("REDIS_HOST");
-        assertThat(redisPort.key()).isEqualTo("REDIS_PORT");
+        assertThat(exampleUri.key()).isEqualTo("NEO4J_URI");
+        assertThat(exampleUsername.key()).isEqualTo("NEO4J_USERNAME");
+        assertThat(examplePassword.key()).isEqualTo("NEO4J_PASSWORD");
+        assertThat(envExample).containsKeys("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "NEO4J_AUTH");
     }
 
     private Placeholder extractAppPlaceholder(String dottedPath) throws Exception {
@@ -79,6 +73,16 @@ class Neo4jDeploymentConfigTest {
     @SuppressWarnings("unchecked")
     private Map<String, Object> loadYaml(Path path) throws Exception {
         return new Yaml().load(Files.readString(path));
+    }
+
+    private Map<String, String> loadEnvExample(Path path) throws Exception {
+        return Files.readAllLines(path).stream()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .filter(line -> !line.startsWith("#"))
+                .map(line -> line.split("=", 2))
+                .filter(parts -> parts.length == 2)
+                .collect(java.util.stream.Collectors.toMap(parts -> parts[0], parts -> parts[1]));
     }
 
     @SuppressWarnings("unchecked")
