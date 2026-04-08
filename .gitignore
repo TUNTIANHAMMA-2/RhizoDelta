@@ -1,4 +1,4 @@
-# Environment variables (contains credentials)
+﻿# Environment variables (contains credentials)
 .env
 
 # Build output
@@ -21,3 +21,6 @@ openspec/
 Doc/
 Pic/
 frontend/README.md
+
+# Local environment config
+src/main/resources/application-local.yml

@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class Neo4jDeploymentConfigTest {
     private static final Path APPLICATION_YAML_PATH = Path.of("src/main/resources/application.yml");
+    private static final Path APPLICATION_LOCAL_YAML_PATH = Path.of("src/main/resources/application-local.yml");
     private static final Path COMPOSE_YAML_PATH = Path.of("docker-compose.yml");
     // Matches both ${VAR} and ${VAR:default}
     private static final Pattern APP_PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{([A-Z0-9_]+)(?::([^}]+))?}");
@@ -38,12 +39,39 @@ class Neo4jDeploymentConfigTest {
         assertThat(rawValue).isNotNull();
     }
 
+    @Test
+    void localProfileInfrastructureSettingsShouldReferenceEnvVars() throws Exception {
+        Placeholder neo4jUri = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.uri");
+        Placeholder neo4jUsername = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.authentication.username");
+        Placeholder neo4jPassword = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.neo4j.authentication.password");
+        Placeholder rabbitHost = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.host");
+        Placeholder rabbitPort = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.port");
+        Placeholder rabbitUsername = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.username");
+        Placeholder rabbitPassword = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.rabbitmq.password");
+        Placeholder redisHost = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.data.redis.host");
+        Placeholder redisPort = extractPlaceholder(APPLICATION_LOCAL_YAML_PATH, "spring.data.redis.port");
+
+        assertThat(neo4jUri.key()).isEqualTo("NEO4J_URI");
+        assertThat(neo4jUsername.key()).isEqualTo("NEO4J_USERNAME");
+        assertThat(neo4jPassword.key()).isEqualTo("NEO4J_PASSWORD");
+        assertThat(rabbitHost.key()).isEqualTo("RABBITMQ_HOST");
+        assertThat(rabbitPort.key()).isEqualTo("RABBITMQ_PORT");
+        assertThat(rabbitUsername.key()).isEqualTo("RABBITMQ_DEFAULT_USER");
+        assertThat(rabbitPassword.key()).isEqualTo("RABBITMQ_DEFAULT_PASS");
+        assertThat(redisHost.key()).isEqualTo("REDIS_HOST");
+        assertThat(redisPort.key()).isEqualTo("REDIS_PORT");
+    }
+
     private Placeholder extractAppPlaceholder(String dottedPath) throws Exception {
-        Map<String, Object> root = loadYaml(APPLICATION_YAML_PATH);
+        return extractPlaceholder(APPLICATION_YAML_PATH, dottedPath);
+    }
+
+    private Placeholder extractPlaceholder(Path path, String dottedPath) throws Exception {
+        Map<String, Object> root = loadYaml(path);
         Object rawValue = findByPath(root, dottedPath);
         Matcher matcher = APP_PLACEHOLDER_PATTERN.matcher(String.valueOf(rawValue));
         assertThat(matcher.matches())
-                .as("Expected %s to be a ${VAR} placeholder, got: %s", dottedPath, rawValue)
+                .as("Expected %s in %s to be a ${VAR} placeholder, got: %s", dottedPath, path, rawValue)
                 .isTrue();
         return new Placeholder(matcher.group(1), matcher.group(2));
     }
