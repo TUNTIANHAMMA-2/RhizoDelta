@@ -26,6 +26,19 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 负责生成和更新共识节点摘要。
+ *
+ * <p>该服务会收集来源帖子、拼接上下文、调用摘要模型生成文本，
+ * 再把摘要正文与对应 embedding 写回图节点。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>{@link #generate(UUID)} 和 {@link #regenerateIncremental(UUID, List)} 都会调用外部模型。</li>
+ *   <li>会写 Neo4j 的 {@code summary_content} 字段。</li>
+ *   <li>会尝试更新摘要 embedding；embedding 失败只记录日志，不回滚摘要写入。</li>
+ * </ul>
+ */
 @Service
 public class SummaryAgentService {
     private static final Logger LOGGER = LoggerFactory.getLogger(SummaryAgentService.class);
@@ -84,6 +97,16 @@ public class SummaryAgentService {
         this.maxSourceTokens = maxSourceTokens;
     }
 
+    /**
+     * 为指定共识节点生成完整摘要。
+     *
+     * <p>该方法会读取所有来源帖子，并在必要时参考既有摘要和分支上下文，再生成新的摘要正文。
+     *
+     * <p>
+     *
+     * @param nodeId 共识节点 ID。
+     * @return 摘要结果。
+     */
     public SummaryResult generate(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
 
@@ -114,6 +137,17 @@ public class SummaryAgentService {
         return new SummaryResult(summary, sourceContents.size(), modelName);
     }
 
+    /**
+     * 基于新增来源增量更新摘要。
+     *
+     * <p>若当前节点还没有既有摘要，则会回退到完整生成流程。
+     *
+     * <p>
+     *
+     * @param consensusNodeId 共识节点 ID。
+     * @param newContributorIds 新增来源节点列表。
+     * @return 增量更新后的摘要结果。
+     */
     public SummaryResult regenerateIncremental(UUID consensusNodeId, List<UUID> newContributorIds) {
         Objects.requireNonNull(consensusNodeId, "consensusNodeId must not be null");
         Objects.requireNonNull(newContributorIds, "newContributorIds must not be null");
@@ -187,6 +221,11 @@ public class SummaryAgentService {
         return new SummaryResult(summary, totalSources, modelName);
     }
 
+    /**
+     * 调用模型生成摘要正文。
+     *
+     * <p>该方法只负责提示词构造与模型调用，不直接落库。
+     */
     private String invokeLlm(SummaryRequest request, String branchContext, String modelName) {
         String sourcesText = buildSourcesText(request.sourceContents());
         String userPrompt = "Sources:\n" + sourcesText;
@@ -209,6 +248,11 @@ public class SummaryAgentService {
         return response.content().text().trim();
     }
 
+    /**
+     * 将来源文本压缩为模型可接受的提示词片段。
+     *
+     * <p>超出预算时会显式写入截断提示，而不是悄悄丢掉尾部内容。
+     */
     private String buildSourcesText(List<String> sourceContents) {
         StringBuilder sb = new StringBuilder();
         int charBudget = maxSourceTokens * 4; // rough chars-per-token estimate
@@ -224,6 +268,16 @@ public class SummaryAgentService {
         return sb.toString();
     }
 
+    /**
+     * 将摘要正文写回图节点。
+     *
+     * <p>这是一个真实写库入口，不是内存更新。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param summary 摘要正文。
+     */
     @Transactional(transactionManager = "transactionManager")
     public void writeSummary(UUID nodeId, String summary) {
         neo4jClient.query(UPDATE_SUMMARY_QUERY)
@@ -234,6 +288,11 @@ public class SummaryAgentService {
                 .orElseThrow(() -> new NoSuchElementException("node not found: " + nodeId));
     }
 
+    /**
+     * 依据摘要正文更新对应 embedding。
+     *
+     * <p>embedding 更新失败不会回滚摘要正文，避免把“摘要可用”错误降级成整体失败。
+     */
     private void updateEmbedding(UUID nodeId, String summary) {
         try {
             List<Float> vector = embeddingModelService.embed(summary);
@@ -244,6 +303,11 @@ public class SummaryAgentService {
         }
     }
 
+    /**
+     * 为共识节点解析分支上下文。
+     *
+     * <p>该上下文用于帮助摘要模型理解当前共识挂接在哪条讨论线上。
+     */
     private String buildBranchContextForConsensus(UUID consensusNodeId) {
         return aiConsensusRepository.findMergedIntoTargetId(consensusNodeId)
                 .map(targetIdStr -> {

@@ -23,6 +23,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 暴露共识决策与回滚的 HTTP 入口。
+ *
+ * <p>该控制器负责接收外部提交的决策命令，并把认证主体绑定为最终操作者，
+ * 再委托给 {@link DecisionService} 或 {@link RollbackService} 执行真正的图谱变更。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>各类决策接口会触发数据库写入，并在事务提交后继续触发事件监听链路。</li>
+ *   <li>回滚接口会尝试删除关系或软删除节点，可能因下游依赖而失败。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/decisions")
 public class DecisionController {
@@ -34,6 +46,11 @@ public class DecisionController {
         this.rollbackService = rollbackService;
     }
 
+    /**
+     * 提交一次合并决策。
+     *
+     * <p>该接口会用当前认证用户覆盖命令中的操作者标识，防止客户端伪造执行者身份。
+     */
     @PostMapping("/merge")
     public ResponseEntity<ApiResponse<DecisionResult>> merge(
             @RequestBody MergeDecisionCommand command,
@@ -44,6 +61,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次分支决策。
+     */
     @PostMapping("/branch")
     public ResponseEntity<ApiResponse<DecisionResult>> branch(
             @RequestBody BranchDecisionCommand command,
@@ -54,6 +74,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次注入决策。
+     */
     @PostMapping("/inject")
     public ResponseEntity<ApiResponse<DecisionResult>> inject(
             @RequestBody InjectDecisionCommand command,
@@ -64,6 +87,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次物化决策。
+     */
     @PostMapping("/materialize")
     public ResponseEntity<ApiResponse<DecisionResult>> materialize(
             @RequestBody MaterializeDecisionCommand command,
@@ -74,6 +100,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次分叉决策。
+     */
     @PostMapping("/fork")
     public ResponseEntity<ApiResponse<ForkDecisionResult>> fork(
             @RequestBody ForkDecisionCommand command,
@@ -84,6 +113,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次跨结果综合决策。
+     */
     @PostMapping("/cross-synth")
     public ResponseEntity<ApiResponse<DecisionResult>> crossSynth(
             @RequestBody CrossSynthDecisionCommand command,
@@ -94,6 +126,9 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 提交一次汇合决策。
+     */
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<DecisionResult>> join(
             @RequestBody JoinDecisionCommand command,
@@ -104,6 +139,11 @@ public class DecisionController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(result));
     }
 
+    /**
+     * 回滚一条普通决策。
+     *
+     * <p><b>注意</b>：返回成功仅表示回滚动作已执行；若仍存在下游依赖，会在服务层抛出异常阻断回滚。
+     */
     @PostMapping("/{decision_id}/rollback")
     public ResponseEntity<ApiResponse<RollbackResult>> rollback(
             @PathVariable("decision_id") String decisionId
@@ -112,6 +152,9 @@ public class DecisionController {
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
+    /**
+     * 按操作批次回滚一次分叉操作。
+     */
     @PostMapping("/fork/{operation_id}/rollback")
     public ResponseEntity<ApiResponse<RollbackService.ForkRollbackResult>> rollbackFork(
             @PathVariable("operation_id") String operationId

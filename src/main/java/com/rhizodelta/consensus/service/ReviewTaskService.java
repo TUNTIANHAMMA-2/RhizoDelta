@@ -18,6 +18,19 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 负责复核任务的持久化与状态流转。
+ *
+ * <p>该服务使用 Redis 保存待复核任务及其有序索引，
+ * 让管理界面可以快速读取任务并执行状态更新。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会读写 Redis 字符串键和值集合索引。</li>
+ *   <li>会序列化和反序列化 {@link ReviewTask}。</li>
+ *   <li>终态任务会从待处理索引中移除。</li>
+ * </ul>
+ */
 @Service
 public class ReviewTaskService {
     private static final String REVIEW_TASK_KEY_PREFIX = "review:task:";
@@ -41,6 +54,16 @@ public class ReviewTaskService {
         this.reviewTtl = reviewTtl;
     }
 
+    /**
+     * 创建一条新的待复核任务。
+     *
+     * <p>该方法会立即把任务写入 Redis，并加入待处理索引。
+     *
+     * <p>
+     *
+     * @param command 创建命令。
+     * @return 已持久化任务。
+     */
     public ReviewTask createPendingTask(ReviewTask.CreateReviewTaskCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         Instant createdAt = Instant.now();
@@ -62,6 +85,11 @@ public class ReviewTaskService {
         return task;
     }
 
+    /**
+     * 按 ID 查询一条复核任务。
+     *
+     * <p>任务不存在时返回空结果，适合做存在性探测。
+     */
     public Optional<ReviewTask> findTask(String reviewId) {
         String payload = valueOps().get(taskKey(requireText(reviewId, "reviewId")));
         if (payload == null || payload.isBlank()) {
@@ -70,11 +98,26 @@ public class ReviewTaskService {
         return Optional.of(deserialize(payload));
     }
 
+    /**
+     * 强制读取一条复核任务。
+     *
+     * <p>任务不存在时抛出 {@link NoSuchElementException}。
+     */
     public ReviewTask getTask(String reviewId) {
         return findTask(reviewId)
                 .orElseThrow(() -> new NoSuchElementException("review task not found: " + reviewId));
     }
 
+    /**
+     * 返回当前可处理的复核任务列表。
+     *
+     * <p>该方法会顺带清理待处理索引中的孤儿任务 ID。
+     *
+     * <p>
+     *
+     * @param limit 可选返回数量。
+     * @return 待处理任务列表。
+     */
     public List<ReviewTask> findPendingTasks(Integer limit) {
         int resolvedLimit = resolveLimit(limit);
         Set<String> reviewIds = zSetOps().range(PENDING_REVIEW_INDEX_KEY, 0, resolvedLimit - 1);
@@ -97,6 +140,17 @@ public class ReviewTaskService {
         return List.copyOf(result);
     }
 
+    /**
+     * 更新任务状态并维护待处理索引。
+     *
+     * <p>非法状态迁移会直接失败，不会静默覆盖。
+     *
+     * <p>
+     *
+     * @param reviewId 任务 ID。
+     * @param status 目标状态。
+     * @return 更新后的任务。
+     */
     public ReviewTask updateStatus(String reviewId, ReviewTask.Status status) {
         ReviewTask existing = getTask(reviewId);
         Objects.requireNonNull(status, "status must not be null");

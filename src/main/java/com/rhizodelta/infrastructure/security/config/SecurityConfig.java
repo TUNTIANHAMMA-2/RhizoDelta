@@ -19,6 +19,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import java.io.IOException;
 
+/**
+ * 配置系统的 HTTP 安全策略。
+ *
+ * <p>该配置类统一定义无状态会话策略、接口权限边界、JWT 过滤器接入位置以及鉴权失败后的响应格式。
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -31,6 +36,12 @@ public class SecurityConfig {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 创建主安全过滤链。
+     *
+     * <p>该链路会关闭 CSRF、启用无状态会话，并把
+     * {@link JwtAuthenticationFilter} 放在用户名密码过滤器之前。
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -61,6 +72,9 @@ public class SecurityConfig {
                 .build();
     }
 
+    /**
+     * 提供密码编码器。
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

@@ -8,6 +8,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 表示一次跨结果综合决策命令。
+ *
+ * <p>该命令用于从多个已有 {@code Result} 节点中再综合出一个新的结果节点，
+ * 关注的是结果层之间的再归纳，而不是帖子层或共识层的普通合并。
+ *
+ * <p><b>关键约束</b>：
+ * <ul>
+ *   <li>{@code source_result_ids} 至少包含两个来源结果节点。</li>
+ *   <li>{@code content} 表示综合后的新结果正文。</li>
+ * </ul>
+ */
 public record CrossSynthDecisionCommand(
         @JsonProperty("decision_id") String decision_id,
         @JsonProperty("request_id") String request_id,
@@ -17,6 +29,9 @@ public record CrossSynthDecisionCommand(
         @JsonProperty("operator_id") String operator_id,
         @JsonProperty("reason") String reason
 ) {
+    /**
+     * 创建跨综合命令并校验来源结果集合。
+     */
     public CrossSynthDecisionCommand {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
         request_id = DecisionCommandValidation.requireText(request_id, "request_id");

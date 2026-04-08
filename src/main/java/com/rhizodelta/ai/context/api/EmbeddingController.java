@@ -15,6 +15,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 暴露 embedding 写入与相似度检索接口。
+ *
+ * <p>该控制器位于 {@code com.rhizodelta.ai.context.api}，负责把节点向量写入能力和相似节点召回能力
+ * 以 HTTP 形式暴露给上层。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>{@link #putEmbedding(String, EmbeddingWriteRequest)} 会写 Neo4j 节点的 {@code embedding} 字段。</li>
+ *   <li>{@link #searchSimilar(SimilaritySearchRequest)} 只读访问向量索引，不修改图数据。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/nodes")
 public class EmbeddingController {
@@ -24,6 +36,17 @@ public class EmbeddingController {
         this.embeddingService = embeddingService;
     }
 
+    /**
+     * 为指定节点写入 embedding。
+     *
+     * <p>该接口通常由异步链路或上游 AI 能力调用，用于补全节点的向量表示。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @param request 向量写入请求。
+     * @return 写入结果。
+     */
     @PutMapping("/{id}/embedding")
     public ApiResponse<EmbeddingWriteResult> putEmbedding(
             @PathVariable("id") String id,
@@ -33,8 +56,17 @@ public class EmbeddingController {
         return ApiResponse.ok(result);
     }
 
-    // POST is used instead of GET because the vector payload may exceed URL length limits.
-    // This operation is idempotent and read-only.
+    /**
+     * 按向量检索相似节点。
+     *
+     * <p>这里使用 {@code POST} 而不是 {@code GET}，是因为查询向量通常过长，不适合放入 URL。
+     * 该操作语义上仍然是只读且幂等的。
+     *
+     * <p>
+     *
+     * @param request 相似度检索请求。
+     * @return 相似节点列表。
+     */
     @PostMapping("/search/similar")
     public ApiResponse<List<SimilaritySearchResult>> searchSimilar(
             @RequestBody SimilaritySearchRequest request

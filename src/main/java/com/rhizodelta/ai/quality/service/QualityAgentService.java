@@ -20,6 +20,19 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 负责调用模型评估帖子质量并写回评分。
+ *
+ * <p>该服务不是纯函数评分器，而是一个带副作用的 AI 评估入口：
+ * 它会构造提示词、调用聊天模型、解析 JSON 结果，并把质量字段写回图节点。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>{@link #evaluate(QualityEvaluationCommand)} 会调用外部模型。</li>
+ *   <li>成功解析后会通过 {@link #writeQualityScore(String, QualityScore)} 写 Neo4j。</li>
+ *   <li>模型响应格式非法时会抛出异常，而不是静默吞掉错误。</li>
+ * </ul>
+ */
 @Service
 public class QualityAgentService {
     private static final Logger LOGGER = LoggerFactory.getLogger(QualityAgentService.class);
@@ -67,6 +80,16 @@ public class QualityAgentService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 评估指定节点内容的质量并写回评分字段。
+     *
+     * <p>该方法是质量评估链路的主入口：先调用模型得到结构化分数，再把分数持久化到节点上。
+     *
+     * <p>
+     *
+     * @param command 评估命令。
+     * @return 结构化评分结果。
+     */
     public QualityScore evaluate(QualityEvaluationCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         String modelName = modelRouterService.resolveModelName(ModelPurpose.QUALITY);
@@ -91,6 +114,11 @@ public class QualityAgentService {
         return score;
     }
 
+    /**
+     * 将评估命令转换为模型用户提示词。
+     *
+     * <p>该方法会按需拼接正文、讨论上下文和图位置描述，避免在无上下文时引入无意义噪音。
+     */
     private String buildUserPrompt(QualityEvaluationCommand command) {
         StringBuilder sb = new StringBuilder();
         sb.append("Post content:\n").append(command.content()).append("\n\n");
@@ -103,6 +131,11 @@ public class QualityAgentService {
         return sb.toString();
     }
 
+    /**
+     * 解析模型返回的 JSON 评分结果。
+     *
+     * <p>该方法会对分值做截断归一化，避免异常模型输出直接污染持久化字段。
+     */
     private QualityScore parseScore(String responseText) {
         try {
             RawQualityScore raw = objectMapper.readValue(responseText, RawQualityScore.class);
@@ -120,6 +153,16 @@ public class QualityAgentService {
         }
     }
 
+    /**
+     * 将质量分写回图节点。
+     *
+     * <p>这是一个真实写库入口，不是内存缓存更新。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param score 质量评分。
+     */
     @Transactional(transactionManager = "transactionManager")
     public void writeQualityScore(String nodeId, QualityScore score) {
         neo4jClient.query(WRITE_QUALITY_QUERY)

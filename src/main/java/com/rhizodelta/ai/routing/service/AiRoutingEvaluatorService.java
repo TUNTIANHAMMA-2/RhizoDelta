@@ -19,6 +19,19 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * 负责让模型在召回上下文上做最终路由判断。
+ *
+ * <p>该服务是 AI 路由链路中的主评估器，会把帖子内容、召回上下文和可选批评反馈组织成提示词，
+ * 再调用路由模型输出 {@code MERGE}/{@code BRANCH}/{@code REVIEW} 之一。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会调用外部聊天模型。</li>
+ *   <li>不会直接写库，但其输出将驱动后续 {@link DecisionService} 执行或人工复核。</li>
+ *   <li>模型返回非法 JSON 时会直接抛出异常。</li>
+ * </ul>
+ */
 @Service
 public class AiRoutingEvaluatorService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AiRoutingEvaluatorService.class);
@@ -59,6 +72,16 @@ public class AiRoutingEvaluatorService {
         this.reviewThreshold = reviewThreshold;
     }
 
+    /**
+     * 基于帖子内容和上下文评估路由动作。
+     *
+     * <p>评估结果会再经过阈值策略处理：低置信度的非 {@code REVIEW} 结论会被下调为人工复核。
+     *
+     * <p>
+     *
+     * @param command 路由评估命令。
+     * @return 结构化评估结果。
+     */
     public RoutingEvaluation evaluate(RoutingEvaluationCommand command) {
         String modelName = resolveModelName();
         String postContent = DecisionCommandValidation.requireText(command.postContent(), "post_content");
@@ -82,6 +105,11 @@ public class AiRoutingEvaluatorService {
         return applyThreshold(modelDecision);
     }
 
+    /**
+     * 构造路由评估提示词消息。
+     *
+     * <p>若存在来自反思阶段的批评反馈，会把该反馈附加到用户提示词中，引导模型重新判断。
+     */
     private List<dev.langchain4j.data.message.ChatMessage> buildMessages(
             String postContent,
             String routingContext,
@@ -103,6 +131,9 @@ public class AiRoutingEvaluatorService {
         return List.of(SystemMessage.from(SYSTEM_PROMPT), UserMessage.from(userPrompt));
     }
 
+    /**
+     * 调用模型并返回原始文本响应。
+     */
     private String invokeModel(List<dev.langchain4j.data.message.ChatMessage> messages, String modelName) {
         ChatLanguageModel model = modelRouterService.getModel(ModelPurpose.ROUTING);
         Response<AiMessage> response = model.generate(messages);
@@ -118,6 +149,11 @@ public class AiRoutingEvaluatorService {
         return responseText;
     }
 
+    /**
+     * 解析模型返回的结构化决策。
+     *
+     * <p>这里会统一校验动作是否合法、理由是否为空，以及置信度是否落在允许区间内。
+     */
     private ModelDecision parseDecision(String responseText) {
         try {
             ModelDecision decision = objectMapper.readValue(responseText, ModelDecision.class);
@@ -136,6 +172,11 @@ public class AiRoutingEvaluatorService {
         }
     }
 
+    /**
+     * 按系统阈值规则降级低置信度决策。
+     *
+     * <p>这一步的意义，是把“模型给出一个勉强的合并/分支结论”转成更安全的人工复核。
+     */
     private RoutingEvaluation applyThreshold(ModelDecision decision) {
         if (decision.confidence() >= reviewThreshold || "REVIEW".equals(decision.action())) {
             return new RoutingEvaluation(decision.action(), decision.reason(), decision.confidence());
@@ -192,6 +233,9 @@ public class AiRoutingEvaluatorService {
         return normalized.substring(0, RESPONSE_PREVIEW_LIMIT) + "...";
     }
 
+    /**
+     * 表示一次路由评估请求。
+     */
     public record RoutingEvaluationCommand(
             String postContent,
             String routingContext,
@@ -203,6 +247,9 @@ public class AiRoutingEvaluatorService {
         }
     }
 
+    /**
+     * 表示路由模型的最终评估结果。
+     */
     public record RoutingEvaluation(
             String action,
             String reason,

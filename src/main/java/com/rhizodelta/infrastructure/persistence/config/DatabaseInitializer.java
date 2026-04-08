@@ -11,6 +11,17 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 在启动阶段初始化 Neo4j 约束、索引与向量索引。
+ *
+ * <p>该组件会在应用启动时主动执行 schema 语句，确保核心节点、关系和向量检索所需的数据库结构已经就绪。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会执行多条 Neo4j DDL 语句。</li>
+ *   <li>一旦 schema 初始化失败，应用启动会直接中止。</li>
+ * </ul>
+ */
 @Component
 public class DatabaseInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseInitializer.class);
@@ -43,6 +54,11 @@ public class DatabaseInitializer {
         this.embeddingDimension = embeddingDimension;
     }
 
+    /**
+     * 在 Bean 初始化后执行 schema 初始化。
+     *
+     * <p>该流程会先创建常规约束与索引，再创建向量索引，最后输出校验日志。
+     */
     @PostConstruct
     void initializeSchema() {
         for (String query : SCHEMA_QUERIES) {
@@ -52,6 +68,11 @@ public class DatabaseInitializer {
         logConstraintStatus();
     }
 
+    /**
+     * 执行单条 schema 语句。
+     *
+     * <p>执行失败会被视为启动级错误，而不是可忽略的告警。
+     */
     private void executeSchemaQuery(String query) {
         try {
             neo4jClient.query(query).run();
@@ -62,6 +83,9 @@ public class DatabaseInitializer {
         }
     }
 
+    /**
+     * 输出当前 RhizoDelta 相关约束和索引状态。
+     */
     private void logConstraintStatus() {
         Collection<Map<String, Object>> constraints = neo4jClient.query("""
                 SHOW CONSTRAINTS
@@ -73,6 +97,11 @@ public class DatabaseInitializer {
         LOGGER.info("Neo4j constraints/indexes verified: {}", constraints);
     }
 
+    /**
+     * 构造向量索引创建语句。
+     *
+     * <p>向量维度直接绑定当前系统配置，避免索引维度与模型维度不一致。
+     */
     private String buildVectorIndexQuery() {
         return """
                 CREATE VECTOR INDEX %s IF NOT EXISTS

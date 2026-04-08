@@ -17,6 +17,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
+/**
+ * 负责本地 SSE 推送与跨实例广播。
+ *
+ * <p>该服务维护当前实例上的 SSE 连接集合，并通过 RabbitMQ 把事件广播到其他实例，
+ * 从而让任意节点产生的事件都能被所有订阅者感知。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会维护内存中的 emitter 注册表。</li>
+ *   <li>会通过 RabbitMQ 广播事件。</li>
+ *   <li>会定期发送心跳并清理失活连接。</li>
+ * </ul>
+ */
 @Service
 public class SseEventService {
     private static final Logger LOGGER = LoggerFactory.getLogger(SseEventService.class);
@@ -32,6 +45,16 @@ public class SseEventService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    /**
+     * 注册一个新的 SSE 连接。
+     *
+     * <p>若提供了用户 ID，则后续可按用户粒度过滤某些敏感状态事件。
+     *
+     * <p>
+     *
+     * @param userId 可选用户 ID。
+     * @return 新的 SSE emitter。
+     */
     public SseEmitter register(String userId) {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
         String emitterId = UUID.randomUUID().toString();
@@ -43,11 +66,21 @@ public class SseEventService {
         return emitter;
     }
 
+    /**
+     * 发布一条 SSE 事件。
+     *
+     * <p>该方法会先在当前实例本地推送，再尽力广播到消息总线；广播失败只记录日志，不影响本地已推送结果。
+     */
     public void publish(SseEventType type, Object payload) {
         publishLocal(type, payload);
         publishToBroker(type, payload);
     }
 
+    /**
+     * 处理来自其他实例的 SSE 广播消息。
+     *
+     * <p>当前实例自己发出的消息会被忽略，避免重复推送。
+     */
     @RabbitListener(queues = "#{sseEventsQueue.name}")
     public void handleBroadcast(SseEventMessage message) {
         if (message == null) {
@@ -66,6 +99,9 @@ public class SseEventService {
         publishLocal(eventType, message.payload());
     }
 
+    /**
+     * 定期发送 SSE 心跳并清理失活连接。
+     */
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL_MILLIS)
     public void sendHeartbeat() {
         emitters.forEach((emitterId, emitter) -> {
@@ -123,6 +159,9 @@ public class SseEventService {
         emitterUserMap.remove(emitterId);
     }
 
+    /**
+     * 定义系统支持的 SSE 事件类型。
+     */
     public enum SseEventType {
         NODE_CREATED,
         EDGE_CREATED,
@@ -133,6 +172,9 @@ public class SseEventService {
         QUALITY_SCORED
     }
 
+    /**
+     * 表示节点创建事件载荷。
+     */
     public record NodeCreatedPayload(
             @JsonProperty("node_id") String nodeId,
             @JsonProperty("label") String label,
@@ -140,6 +182,9 @@ public class SseEventService {
     ) {
     }
 
+    /**
+     * 表示边创建事件载荷。
+     */
     public record EdgeCreatedPayload(
             @JsonProperty("source") String source,
             @JsonProperty("target") String target,
@@ -162,6 +207,11 @@ public class SseEventService {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    /**
+     * 表示编排状态事件载荷。
+     *
+     * <p>该对象支持附带可选的复核 ID、决策 ID 和结构化解释文本。
+     */
     public record OrchestrationStatusPayload(
             @JsonProperty("request_id") String requestId,
             @JsonProperty("event_id") String eventId,
@@ -182,9 +232,15 @@ public class SseEventService {
         }
     }
 
+    /**
+     * 表示跨实例 SSE 广播消息。
+     */
     public record SseEventMessage(String origin, String type, Object payload) {
     }
 
+    /**
+     * 表示摘要生成完成事件载荷。
+     */
     public record SummaryGeneratedPayload(
             @JsonProperty("node_id") String nodeId,
             @JsonProperty("summary") String summary,
@@ -193,6 +249,9 @@ public class SseEventService {
     ) {
     }
 
+    /**
+     * 表示质量评分完成事件载荷。
+     */
     public record QualityScoredPayload(
             @JsonProperty("node_id") String nodeId,
             @JsonProperty("quality_overall") double qualityOverall,

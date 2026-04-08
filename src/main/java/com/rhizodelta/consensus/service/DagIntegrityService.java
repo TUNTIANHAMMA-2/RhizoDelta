@@ -7,6 +7,17 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 校验决策执行是否会破坏图的 DAG 完整性。
+ *
+ * <p>该服务会在真正建边前先做环检测，防止版本演化层或结果层形成闭环。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>只读访问 Neo4j，不写库。</li>
+ *   <li>检测到环后会抛出 {@link DagIntegrityViolationException}，用于阻断上层事务。</li>
+ * </ul>
+ */
 @Service
 public class DagIntegrityService {
     private static final int MAX_ALLOWED_DEPTH = 50;
@@ -33,6 +44,14 @@ public class DagIntegrityService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 校验版本演化关系不会形成回路。
+     *
+     * <p>
+     *
+     * @param sourceNodeId 来源节点。
+     * @param targetNodeId 目标节点。
+     */
     public void assertNoVersionEvolutionCycle(UUID sourceNodeId, UUID targetNodeId) {
         UUID source = requireNodeId(sourceNodeId, "sourceNodeId");
         UUID target = requireNodeId(targetNodeId, "targetNodeId");
@@ -46,6 +65,14 @@ public class DagIntegrityService {
         }
     }
 
+    /**
+     * 校验结果层的跨综合关系不会形成回路。
+     *
+     * <p>
+     *
+     * @param newResultNodeId 新结果节点。
+     * @param sourceResultNodeId 来源结果节点。
+     */
     public void assertNoResultLayerCycle(UUID newResultNodeId, UUID sourceResultNodeId) {
         UUID source = requireNodeId(newResultNodeId, "newResultNodeId");
         UUID target = requireNodeId(sourceResultNodeId, "sourceResultNodeId");

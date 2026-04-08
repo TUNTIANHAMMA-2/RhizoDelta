@@ -20,6 +20,18 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 提供节点 embedding 写入与向量相似度检索能力。
+ *
+ * <p>该服务是 AI 上下文层的基础设施封装，负责把向量写回图节点，并通过 Neo4j 向量索引召回相似节点。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>{@link #writeEmbedding(String, List)} 会写 Neo4j 节点的 {@code embedding} 字段。</li>
+ *   <li>{@link #searchSimilar(List, Integer, String)} 只读访问向量索引，不修改图数据。</li>
+ *   <li>向量维度不匹配会直接抛异常，避免错误向量污染索引。</li>
+ * </ul>
+ */
 @Service
 public class EmbeddingService {
     private static final int DEFAULT_TOP_K = 10;
@@ -71,6 +83,17 @@ public class EmbeddingService {
         this.embeddingDimension = embeddingDimension;
     }
 
+    /**
+     * 将 embedding 写入指定节点。
+     *
+     * <p>该方法存在的意义，是把向量维度校验、节点存在性校验和写库动作统一收敛到一个事务入口。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param vector embedding 向量。
+     * @return 写入结果。
+     */
     @Transactional(transactionManager = "transactionManager")
     public EmbeddingWriteResult writeEmbedding(String nodeId, List<Float> vector) {
         String validatedNodeId = DecisionCommandValidation.requireText(nodeId, "node_id");
@@ -96,11 +119,35 @@ public class EmbeddingService {
         return new EmbeddingWriteResult(parsedNodeId, actualDimension);
     }
 
+    /**
+     * 按默认召回数量搜索相似节点。
+     *
+     * <p>这是 {@link #searchSimilar(List, Integer, String)} 的便捷重载，
+     * 不限制根节点范围。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<SimilaritySearchResult> searchSimilar(List<Float> vector, Integer topK) {
         return searchSimilar(vector, topK, null);
     }
 
+    /**
+     * 搜索与给定向量最相似的节点。
+     *
+     * <p>该方法可选按 {@code rootId} 限制检索范围，从而把召回限制在同一谱系内。
+     *
+     * <p><b>注意事项</b>：
+     * <ul>
+     *   <li>只会返回未删除节点。</li>
+     *   <li>结果中会附带邻居节点摘要，便于后续上下文构建与路由判断。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param vector 查询向量。
+     * @param topK 可选召回数量。
+     * @param rootId 可选根节点限制。
+     * @return 相似节点列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<SimilaritySearchResult> searchSimilar(List<Float> vector, Integer topK, String rootId) {
         List<Float> validatedVector = requireVector(vector);

@@ -26,6 +26,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 提供人工复核任务的查询与处理入口。
+ *
+ * <p>该控制器用于承接自动流程无法直接闭合的决策场景，
+ * 允许管理员查看待处理任务、批准建议动作或直接拒绝。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>批准操作会真正调用 {@link DecisionService} 执行图谱写入。</li>
+ *   <li>批准失败会把任务状态更新为 {@link ReviewTask.Status#EXECUTION_FAILED}。</li>
+ *   <li>拒绝操作会直接变更复核任务状态，不执行任何图谱决策。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/reviews")
 public class ReviewController {
@@ -40,6 +53,11 @@ public class ReviewController {
         this.decisionService = decisionService;
     }
 
+    /**
+     * 返回待处理的复核任务列表。
+     *
+     * <p>该接口只返回处于可处理状态的任务，不负责恢复过期或终态任务。
+     */
     @GetMapping("/pending")
     public ApiResponse<List<ReviewTaskPayload>> getPendingReviews(
             @RequestParam(value = "limit", required = false) Integer limit
@@ -50,11 +68,20 @@ public class ReviewController {
         return ApiResponse.ok(tasks);
     }
 
+    /**
+     * 返回单条复核任务详情。
+     */
     @GetMapping("/{id}")
     public ApiResponse<ReviewTaskPayload> getReviewById(@PathVariable("id") String reviewId) {
         return ApiResponse.ok(toPayload(reviewTaskService.getTask(reviewId)));
     }
 
+    /**
+     * 以人工身份批准一次合并建议。
+     *
+     * <p>该接口会从任务草稿中重建 {@link MergeDecisionCommand}，并把操作者类型固定为
+     * {@link DecisionOperatorType#HUMAN}。
+     */
     @PostMapping("/{id}/approve-merge")
     public ResponseEntity<ApiResponse<DecisionResult>> approveMerge(
             @PathVariable("id") String reviewId,
@@ -75,6 +102,9 @@ public class ReviewController {
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
+    /**
+     * 以人工身份批准一次分支建议。
+     */
     @PostMapping("/{id}/approve-branch")
     public ResponseEntity<ApiResponse<DecisionResult>> approveBranch(
             @PathVariable("id") String reviewId,
@@ -102,6 +132,11 @@ public class ReviewController {
         }
     }
 
+    /**
+     * 拒绝一条复核任务。
+     *
+     * <p>拒绝只更新任务状态，不执行底层决策命令。
+     */
     @PostMapping("/{id}/reject")
     public ApiResponse<ReviewTaskPayload> rejectReview(@PathVariable("id") String reviewId) {
         ReviewTask updated = reviewTaskService.updateStatus(reviewId, ReviewTask.Status.REJECTED);
@@ -188,6 +223,11 @@ public class ReviewController {
                 .toList();
     }
 
+    /**
+     * 表示复核任务的对外响应载荷。
+     *
+     * <p>该对象把任务的当前状态、候选动作和草稿数据打包返回给管理界面。
+     */
     public record ReviewTaskPayload(
             @JsonProperty("review_id") String reviewId,
             @JsonProperty("request_id") String requestId,

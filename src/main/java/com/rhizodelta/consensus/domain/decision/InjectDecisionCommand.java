@@ -6,6 +6,18 @@ import com.rhizodelta.core.validation.DecisionCommandValidation;
 
 import java.util.UUID;
 
+/**
+ * 表示一次注入决策命令。
+ *
+ * <p>该命令用于把一条新帖子以 {@code CONTINUES_FROM} 的形式接入既有节点，
+ * 但不创建共识节点也不形成新的平行分支。
+ *
+ * <p><b>适用场景</b>：
+ * <ul>
+ *   <li>内容与现有讨论强相关，但尚不足以形成摘要共识。</li>
+ *   <li>希望保留时间序列连续性，而不是做汇聚或分叉。</li>
+ * </ul>
+ */
 public record InjectDecisionCommand(
         @JsonProperty("decision_id") String decision_id,
         @JsonProperty("request_id") String request_id,
@@ -16,6 +28,9 @@ public record InjectDecisionCommand(
         @JsonProperty("operator_id") String operator_id,
         @JsonProperty("reason") String reason
 ) {
+    /**
+     * 创建注入命令并执行基础完整性校验。
+     */
     public InjectDecisionCommand {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
         request_id = DecisionCommandValidation.requireText(request_id, "request_id");

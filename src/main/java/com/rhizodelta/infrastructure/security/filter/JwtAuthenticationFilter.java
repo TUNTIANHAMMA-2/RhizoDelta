@@ -29,6 +29,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 负责解析并验证请求中的 JWT。
+ *
+ * <p>该过滤器会从 {@code Authorization} 头中提取 Bearer Token，
+ * 校验签名与有效期，并在成功后把 {@link AuthenticatedUser} 写入安全上下文。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会修改 {@link SecurityContextHolder} 中的当前认证主体。</li>
+ *   <li>JWT 失效或非法时会直接写回 {@code 401} JSON 响应并中断链路。</li>
+ * </ul>
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
@@ -44,6 +56,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 对当前请求执行 JWT 鉴权。
+     *
+     * <p>没有 token 时会直接放行，由后续安全链决定是否需要认证。
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -84,6 +101,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * 从请求头中提取 Bearer Token。
+     */
     private String extractToken(HttpServletRequest request) {
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (header != null && header.startsWith(BEARER_PREFIX)) {
@@ -101,6 +121,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return Collections.emptyList();
     }
 
+    /**
+     * 写回统一的未认证响应。
+     */
     private void writeErrorResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

@@ -22,6 +22,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * 定义 AI 路由的状态工作流。
+ *
+ * <p>该服务基于 LangGraph4j 将召回、规则预过滤、LLM 评估、反思校验、提交前守卫和复核分支
+ * 串成一个可执行状态图。
+ *
+ * <p><b>设计意图</b>：
+ * <ul>
+ *   <li>把每个路由阶段拆成独立节点，便于观察与扩展。</li>
+ *   <li>通过状态图显式表达“跳过 LLM”“重试反思”“进入人工复核”等分支。</li>
+ *   <li>把最终动作收敛为 {@code MERGE}/{@code BRANCH}/{@code REVIEW} 三种出口。</li>
+ * </ul>
+ */
 @Service
 public class AiRoutingWorkflowService {
     static final String LOAD_POST = "load-post";
@@ -58,6 +71,16 @@ public class AiRoutingWorkflowService {
         this.workflow = buildWorkflow();
     }
 
+    /**
+     * 以初始输入执行路由骨架工作流。
+     *
+     * <p>该入口返回最终状态快照，供编排层决定后续是执行决策还是创建复核任务。
+     *
+     * <p>
+     *
+     * @param input 初始状态数据。
+     * @return 最终状态。
+     */
     public Optional<AiRoutingState> invokeSkeleton(Map<String, Object> input) {
         Objects.requireNonNull(input, "input must not be null");
         return workflow.invoke(input);
@@ -67,6 +90,11 @@ public class AiRoutingWorkflowService {
         return workflow;
     }
 
+    /**
+     * 构建并编译路由状态图。
+     *
+     * <p>这里定义了完整的节点、边和条件跳转关系，是整个 AI 路由流程的结构化说明书。
+     */
     private CompiledGraph<AiRoutingState> buildWorkflow() throws GraphStateException {
         StateGraph<AiRoutingState> graph = new StateGraph<>(AiRoutingState.channels(), AiRoutingState::new);
         graph.addNode(LOAD_POST, loadPost());
@@ -108,6 +136,9 @@ public class AiRoutingWorkflowService {
                 .build());
     }
 
+    /**
+     * 创建加载初始状态的节点。
+     */
     private AsyncNodeAction<AiRoutingState> loadPost() {
         return AsyncNodeAction.node_async(state -> Map.of(
                 AiRoutingState.EXECUTED_NODES, List.of(LOAD_POST),
@@ -122,6 +153,9 @@ public class AiRoutingWorkflowService {
         ));
     }
 
+    /**
+     * 创建召回候选归一化节点。
+     */
     private AsyncNodeAction<AiRoutingState> vectorRecall() {
         return AsyncNodeAction.node_async(state -> Map.of(
                 AiRoutingState.EXECUTED_NODES, List.of(VECTOR_RECALL),
@@ -129,6 +163,9 @@ public class AiRoutingWorkflowService {
         ));
     }
 
+    /**
+     * 创建上下文裁剪结果归一化节点。
+     */
     private AsyncNodeAction<AiRoutingState> contextPrune() {
         return AsyncNodeAction.node_async(state -> {
             List<String> selectedCandidateNodeIds = normalizeSelectedCandidates(state);
@@ -143,6 +180,11 @@ public class AiRoutingWorkflowService {
         });
     }
 
+    /**
+     * 创建规则预过滤节点。
+     *
+     * <p>该节点决定当前是否可以跳过 LLM 直接进入后续阶段。
+     */
     private AsyncNodeAction<AiRoutingState> rulePreFilter() {
         return AsyncNodeAction.node_async(state -> {
             boolean hasCandidates = !state.selectedCandidateNodeIds().isEmpty();
@@ -163,6 +205,9 @@ public class AiRoutingWorkflowService {
         return state -> CompletableFuture.completedFuture(state.skipLlm() ? "skip" : "evaluate");
     }
 
+    /**
+     * 创建主 LLM 评估节点。
+     */
     private AsyncNodeAction<AiRoutingState> llmEvaluate() {
         return AsyncNodeAction.node_async(state -> {
             AiRoutingEvaluatorService.RoutingEvaluation evaluation = aiRoutingEvaluatorService.evaluate(
@@ -186,6 +231,11 @@ public class AiRoutingWorkflowService {
         });
     }
 
+    /**
+     * 创建反思校验节点。
+     *
+     * <p>该节点可能确认原结论、触发重试，或在达到最大次数后降级为人工复核。
+     */
     private AsyncNodeAction<AiRoutingState> reflectionValidate() {
         return AsyncNodeAction.node_async(state -> {
             ReflectionResult result = reflectionCriticService.critique(
@@ -258,6 +308,11 @@ public class AiRoutingWorkflowService {
         ));
     }
 
+    /**
+     * 创建提交前守卫节点。
+     *
+     * <p>若图状态已经前进，则会把动作降级为 {@code REVIEW}，避免基于旧上下文继续执行。
+     */
     private AsyncNodeAction<AiRoutingState> preCommitGuardNode() {
         return AsyncNodeAction.node_async(state -> {
             if (state.sourceNodeId().isBlank()) {

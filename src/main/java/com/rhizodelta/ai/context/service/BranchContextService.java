@@ -11,6 +11,19 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 负责构建分支上下文并格式化为提示词片段。
+ *
+ * <p>该服务从图谱中聚合祖先链、已有共识和同级回复，用于为
+ * {@code routing} 和 {@code summary} 流程补充上下文语义。
+ *
+ * <p><b>关键特征</b>：
+ * <ul>
+ *   <li>只读访问 Neo4j，不写库。</li>
+ *   <li>会根据配置限制祖先深度、同级回复数量和最终字符预算。</li>
+ *   <li>格式化方法会主动截断超预算内容，而不是静默溢出。</li>
+ * </ul>
+ */
 @Service
 public class BranchContextService {
     private static final Logger LOGGER = LoggerFactory.getLogger(BranchContextService.class);
@@ -67,14 +80,40 @@ public class BranchContextService {
         this.maxCharBudget = maxSourceTokens * 4; // rough chars-per-token
     }
 
+    /**
+     * 表示单条上下文片段。
+     *
+     * <p>该对象统一承载节点标识、类型、文本和相对深度，便于后续格式化策略复用。
+     */
     public record ContextEntry(String nodeId, String label, String text, int depth) {}
 
+    /**
+     * 表示完整的分支上下文集合。
+     *
+     * <p>该对象将祖先、已有共识和同级回复显式分区，避免后续提示词构建阶段混淆来源。
+     */
     public record BranchContext(
             List<ContextEntry> ancestors,
             List<ContextEntry> existingConsensus,
             List<ContextEntry> siblings
     ) {}
 
+    /**
+     * 构建指定源节点的分支上下文。
+     *
+     * <p>该方法会读取三类上下文：
+     * <ul>
+     *   <li>祖先链，帮助理解当前讨论从何而来。</li>
+     *   <li>已有共识，帮助判断是否已有汇总结论。</li>
+     *   <li>同级回复，帮助判断新内容是否重复或偏离。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param sourceNodeId 源节点 ID。
+     * @param excludePostNodeId 需要从同级回复中排除的帖子节点。
+     * @return 分支上下文。
+     */
     public BranchContext buildContext(UUID sourceNodeId, UUID excludePostNodeId) {
         List<ContextEntry> ancestors = queryAncestors(sourceNodeId);
         List<ContextEntry> consensus = queryExistingConsensus(sourceNodeId);
@@ -85,6 +124,16 @@ public class BranchContextService {
         return new BranchContext(ancestors, consensus, siblings);
     }
 
+    /**
+     * 将分支上下文格式化为路由提示词片段。
+     *
+     * <p>路由场景需要保留更多结构化元数据，因此该格式会包含节点 ID、标签与深度信息。
+     *
+     * <p>
+     *
+     * @param ctx 分支上下文。
+     * @return 路由场景可直接拼接的文本。
+     */
     public String formatForRouting(BranchContext ctx) {
         if (isEmpty(ctx)) return "";
 
@@ -101,6 +150,16 @@ public class BranchContextService {
         return sb.toString();
     }
 
+    /**
+     * 将分支上下文格式化为摘要提示词片段。
+     *
+     * <p>摘要场景更关注内容本身，因此会压缩元数据，只保留必要的文本和轻量前缀。
+     *
+     * <p>
+     *
+     * @param ctx 分支上下文。
+     * @return 摘要场景可直接拼接的文本。
+     */
     public String formatForSummary(BranchContext ctx) {
         if (isEmpty(ctx)) return "";
 

@@ -15,6 +15,18 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * 负责回滚已提交的决策结果。
+ *
+ * <p>该服务不会盲目删除节点，而是先确认节点类型、检查是否仍有下游依赖，
+ * 再执行关系清理与软删除。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会修改图节点的软删除标记并删除关联关系。</li>
+ *   <li>若检测到下游依赖，会抛出 {@link RollbackBlockedException}。</li>
+ * </ul>
+ */
 @Service
 public class RollbackService {
     private static final String LABEL_AI_CONSENSUS = "AI_Consensus";
@@ -112,6 +124,16 @@ public class RollbackService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 回滚一条普通决策。
+     *
+     * <p>该方法会先解析决策节点类型，再选择对应的合并、分支或结果层回滚路径。
+     *
+     * <p>
+     *
+     * @param decisionId 决策 ID。
+     * @return 回滚结果。
+     */
     @Transactional(transactionManager = "transactionManager")
     public RollbackResult rollbackDecision(String decisionId) {
         String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
@@ -128,6 +150,16 @@ public class RollbackService {
         return rollbackBranch(validatedDecisionId, decisionNode.nodeId());
     }
 
+    /**
+     * 按操作批次回滚一次分叉操作。
+     *
+     * <p>只有当这批分支节点都没有被后续节点依赖时，才会执行批量软删除。
+     *
+     * <p>
+     *
+     * @param operationId 分叉操作 ID。
+     * @return 分叉批次回滚结果。
+     */
     @Transactional(transactionManager = "transactionManager")
     public ForkRollbackResult rollbackForkByOperationId(String operationId) {
         String validatedOperationId = DecisionCommandValidation.requireText(operationId, "operation_id");
@@ -163,6 +195,9 @@ public class RollbackService {
         return new ForkRollbackResult(validatedOperationId, forkNodeIds, relsDeleted, true, (int) deletedCount);
     }
 
+    /**
+     * 表示一次分叉批次回滚的聚合结果。
+     */
     public record ForkRollbackResult(
             String operation_id,
             List<UUID> rolled_back_node_ids,

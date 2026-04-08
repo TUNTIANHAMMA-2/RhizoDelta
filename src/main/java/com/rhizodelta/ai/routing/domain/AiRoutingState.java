@@ -9,6 +9,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 表示 AI 路由工作流的运行时状态。
+ *
+ * <p>该对象基于 {@link AgentState} 封装了路由流程中各阶段共享的数据槽位，
+ * 例如召回候选、路由动作、反思次数和结构化解释。
+ *
+ * <p><b>设计意图</b>：
+ * <ul>
+ *   <li>用统一的 channel key 避免工作流节点之间散落字符串常量。</li>
+ *   <li>为缺省值提供稳定回退，避免节点执行时频繁判空。</li>
+ *   <li>让 {@code ai.routing.service} 能以类型化方式读取工作流状态。</li>
+ * </ul>
+ */
 public final class AiRoutingState extends AgentState {
     public static final String REQUEST_ID = "requestId";
     public static final String EVENT_ID = "eventId";
@@ -125,6 +138,11 @@ public final class AiRoutingState extends AgentState {
         return value(CRITIC_FEEDBACK, EMPTY_TEXT);
     }
 
+    /**
+     * 定义工作流状态通道及其默认值。
+     *
+     * <p>该方法是路由状态图编译时的关键入口，决定每个字段如何初始化和追加。
+     */
     public static Map<String, Channel<?>> channels() {
         Map<String, Channel<?>> channels = new HashMap<>();
         channels.put(REQUEST_ID, Channels.base(() -> EMPTY_TEXT));

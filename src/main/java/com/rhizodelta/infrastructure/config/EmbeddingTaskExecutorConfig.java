@@ -7,6 +7,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
+/**
+ * 配置 embedding 与 routing 异步任务线程池。
+ *
+ * <p>该配置类把两类 AI 异步工作拆分到不同线程池，
+ * 避免向量生成和路由编排在高负载下互相抢占执行资源。
+ */
 @Configuration
 public class EmbeddingTaskExecutorConfig {
     private static final String CORE_POOL_SIZE_PROPERTY = "rhizodelta.embedding.executor.corePoolSize";
@@ -25,6 +31,11 @@ public class EmbeddingTaskExecutorConfig {
     private static final int ROUTING_DEFAULT_QUEUE_CAPACITY = 50;
     private static final String ROUTING_THREAD_NAME_PREFIX = "routing-";
 
+    /**
+     * 创建 embedding 任务线程池。
+     *
+     * <p>该线程池主要服务于 embedding 生成、摘要后向量更新等偏 IO/模型调用型任务。
+     */
     @Bean(name = "embeddingTaskExecutor")
     public Executor embeddingTaskExecutor(Environment environment) {
         int corePoolSize = resolvePositiveInt(environment, CORE_POOL_SIZE_PROPERTY, DEFAULT_CORE_POOL_SIZE);
@@ -40,6 +51,11 @@ public class EmbeddingTaskExecutorConfig {
         return executor;
     }
 
+    /**
+     * 创建 routing 任务线程池。
+     *
+     * <p>该线程池主要服务于 AI 路由编排与工作流执行，避免与 embedding 任务互相干扰。
+     */
     @Bean(name = "routingTaskExecutor")
     public Executor routingTaskExecutor(Environment environment) {
         int corePoolSize = resolvePositiveInt(environment, ROUTING_CORE_POOL_SIZE_PROPERTY, ROUTING_DEFAULT_CORE_POOL_SIZE);
@@ -55,6 +71,11 @@ public class EmbeddingTaskExecutorConfig {
         return executor;
     }
 
+    /**
+     * 从环境变量中读取正整数配置。
+     *
+     * <p>非法值会直接抛异常，避免系统带着错误线程池配置启动。
+     */
     private static int resolvePositiveInt(Environment environment, String key, int defaultValue) {
         String value = environment.getProperty(key);
         if (value == null || value.isBlank()) {

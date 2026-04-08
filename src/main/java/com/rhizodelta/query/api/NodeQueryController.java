@@ -17,6 +17,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 提供图谱节点的只读查询接口。
+ *
+ * <p>该控制器位于 {@code com.rhizodelta.query.api}，负责把节点摘要、谱系拓扑、子树拓扑、
+ * 溯源信息与业务关联信息统一暴露给上层调用方。
+ *
+ * <p><b>关键特征</b>：
+ * <ul>
+ *   <li>所有接口均为只读，不直接写数据库、不发布消息。</li>
+ *   <li>入口层统一校验 UUID，避免非法节点 ID 进入服务层。</li>
+ *   <li>拓扑接口会把服务层的统一节点视图转换成前端可直接消费的节点/边响应结构。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/nodes")
 public class NodeQueryController {
@@ -28,6 +41,16 @@ public class NodeQueryController {
         this.associationService = associationService;
     }
 
+    /**
+     * 返回根节点摘要列表。
+     *
+     * <p>该接口通常作为图谱入口导航使用，调用方无需理解根节点判定规则。
+     *
+     * <p>
+     *
+     * @param limit 可选返回数量。
+     * @return 根节点摘要列表。
+     */
     @GetMapping("/roots")
     public ApiResponse<List<NodePayload>> getRoots(
             @RequestParam(value = "limit", required = false) Integer limit
@@ -38,6 +61,16 @@ public class NodeQueryController {
         return ApiResponse.ok(roots);
     }
 
+    /**
+     * 返回单个节点的统一摘要。
+     *
+     * <p>该接口适合详情页头部或轻量卡片场景，不负责展开整张图。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @return 节点摘要。
+     */
     @GetMapping("/{id}")
     public ApiResponse<NodePayload> getNodeById(@PathVariable("id") String id) {
         UUID nodeId = parseUuid(id);
@@ -45,6 +78,17 @@ public class NodeQueryController {
         return ApiResponse.ok(fromLineageNode(node));
     }
 
+    /**
+     * 返回节点向上的谱系拓扑。
+     *
+     * <p>该接口用于展示一个节点如何沿着版本演化关系回溯到其祖先，并附带相关共识节点。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @param maxDepth 可选最大深度。
+     * @return 谱系拓扑。
+     */
     @GetMapping("/{id}/lineage")
     public ApiResponse<GraphTopologyResponse> getLineage(
             @PathVariable("id") String id,
@@ -61,6 +105,19 @@ public class NodeQueryController {
         return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
     }
 
+    /**
+     * 返回节点向下的子树拓扑。
+     *
+     * <p>该接口会把回复、分支、共识与结果层节点一起纳入返回视图，
+     * 适合“从当前节点继续往后看”的查询场景。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @param maxDepth 可选最大深度。
+     * @param limit 可选节点数量限制。
+     * @return 子树拓扑。
+     */
     @GetMapping("/{id}/children")
     public ApiResponse<GraphTopologyResponse> getChildren(
             @PathVariable("id") String id,
@@ -78,6 +135,16 @@ public class NodeQueryController {
         return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
     }
 
+    /**
+     * 返回共识节点的来源摘要列表。
+     *
+     * <p>当目标节点本身是帖子节点时，返回空列表表示不存在更底层的来源集合。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @return 溯源节点摘要列表。
+     */
     @GetMapping("/{id}/provenance")
     public ApiResponse<List<NodePayload>> getProvenance(@PathVariable("id") String id) {
         UUID nodeId = parseUuid(id);
@@ -88,6 +155,18 @@ public class NodeQueryController {
         return ApiResponse.ok(provenance);
     }
 
+    /**
+     * 返回节点的业务关联关系。
+     *
+     * <p>该接口与谱系查询不同，关注的是语义关联而非版本演化关系。
+     *
+     * <p>
+     *
+     * @param id 节点 UUID 字符串。
+     * @param type 可选关联类型过滤条件。
+     * @param limit 可选数量限制。
+     * @return 关联列表。
+     */
     @GetMapping("/{id}/associations")
     public ApiResponse<List<AssociationInfo>> getAssociations(
             @PathVariable("id") String id,
@@ -125,12 +204,20 @@ public class NodeQueryController {
         }
     }
 
+    /**
+     * 表示拓扑查询的统一响应结构。
+     *
+     * <p>该对象把节点集与边集显式拆开，便于图组件直接消费。
+     */
     public record GraphTopologyResponse(
             @JsonProperty("nodes") List<NodePayload> nodes,
             @JsonProperty("edges") List<EdgePayload> edges
     ) {
     }
 
+    /**
+     * 表示一条用于前端展示的拓扑边。
+     */
     public record EdgePayload(
             @JsonProperty("source") String source,
             @JsonProperty("target") String target,
@@ -140,6 +227,11 @@ public class NodeQueryController {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    /**
+     * 表示统一的节点展示载荷。
+     *
+     * <p>该对象屏蔽了底层帖子、共识、结果节点之间的差异，便于前端统一渲染。
+     */
     public record NodePayload(
             @JsonProperty("node_id") String nodeId,
             @JsonProperty("label") String label,

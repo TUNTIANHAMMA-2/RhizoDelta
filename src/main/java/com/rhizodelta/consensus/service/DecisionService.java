@@ -29,12 +29,28 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
+/**
+ * 负责执行共识层的各类决策写操作。
+ *
+ * <p>该服务是共识层最核心的事务边界，负责把各种决策命令落为图节点、关系边和提交后事件。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会写 Neo4j 节点与关系。</li>
+ *   <li>会调用 {@link DagIntegrityService} 做 DAG 环校验。</li>
+ *   <li>事务提交后会发布 {@link DecisionCommittedEvent}，驱动 embedding、摘要和 SSE 链路。</li>
+ * </ul>
+ */
 @Service
 public class DecisionService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionService.class);
     private static final String QUEUED_STATUS = "QUEUED";
     private record UpsertResult(UUID nodeId, boolean created) {}
 
+    /**
+     * 表示合并最终是“新建共识”还是“追加来源”。
+     */
     public record MergeOrAppendResult(
             DecisionResult decisionResult,
             boolean appended
@@ -318,6 +334,12 @@ public class DecisionService {
         this.dagIntegrityService = dagIntegrityService;
         this.eventPublisher = eventPublisher;
     }
+
+    /**
+     * 执行一次标准合并决策。
+     *
+     * <p>该方法会创建新的共识节点并挂接来源；若命中幂等 upsert，则直接返回现有结果。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeMerge(MergeDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -336,6 +358,11 @@ public class DecisionService {
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
 
+    /**
+     * 执行“新建或追加”的原子化合并逻辑。
+     *
+     * <p>若源节点上已经存在共识，则只追加来源；否则新建共识节点。
+     */
     @Transactional(transactionManager = "transactionManager")
     public MergeOrAppendResult mergeOrAppend(MergeDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -386,6 +413,9 @@ public class DecisionService {
         return new MergeOrAppendResult(decisionResult, appended);
     }
 
+    /**
+     * 执行一次分支决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeBranch(BranchDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -404,8 +434,10 @@ public class DecisionService {
     }
 
     /**
-     * Links an existing HumanPost as a branch from the source node without creating a new node.
-     * Used by AI routing when the reply post itself should become the branched node.
+     * 将一个既有帖子节点挂为新的分支节点。
+     *
+     * <p>该入口主要服务于 AI 路由场景：回复帖子本身已存在，只需要补一条
+     * {@code BRANCHED_FROM} 关系，而不再创建新节点。
      */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult linkBranch(
@@ -440,6 +472,9 @@ public class DecisionService {
         return new DecisionResult(decisionId, existingNodeId, QUEUED_STATUS);
     }
 
+    /**
+     * 执行一次注入决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeInject(InjectDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -456,6 +491,10 @@ public class DecisionService {
                 command.content(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
+
+    /**
+     * 执行一次物化决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeMaterialize(MaterializeDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -471,6 +510,10 @@ public class DecisionService {
                 command.content(), relationshipCreatedAt));
         return new DecisionResult(command.decision_id(), upsertResult.nodeId(), QUEUED_STATUS);
     }
+
+    /**
+     * 执行一次分叉决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public ForkDecisionResult executeFork(ForkDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -507,6 +550,10 @@ public class DecisionService {
         return new ForkDecisionResult(command.operation_id(), nodeIds, QUEUED_STATUS,
                 (int) createdCount, command.branches().size());
     }
+
+    /**
+     * 执行一次跨结果综合决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeCrossSynth(CrossSynthDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -542,6 +589,10 @@ public class DecisionService {
                 command.content(), createdAt));
         return new DecisionResult(command.decision_id(), resolvedNodeId, QUEUED_STATUS);
     }
+
+    /**
+     * 执行一次汇合决策。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DecisionResult executeJoin(JoinDecisionCommand command) {
         Objects.requireNonNull(command, "command must not be null");

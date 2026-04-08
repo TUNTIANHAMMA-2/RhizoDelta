@@ -20,6 +20,19 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * 负责串联 AI 路由的完整编排流程。
+ *
+ * <p>该服务把召回、上下文增强、状态工作流执行、SSE 状态广播、人工复核创建和最终决策执行
+ * 串成一条完整链路，是帖子进入自动路由后的顶层协调者。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会发布多阶段的 {@link SseEventService.SseEventType#ORCHESTRATION_STATUS} 事件。</li>
+ *   <li>可能会创建 {@link ReviewTask}，也可能直接调用 {@link AiRoutingExecutionService} 落地决策。</li>
+ *   <li>本身不直接写图谱节点，但会驱动后续写动作发生。</li>
+ * </ul>
+ */
 @Service
 public class AiRoutingOrchestratorService {
     private final AiRoutingWorkflowService workflowService;
@@ -48,6 +61,21 @@ public class AiRoutingOrchestratorService {
         this.agentVersion = agentVersion;
     }
 
+    /**
+     * 对新帖子执行完整路由编排。
+     *
+     * <p>该方法会先做召回和上下文增强，再运行状态工作流，最后根据结果进入：
+     * <ul>
+     *   <li>直接执行决策</li>
+     *   <li>创建人工复核任务</li>
+     *   <li>跳过执行并广播原因</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param message 帖子事件消息。
+     * @param post 已落库的人类帖子节点。
+     */
     public void orchestrate(PostEventMessage message, HumanPost post) {
         publishStatus(message, post.getNodeId().toString(), "EVALUATION_STARTED", null, "ai routing workflow started");
         PrunedContext prunedContext = routingRecallService.recall(post.getContent(), message.targetNodeId());
@@ -155,6 +183,9 @@ public class AiRoutingOrchestratorService {
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
 
+    /**
+     * 将召回候选格式化为路由上下文文本。
+     */
     private String buildRoutingContext(PrunedContext prunedContext) {
         return prunedContext.selected().stream()
                 .map(result -> "node_id=%s label=%s score=%.4f content=%s".formatted(
@@ -172,6 +203,11 @@ public class AiRoutingOrchestratorService {
                 .trim();
     }
 
+    /**
+     * 创建人工复核任务并广播待复核状态。
+     *
+     * <p>该方法会把当前帖子和路由结果重建为一份草稿载荷，供人工批准时转为正式决策命令。
+     */
     private void createReviewTask(PostEventMessage message, HumanPost post, AiRoutingState state) {
         Map<String, Object> draft = new HashMap<>();
         draft.put("request_id", message.requestId());
@@ -197,6 +233,9 @@ public class AiRoutingOrchestratorService {
         publishStatus(message, post.getNodeId().toString(), "REVIEW_PENDING", task.reviewId(), "review task created");
     }
 
+    /**
+     * 将路由结果交给执行服务落地，并广播排队状态。
+     */
     private void executeDecision(PostEventMessage message, HumanPost post, AiRoutingState state) {
         AiRoutingExecutionService.RoutingExecutionResult executionResult = aiRoutingExecutionService.execute(
                 new AiRoutingExecutionService.RoutingExecutionCommand(

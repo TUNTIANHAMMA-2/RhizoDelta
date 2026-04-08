@@ -20,6 +20,20 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * 在决策事务提交后补充执行 embedding 与 SSE 广播。
+ *
+ * <p>该监听器不参与主事务中的决策写入，而是在
+ * {@link TransactionPhase#AFTER_COMMIT} 阶段消费 {@link DecisionCommittedEvent}，
+ * 以避免后置副作用影响主决策提交。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会异步生成并写回共识或结果节点的 embedding。</li>
+ *   <li>会通过 {@link SseEventService} 广播边创建事件和决策完成事件。</li>
+ *   <li>embedding 失败只记日志，不会回滚已提交的决策事务。</li>
+ * </ul>
+ */
 @Component
 public class DecisionAfterCommitListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(DecisionAfterCommitListener.class);
@@ -44,6 +58,11 @@ public class DecisionAfterCommitListener {
         this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor, "embeddingTaskExecutor must not be null");
     }
 
+    /**
+     * 处理合并完成事件。
+     *
+     * <p>该处理器会异步写入共识 embedding，并同步广播合并边、来源边和决策完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMergeCompleted(DecisionCommittedEvent.MergeCompleted event) {
         CompletableFuture.runAsync(
@@ -56,18 +75,29 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.MERGE, event.decisionId());
     }
 
+    /**
+     * 处理分支完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onBranchCompleted(DecisionCommittedEvent.BranchCompleted event) {
         publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "BRANCHED_FROM", event.relationshipCreatedAt());
         publishDecisionComplete(event.nodeId(), DecisionType.BRANCH, event.decisionId());
     }
 
+    /**
+     * 处理注入完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onInjectCompleted(DecisionCommittedEvent.InjectCompleted event) {
         publishEdgeCreated(event.nodeId(), event.sourceNodeId(), "CONTINUES_FROM", event.relationshipCreatedAt());
         publishDecisionComplete(event.nodeId(), DecisionType.INJECT, event.decisionId());
     }
 
+    /**
+     * 处理物化完成事件。
+     *
+     * <p>该处理器会异步生成结果节点的 embedding，并广播物化边和决策完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMaterializeCompleted(DecisionCommittedEvent.MaterializeCompleted event) {
         CompletableFuture.runAsync(
@@ -77,6 +107,9 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.MATERIALIZE, event.decisionId());
     }
 
+    /**
+     * 处理分叉完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onForkCompleted(DecisionCommittedEvent.ForkCompleted event) {
         for (UUID nodeId : event.nodeIds()) {
@@ -85,6 +118,9 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.sourceNodeId(), DecisionType.FORK, event.operationId());
     }
 
+    /**
+     * 处理跨综合完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCrossSynthCompleted(DecisionCommittedEvent.CrossSynthCompleted event) {
         CompletableFuture.runAsync(
@@ -96,6 +132,9 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.CROSS_SYNTH, event.decisionId());
     }
 
+    /**
+     * 处理汇合完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onJoinCompleted(DecisionCommittedEvent.JoinCompleted event) {
         CompletableFuture.runAsync(
@@ -107,6 +146,9 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.JOIN, event.decisionId());
     }
 
+    /**
+     * 处理追加来源完成事件。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMergeAppended(DecisionCommittedEvent.MergeAppended event) {
         for (UUID contributorId : event.synthesizedFrom()) {
@@ -115,6 +157,11 @@ public class DecisionAfterCommitListener {
         publishDecisionComplete(event.nodeId(), DecisionType.MERGE, event.decisionId());
     }
 
+    /**
+     * 为共识节点生成并写回 embedding。
+     *
+     * <p>失败时仅记录日志，不中断已提交的主事务。
+     */
     private void writeConsensusEmbedding(UUID nodeId, String summaryContent, String decisionId) {
         try {
             List<Float> vector = embeddingModelService.embed(summaryContent);
@@ -125,6 +172,9 @@ public class DecisionAfterCommitListener {
         }
     }
 
+    /**
+     * 为结果节点生成并写回 embedding。
+     */
     private void writeResultEmbedding(UUID nodeId, String content, String decisionId) {
         try {
             List<Float> vector = embeddingModelService.embed(content);

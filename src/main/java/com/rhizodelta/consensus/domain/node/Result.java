@@ -11,6 +11,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 表示沉淀到结果层的图节点。
+ *
+ * <p>该实体用于承载已经脱离普通帖子或共识摘要语义的“结果对象”，通常由物化或跨综合等决策产生，
+ * 是结果层继续演化的基础。
+ *
+ * <p><b>关键特征</b>：
+ * <ul>
+ *   <li>实体不可变，适合作为只读领域对象在查询和审计场景中传递。</li>
+ *   <li>记录了决策来源和操作者信息，便于追踪结果是如何生成的。</li>
+ *   <li>{@code embedding} 允许为空，因为可能在提交后异步生成。</li>
+ * </ul>
+ */
 @Node({"Result", "GraphNode"})
 public final class Result {
     @Id
@@ -40,6 +53,11 @@ public final class Result {
     private final List<Float> embedding;
 
     @PersistenceCreator
+    /**
+     * 使用持久化字段重建结果实体。
+     *
+     * <p>该构造器主要由持久化映射层调用，用于确保恢复出的结果对象保持完整元数据。
+     */
     public Result(
             UUID nodeId,
             String content,

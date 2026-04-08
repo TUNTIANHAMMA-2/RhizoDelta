@@ -23,6 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.aopalliance.intercept.MethodInterceptor;
 
+/**
+ * 配置 RabbitMQ 的交换机、队列、重试和消息转换器。
+ *
+ * <p>该配置类定义了帖子异步处理链路和 SSE 广播链路所需的核心消息基础设施。
+ */
 @Configuration
 public class RabbitMqConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(RabbitMqConfig.class);
@@ -39,11 +44,19 @@ public class RabbitMqConfig {
     public static final String SSE_EVENTS_EXCHANGE = "rhizodelta.sse.events";
     public static final String SSE_EVENTS_ROUTING_KEY = "";
 
+    /**
+     * 定义帖子主题交换机。
+     */
     @Bean
     public TopicExchange postsExchange() {
         return new TopicExchange(POSTS_EXCHANGE);
     }
 
+    /**
+     * 定义帖子处理主队列。
+     *
+     * <p>该队列绑定死信交换机，用于承接无法成功消费的消息。
+     */
     @Bean
     public Queue postsQueue() {
         return QueueBuilder.durable(POSTS_QUEUE)
@@ -92,6 +105,9 @@ public class RabbitMqConfig {
         return new Jackson2JsonMessageConverter();
     }
 
+    /**
+     * 创建启用 publisher confirm 和 return 的连接工厂。
+     */
     @Bean
     public CachingConnectionFactory rabbitConnectionFactory(RabbitProperties rabbitProperties) {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
@@ -105,6 +121,11 @@ public class RabbitMqConfig {
         return connectionFactory;
     }
 
+    /**
+     * 创建 RabbitTemplate 并启用返回与确认日志。
+     *
+     * <p>发布失败不会在这里自动重试，而是通过 confirm/return 机制把失败暴露给上层。
+     */
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MessageConverter messageConverter) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
@@ -126,6 +147,11 @@ public class RabbitMqConfig {
         return template;
     }
 
+    /**
+     * 创建监听器重试拦截器。
+     *
+     * <p>超过最大次数后消息会被拒绝并进入死信链路。
+     */
     @Bean
     public MethodInterceptor rabbitRetryInterceptor() {
         return RetryInterceptorBuilder.stateless()
@@ -135,6 +161,11 @@ public class RabbitMqConfig {
                 .build();
     }
 
+    /**
+     * 创建 Rabbit 监听容器工厂。
+     *
+     * <p>该工厂统一设置消息转换器、重试链与自动确认模式。
+     */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,

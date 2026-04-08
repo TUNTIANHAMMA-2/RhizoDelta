@@ -24,6 +24,19 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 提供决策审计查询能力。
+ *
+ * <p>该服务把图中的决策关系查询映射为稳定的审计记录和详情对象，
+ * 并统一处理过滤条件、分页游标和字段类型转换。
+ *
+ * <p><b>关键特征</b>：
+ * <ul>
+ *   <li>所有公开方法都只读，不修改图数据。</li>
+ *   <li>游标基于“创建时间 + 决策 ID”编码，保证分页稳定。</li>
+ *   <li>非法类型、非法时间窗口或非法游标会直接抛出异常，而不是静默容错。</li>
+ * </ul>
+ */
 @Service
 public class AuditService {
     static final int DEFAULT_LIMIT = 20;
@@ -101,6 +114,22 @@ public class AuditService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 按条件分页查询决策审计记录。
+     *
+     * <p>该方法统一收敛类型过滤、操作者过滤、节点过滤、时间窗口过滤和游标续页逻辑。
+     *
+     * <p>
+     *
+     * @param type 可选决策类型。
+     * @param operatorId 可选操作者 ID。
+     * @param nodeId 可选节点 ID。
+     * @param since 可选起始时间。
+     * @param until 可选结束时间。
+     * @param after 可选游标。
+     * @param limit 可选页大小。
+     * @return 一页审计记录及下一页游标。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public AuditListResponse listDecisions(
             String type,
@@ -127,6 +156,16 @@ public class AuditService {
         return toPagedResponse(records, pageSize);
     }
 
+    /**
+     * 查询单条决策的审计详情。
+     *
+     * <p>当决策不存在时会抛出 {@link NoSuchElementException}，防止调用方把缺失记录误判为“空详情”。
+     *
+     * <p>
+     *
+     * @param decisionId 决策 ID。
+     * @return 审计详情。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public AuditDetail getDecisionDetail(String decisionId) {
         String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
@@ -200,6 +239,11 @@ public class AuditService {
         return new AuditListResponse(List.copyOf(pageRecords), nextCursor);
     }
 
+    /**
+     * 将分页位置编码为游标字符串。
+     *
+     * <p>该游标用于支持稳定的倒序翻页。
+     */
     static String encodeCursor(Instant createdAt, String decisionId) {
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         String validatedDecisionId = DecisionCommandValidation.requireText(decisionId, "decision_id");
@@ -207,6 +251,9 @@ public class AuditService {
         return CURSOR_ENCODER.encodeToString(payload.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * 解析客户端传入的游标。
+     */
     static Cursor decodeCursor(String cursor) {
         String validatedCursor = DecisionCommandValidation.requireText(cursor, "after");
         try {
@@ -298,6 +345,9 @@ public class AuditService {
         return List.copyOf(result);
     }
 
+    /**
+     * 表示已解析的分页游标。
+     */
     record Cursor(Instant createdAt, String decisionId) {
     }
 }

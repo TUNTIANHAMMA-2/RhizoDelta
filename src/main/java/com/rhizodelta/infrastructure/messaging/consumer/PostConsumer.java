@@ -23,6 +23,20 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * 消费帖子事件并触发后续异步处理链路。
+ *
+ * <p>该消费者接到 {@link PostEventMessage} 后，会依次完成帖子落库，
+ * 并触发 embedding、质量评估、SSE 广播以及 AI 路由编排。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会调用 {@link PostService} 写入帖子节点。</li>
+ *   <li>会异步生成 embedding 并写回图谱。</li>
+ *   <li>会按条件触发质量评估和 AI 路由。</li>
+ *   <li>会通过 {@link SseEventService} 广播节点、边和编排状态。</li>
+ * </ul>
+ */
 @Component
 public class PostConsumer {
     private static final Logger LOGGER = LoggerFactory.getLogger(PostConsumer.class);
@@ -50,6 +64,9 @@ public class PostConsumer {
         this.sseEventService = sseEventService;
     }
 
+    /**
+     * 处理 RabbitMQ 中的帖子消息。
+     */
     @RabbitListener(queues = RabbitMqConfig.POSTS_QUEUE)
     public void handleMessage(PostEventMessage message) {
         processMessage(message);
@@ -85,6 +102,11 @@ public class PostConsumer {
         this.qualityMinContentLength = qualityMinContentLength;
     }
 
+    /**
+     * 执行帖子消息的主处理流程。
+     *
+     * <p>若命中幂等复用，则直接跳过所有后续副作用，避免重复广播和重复评估。
+     */
     private void processMessage(PostEventMessage message) {
         PostService.CreateHumanPostCommand command = new PostService.CreateHumanPostCommand(
                 message.requestId(),
@@ -105,6 +127,11 @@ public class PostConsumer {
         scheduleRouting(message, post);
     }
 
+    /**
+     * 异步生成帖子 embedding 并广播状态。
+     *
+     * <p>失败时会向当前作者广播失败状态，但不会回滚已创建的帖子节点。
+     */
     private void writeEmbedding(PostEventMessage message, HumanPost post) {
         try {
             List<Float> vector = embeddingModelService.embed(post.getContent());
@@ -125,7 +152,7 @@ public class PostConsumer {
                     post.getNodeId().toString(),
                     "FAILED",
                     "embedding generation failed",
-                    message.authorId()
+                message.authorId()
             );
         }
     }
@@ -173,6 +200,11 @@ public class PostConsumer {
         sseEventService.publish(SseEventService.SseEventType.ORCHESTRATION_STATUS, payload);
     }
 
+    /**
+     * 按条件异步触发质量评估。
+     *
+     * <p>若功能关闭、服务不存在或正文过短，则直接跳过。
+     */
     private void scheduleQualityEvaluation(HumanPost post) {
         if (!qualityEnabled || qualityAgentService == null) {
             return;
@@ -201,6 +233,11 @@ public class PostConsumer {
         }, embeddingTaskExecutor);
     }
 
+    /**
+     * 异步触发 AI 路由编排。
+     *
+     * <p>路由失败时只广播失败状态，不回滚帖子节点本身。
+     */
     private void scheduleRouting(PostEventMessage message, HumanPost post) {
         if (aiRoutingOrchestratorService == null) {
             return;

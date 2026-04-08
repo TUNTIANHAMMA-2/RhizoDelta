@@ -27,6 +27,19 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * 提供注册、登录与当前用户信息接口。
+ *
+ * <p>该控制器负责管理用户账户的创建与认证会话签发，
+ * 并通过 JWT 把认证结果返回给调用方。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>注册会写 Neo4j 中的 {@code UserAccount} 节点。</li>
+ *   <li>登录和注册都会签发新的 JWT。</li>
+ *   <li>密码会在写库前经由 {@link PasswordEncoder} 加密。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -78,6 +91,11 @@ public class AuthController {
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * 注册一个新用户并返回登录态。
+     *
+     * <p>若用户名已存在，该接口会直接失败，不会悄悄覆盖原账户。
+     */
     @PostMapping("/register")
     public ApiResponse<AuthSessionPayload> register(@RequestBody RegisterRequest request) {
         validateCredentials(request.username(), request.password());
@@ -85,6 +103,9 @@ public class AuthController {
         return ApiResponse.ok(toSessionPayload(user, issueToken(user)));
     }
 
+    /**
+     * 使用用户名和密码登录并返回登录态。
+     */
     @PostMapping("/login")
     public ApiResponse<AuthSessionPayload> login(@RequestBody LoginRequest request) {
         validateCredentials(request.username(), request.password());
@@ -96,6 +117,9 @@ public class AuthController {
         return ApiResponse.ok(toSessionPayload(user, issueToken(user)));
     }
 
+    /**
+     * 返回当前认证用户信息。
+     */
     @GetMapping("/me")
     public ApiResponse<UserPayload> me(Authentication authentication) {
         AuthenticatedUser user = requireAuthenticatedUser(authentication);
@@ -213,6 +237,9 @@ public class AuthController {
     ) {
     }
 
+    /**
+     * 表示注册请求。
+     */
     public record RegisterRequest(
             @JsonProperty("username") String username,
             @JsonProperty("password") String password,
@@ -220,18 +247,27 @@ public class AuthController {
     ) {
     }
 
+    /**
+     * 表示登录请求。
+     */
     public record LoginRequest(
             @JsonProperty("username") String username,
             @JsonProperty("password") String password
     ) {
     }
 
+    /**
+     * 表示认证会话响应。
+     */
     public record AuthSessionPayload(
             @JsonProperty("token") String token,
             @JsonProperty("user") UserPayload user
     ) {
     }
 
+    /**
+     * 表示当前用户的对外视图。
+     */
     public record UserPayload(
             @JsonProperty("user_id") String userId,
             @JsonProperty("username") String username,

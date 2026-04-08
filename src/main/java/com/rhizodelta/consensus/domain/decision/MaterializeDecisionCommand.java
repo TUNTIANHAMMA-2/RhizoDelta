@@ -6,6 +6,12 @@ import com.rhizodelta.core.validation.DecisionCommandValidation;
 
 import java.util.UUID;
 
+/**
+ * 表示一次物化结果决策命令。
+ *
+ * <p>该命令用于从一个既有源节点派生出一个新的 {@code Result} 节点，
+ * 强调的是“把当前阶段的结论沉淀为结果层对象”，而不是继续在帖子层演化。
+ */
 public record MaterializeDecisionCommand(
         @JsonProperty("decision_id") String decision_id,
         @JsonProperty("request_id") String request_id,
@@ -15,6 +21,9 @@ public record MaterializeDecisionCommand(
         @JsonProperty("operator_id") String operator_id,
         @JsonProperty("reason") String reason
 ) {
+    /**
+     * 创建物化命令并校验关键输入。
+     */
     public MaterializeDecisionCommand {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
         request_id = DecisionCommandValidation.requireText(request_id, "request_id");

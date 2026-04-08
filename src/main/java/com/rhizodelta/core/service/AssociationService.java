@@ -23,6 +23,25 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 负责维护图谱节点之间的业务关联关系。
+ *
+ * <p>该服务为 {@code com.rhizodelta.core.service} 中的关系写模型入口，封装了
+ * 关联创建、关联删除和关联查询三类能力，并统一处理节点存在性、置信度与返回结构映射。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>创建关联会写 Neo4j 关系边及其审计属性。</li>
+ *   <li>删除关联会物理删除允许管理的关系类型。</li>
+ *   <li>查询接口只读，但会把图关系映射为面向 API 的 {@link AssociationInfo}。</li>
+ * </ul>
+ *
+ * <p><b>隐藏约束</b>：
+ * <ul>
+ *   <li>当前只允许处理 {@link AssociationType#CONCEPTUAL_OVERLAP} 与 {@link AssociationType#RELATES_TO}。</li>
+ *   <li>源节点和目标节点必须不同，且都必须存在且未被软删除。</li>
+ * </ul>
+ */
 @Service
 public class AssociationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AssociationService.class);
@@ -93,6 +112,29 @@ public class AssociationService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 创建一条关联关系，或在关系已存在时返回既有结果。
+     *
+     * <p>该方法存在的意义，是把节点校验、置信度标准化和关系 upsert 收敛为单个事务，
+     * 让上层只关注业务语义，不需要感知图数据库的关系模板。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会写 Neo4j 关系边。</li>
+     *   <li>会记录创建者、原因、创建时间与置信度。</li>
+     * </ul>
+     *
+     * <p><b>注意事项</b>：
+     * <ul>
+     *   <li>若关系已存在，返回的 {@code created=false}，但仍会返回完整的关联结果。</li>
+     *   <li>浮点置信度会被转换为 {@link Double} 写入数据库，避免精度歧义。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param command 关联创建命令。
+     * @return 关联结果以及是否新建的信息。
+     */
     @Transactional(transactionManager = "transactionManager")
     public CreateAssociationOutcome createAssociation(CreateAssociationCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -118,6 +160,23 @@ public class AssociationService {
         return toCreateOutcome(result, command.type());
     }
 
+    /**
+     * 删除指定的关联关系。
+     *
+     * <p>该方法存在，是为了把“按关联 ID 删除图关系”的细节隐藏在服务层，
+     * 同时为审计日志和异常语义提供统一出口。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会删除底层关系边。</li>
+     *   <li>会输出删除日志，便于追踪人工治理动作。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param associationId 关联 ID。
+     * @return 删除结果。
+     */
     @Transactional(transactionManager = "transactionManager")
     public DeleteAssociationOutcome deleteAssociation(UUID associationId) {
         UUID validatedAssociationId = DecisionCommandValidation.requireUuid(associationId, "association_id");
@@ -134,6 +193,25 @@ public class AssociationService {
         return new DeleteAssociationOutcome(validatedAssociationId, true);
     }
 
+    /**
+     * 查询节点当前可见的关联关系列表。
+     *
+     * <p>该方法存在，是为了给查询层和 API 层提供稳定的关系视图，
+     * 由服务层统一处理节点校验、默认分页与图记录到 DTO 的映射。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>只读访问 Neo4j，不会修改图数据。</li>
+     *   <li>当节点不存在时会抛出 {@link NoSuchElementException}，而不是返回空列表掩盖错误。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param nodeId 要查询关联的节点 ID。
+     * @param type 可选的关联类型过滤条件。
+     * @param limit 可选的返回数量上限；为空或非法时会回退到默认值。
+     * @return 关联信息列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<AssociationInfo> findAssociationsByNodeId(UUID nodeId, AssociationType type, Integer limit) {
         UUID validatedNodeId = DecisionCommandValidation.requireUuid(nodeId, "node_id");
@@ -151,6 +229,12 @@ public class AssociationService {
         return records.stream().map(AssociationService::toAssociationInfo).toList();
     }
 
+    /**
+     * 校验关联两端节点是否满足建边前置条件。
+     *
+     * <p>该校验被独立抽出，是为了把“自引用禁止”和“节点存在性校验”集中在一个地方，
+     * 避免不同写操作分支出现不一致的约束语义。
+     */
     private void validateAssociationNodes(UUID sourceNodeId, UUID targetNodeId) {
         if (sourceNodeId.equals(targetNodeId)) {
             throw new IllegalArgumentException("source_node_id and target_node_id must be different");
@@ -234,9 +318,19 @@ public class AssociationService {
         return new BigDecimal(confidence.toString()).doubleValue();
     }
 
+    /**
+     * 表示关联创建结果。
+     *
+     * <p>该对象让调用方能同时拿到关联详情和幂等创建标记。
+     */
     public record CreateAssociationOutcome(AssociationResult association, boolean created) {
     }
 
+    /**
+     * 表示关联删除结果。
+     *
+     * <p>该对象用于显式表达删除动作是否生效，避免上层自行推断删除状态。
+     */
     public record DeleteAssociationOutcome(UUID association_id, boolean deleted) {
     }
 }

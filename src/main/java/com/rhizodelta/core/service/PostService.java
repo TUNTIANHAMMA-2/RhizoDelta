@@ -12,6 +12,25 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 负责将用户帖子持久化为核心图谱节点。
+ *
+ * <p>该服务位于 {@code com.rhizodelta.core.service}，承担“把一条人类输入稳定落到图谱里”的职责，
+ * 并维护帖子与目标节点之间的 {@code CONTINUES_FROM} 关系。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会在 Neo4j 中创建或复用 {@link HumanPost} 节点。</li>
+ *   <li>当存在 {@code targetNodeId} 时，会补写一条回复关系边。</li>
+ *   <li>该服务本身不发 MQ、不推 SSE，只负责核心持久化语义。</li>
+ * </ul>
+ *
+ * <p><b>隐藏约束</b>：
+ * <ul>
+ *   <li>幂等键是 {@code requestId}，重复请求不会重复创建帖子。</li>
+ *   <li>目标节点不存在时会直接失败，避免异步链路后置暴露脏引用。</li>
+ * </ul>
+ */
 @Service
 public class PostService {
     private static final String HUMAN_OPERATOR_TYPE = "HUMAN";
@@ -65,6 +84,30 @@ public class PostService {
         this.humanPostRepository = humanPostRepository;
     }
 
+    /**
+     * 创建一条人工帖子节点，并在需要时补上回复关系。
+     *
+     * <p>该方法存在的意义，是把“帖子节点创建”“目标节点校验”“回复边创建”收敛为单个事务边界，
+     * 保证调用方拿到的结果要么是已存在的幂等节点，要么是一次完整写入后的新节点。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会写 Neo4j 节点。</li>
+     *   <li>在 {@code targetNodeId} 存在时会写 {@code CONTINUES_FROM} 关系。</li>
+     *   <li>会读取仓储确认最终持久化结果，而不是直接信任 upsert 查询结果。</li>
+     * </ul>
+     *
+     * <p><b>注意事项</b>：
+     * <ul>
+     *   <li>当 {@code requestId} 已存在时，返回结果中的 {@code created=false}。</li>
+     *   <li>该方法是下游 embedding、质量评估与 AI 路由链路的前置基础，不应在失败时静默降级。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param command 帖子创建命令。
+     * @return 包含最终帖子节点及是否新建的结果对象。
+     */
     @Transactional(transactionManager = "transactionManager")
     public CreateHumanPostResult createHumanPost(CreateHumanPostCommand command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -91,9 +134,26 @@ public class PostService {
         return new CreateHumanPostResult(created, true);
     }
 
+    /**
+     * 表示帖子创建结果。
+     *
+     * <p>该结果对象用于让调用方区分“新创建成功”与“命中了幂等复用”两种语义。
+     */
     public record CreateHumanPostResult(HumanPost post, boolean created) {
     }
 
+    /**
+     * 按 {@code requestId} 执行帖子节点 upsert。
+     *
+     * <p>该方法单独存在，是为了把节点属性初始化和根节点归属计算封装在一个 Neo4j 语句里，
+     * 避免调用方在事务中重复拼接图谱建模细节。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会写或复用 {@code Human_Post} 节点。</li>
+     *   <li>会根据目标节点决定新帖子的 {@code root_id}。</li>
+     * </ul>
+     */
     private String upsertByRequestId(
             CreateHumanPostCommand command,
             UUID generatedNodeId,
@@ -111,6 +171,18 @@ public class PostService {
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve node_id from upsert query"));
     }
 
+    /**
+     * 在帖子作为回复时补建 {@code CONTINUES_FROM} 关系。
+     *
+     * <p>该关系并不是附带信息，而是查询谱系、分支上下文和 AI 路由判断的基础，
+     * 所以与帖子节点写入放在同一事务语义下处理。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会向图谱中写一条回复关系边。</li>
+     *   <li>当帖子不是回复时直接返回，不产生任何写操作。</li>
+     * </ul>
+     */
     private void createReplyRelationshipIfNeeded(
             String postNodeId,
             CreateHumanPostCommand command,
@@ -139,6 +211,17 @@ public class PostService {
                 .orElse(null);
     }
 
+    /**
+     * 校验回复目标节点是否存在且仍然有效。
+     *
+     * <p>这一步存在的意义，是在真正写帖子前阻断悬空引用，避免后续链路基于非法父节点继续扩散错误。
+     *
+     * <p><b>关键副作用</b>：
+     * <ul>
+     *   <li>会读取 Neo4j。</li>
+     *   <li>目标节点不存在时抛出 {@link IllegalArgumentException}。</li>
+     * </ul>
+     */
     private void validateTargetNodeExists(String targetNodeId) {
         Map<String, Object> result = neo4jClient.query(TARGET_NODE_EXISTS_QUERY)
                 .bind(targetNodeId).to("targetNodeId")
@@ -150,6 +233,15 @@ public class PostService {
         }
     }
 
+    /**
+     * 表示人工帖子创建命令。
+     *
+     * <p><b>注意事项</b>：
+     * <ul>
+     *   <li>{@code targetNodeId} 允许为空，表示创建一条新的根帖子。</li>
+     *   <li>构造阶段会完成基础文本校验与目标节点 ID 归一化，避免服务层重复处理空白值。</li>
+     * </ul>
+     */
     public record CreateHumanPostCommand(String requestId, String authorId, String content, String targetNodeId) {
         public CreateHumanPostCommand {
             requestId = requireText(requestId, "requestId");

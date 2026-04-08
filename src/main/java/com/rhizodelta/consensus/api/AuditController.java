@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 
+/**
+ * 提供决策审计查询入口。
+ *
+ * <p>该控制器只负责读取已经发生过的决策记录，不会触发任何图谱写操作。
+ */
 @RestController
 @RequestMapping("/api/audit/decisions")
 public class AuditController {
@@ -23,6 +28,11 @@ public class AuditController {
         this.auditService = auditService;
     }
 
+    /**
+     * 按条件分页查询决策审计记录。
+     *
+     * <p>支持按类型、操作者、节点以及时间窗口过滤，并使用游标继续翻页。
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<AuditListResponse>> listDecisions(
             @RequestParam(value = "type", required = false) String type,
@@ -39,6 +49,9 @@ public class AuditController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    /**
+     * 返回单条决策的审计详情。
+     */
     @GetMapping("/{decision_id}")
     public ResponseEntity<ApiResponse<AuditDetail>> getDecisionDetail(
             @PathVariable("decision_id") String decisionId

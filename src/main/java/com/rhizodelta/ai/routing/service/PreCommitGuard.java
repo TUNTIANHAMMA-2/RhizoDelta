@@ -10,6 +10,12 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 在真正提交路由决策前检查图状态是否已发生变化。
+ *
+ * <p>该守卫用于防止“模型基于旧上下文做出的判断”在图已经前进后仍然落地，
+ * 从而降低并发场景下错误合并或错误分支的风险。
+ */
 @Service
 public class PreCommitGuard {
     private static final String SOURCE_STALENESS_QUERY = """
@@ -37,6 +43,19 @@ public class PreCommitGuard {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 判断源节点或目标节点在工作流开始后是否已经前进。
+     *
+     * <p>若源分支已前进、目标头节点已前进，或者源节点本身消失，都会返回
+     * {@code stale=true}，提示上层转入人工复核。
+     *
+     * <p>
+     *
+     * @param sourceNodeId 源节点 ID。
+     * @param workflowStartedAt 工作流开始时间。
+     * @param targetNodeId 可选目标节点 ID。
+     * @return 提交流程守卫结果。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public PreCommitGuardResult evaluate(String sourceNodeId, Instant workflowStartedAt, String targetNodeId) {
         Objects.requireNonNull(sourceNodeId, "sourceNodeId must not be null");
@@ -70,6 +89,9 @@ public class PreCommitGuard {
         return new PreCommitGuardResult(false, "graph unchanged");
     }
 
+    /**
+     * 表示提交前守卫的判断结果。
+     */
     public record PreCommitGuardResult(boolean stale, String reason) {
     }
 }

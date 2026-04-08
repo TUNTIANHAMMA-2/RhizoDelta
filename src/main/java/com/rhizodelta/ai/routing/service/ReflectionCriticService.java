@@ -16,6 +16,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * 负责对路由决策执行一次模型化反思校验。
+ *
+ * <p>该服务不是直接产出最终决策的主评估器，而是作为二次审查者，
+ * 判断当前动作和置信度是否合理，并返回确认或修正建议。
+ */
 @Service
 public class ReflectionCriticService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReflectionCriticService.class);
@@ -46,6 +52,20 @@ public class ReflectionCriticService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 对当前路由结论进行反思审查。
+     *
+     * <p>该方法会再次调用路由模型，并要求模型以结构化 JSON 返回“确认/修正”结论。
+     *
+     * <p>
+     *
+     * @param action 当前动作。
+     * @param confidence 当前置信度。
+     * @param reason 当前理由。
+     * @param postContent 原始帖子内容。
+     * @param routingContext 当前召回上下文。
+     * @return 反思结果。
+     */
     public ReflectionResult critique(
             String action,
             double confidence,
@@ -86,6 +106,11 @@ public class ReflectionCriticService {
         return parseResult(responseText);
     }
 
+    /**
+     * 将模型返回解析为 {@link ReflectionResult}。
+     *
+     * <p>解析失败会直接抛出异常，避免工作流基于非结构化文本继续推进。
+     */
     private ReflectionResult parseResult(String responseText) {
         try {
             return objectMapper.readValue(responseText, ReflectionResult.class);

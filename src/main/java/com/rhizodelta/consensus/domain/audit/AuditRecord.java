@@ -9,6 +9,12 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * 表示一条决策审计摘要记录。
+ *
+ * <p>该模型用于审计列表场景，承载“发生了什么决策、由谁执行、作用于哪些节点、何时发生”的最小信息集合。
+ * 它是只读视图，不参与任何决策执行。
+ */
 public record AuditRecord(
         @JsonProperty("decision_id") String decision_id,
         @JsonProperty("decision_type") DecisionType decision_type,
@@ -19,6 +25,11 @@ public record AuditRecord(
         @JsonProperty("reason") String reason,
         @JsonProperty("created_at") Instant created_at
 ) {
+    /**
+     * 创建审计摘要记录并校验关键字段完整性。
+     *
+     * <p>这里在模型层执行非空校验，是为了确保分页结果中的每一项都能直接用于展示与追踪。
+     */
     public AuditRecord {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
         decision_type = Objects.requireNonNull(decision_type, "decision_type must not be null");

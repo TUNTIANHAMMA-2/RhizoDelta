@@ -18,6 +18,18 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * 在合并类决策提交后触发摘要生成。
+ *
+ * <p>该监听器同样运行在 {@link TransactionPhase#AFTER_COMMIT} 阶段，
+ * 确保摘要生成失败不会影响主事务提交。
+ *
+ * <p><b>关键副作用</b>：
+ * <ul>
+ *   <li>会异步调用 {@link SummaryAgentService} 生成或增量更新摘要。</li>
+ *   <li>摘要成功后会通过 {@link SseEventService} 广播 {@code SUMMARY_GENERATED} 事件。</li>
+ * </ul>
+ */
 @Component
 public class SummaryAfterMergeListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(SummaryAfterMergeListener.class);
@@ -42,6 +54,11 @@ public class SummaryAfterMergeListener {
         this.embeddingTaskExecutor = Objects.requireNonNull(embeddingTaskExecutor);
     }
 
+    /**
+     * 处理新合并完成事件并触发首次摘要生成。
+     *
+     * <p>若摘要功能被关闭，则直接跳过，不做隐式降级补偿。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMergeCompleted(DecisionCommittedEvent.MergeCompleted event) {
         if (!summaryEnabled) {
@@ -55,6 +72,9 @@ public class SummaryAfterMergeListener {
                 });
     }
 
+    /**
+     * 处理追加来源完成事件并触发增量摘要更新。
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMergeAppended(DecisionCommittedEvent.MergeAppended event) {
         if (!summaryEnabled) {
@@ -68,6 +88,9 @@ public class SummaryAfterMergeListener {
                 });
     }
 
+    /**
+     * 生成完整摘要并广播结果。
+     */
     private void generateSummary(DecisionCommittedEvent.MergeCompleted event) {
         try {
             SummaryResult result = summaryAgentService.generate(event.nodeId());
@@ -84,6 +107,9 @@ public class SummaryAfterMergeListener {
         }
     }
 
+    /**
+     * 基于新增来源生成增量摘要并广播结果。
+     */
     private void generateIncrementalSummary(DecisionCommittedEvent.MergeAppended event) {
         try {
             List<UUID> newContributorIds = event.synthesizedFrom();

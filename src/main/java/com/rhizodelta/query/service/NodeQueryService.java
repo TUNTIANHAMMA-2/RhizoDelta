@@ -23,6 +23,19 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 负责构建节点摘要、谱系拓扑与子树拓扑的只读查询服务。
+ *
+ * <p>该服务统一封装帖子节点、共识节点和结果节点的读取逻辑，并将底层图查询映射为上层可直接消费的
+ * 统一摘要与拓扑对象。
+ *
+ * <p><b>关键特征</b>：
+ * <ul>
+ *   <li>所有公开方法都以只读事务执行，不修改图数据。</li>
+ *   <li>会主动排除软删除节点，避免查询层重新暴露逻辑删除对象。</li>
+ *   <li>谱系与子树查询不仅遍历主干关系，还会附带共识、来源和结果层节点。</li>
+ * </ul>
+ */
 @Service
 public class NodeQueryService {
     private static final int DEFAULT_MAX_DEPTH = 10;
@@ -230,6 +243,17 @@ public class NodeQueryService {
         this.neo4jClient = neo4jClient;
     }
 
+    /**
+     * 按节点 ID 返回底层实体的统一视图。
+     *
+     * <p>该方法存在的意义，是让上层调用方无需分别访问多个仓储，
+     * 就能在一个入口中解析 {@link HumanPost}、{@link AIConsensus} 与 {@link Result}。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @return 节点结果视图。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public NodeResult getNodeById(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -241,11 +265,35 @@ public class NodeQueryService {
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
+    /**
+     * 返回节点的祖先谱系节点列表。
+     *
+     * <p>这是 {@link #getLineageTopology(UUID, Integer)} 的便捷封装，
+     * 适合只关心节点集合而不需要边关系的场景。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param maxDepth 可选最大深度。
+     * @return 谱系节点列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getLineage(UUID nodeId, Integer maxDepth) {
         return getLineageTopology(nodeId, maxDepth).nodes();
     }
 
+    /**
+     * 构建节点向上的谱系拓扑。
+     *
+     * <p>该方法会沿着版本演化主干向祖先遍历，并补挂与主干节点相关的共识及来源边，
+     * 以提供完整的“回溯视图”。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param maxDepth 可选最大深度。
+     * @return 谱系拓扑。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public GraphTopology getLineageTopology(UUID nodeId, Integer maxDepth) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -254,6 +302,24 @@ public class NodeQueryService {
         return executeGraphTopologyQuery(LINEAGE_QUERY, nodeId, resolvedMaxDepth);
     }
 
+    /**
+     * 构建节点向下的子树拓扑。
+     *
+     * <p>该方法会把回复、分支、共识与结果层节点一起纳入结果，因此适合“从当前节点继续向后观察”的场景。
+     *
+     * <p><b>注意事项</b>：
+     * <ul>
+     *   <li>若节点不存在，会抛出 {@link NoSuchElementException} 而不是返回空拓扑。</li>
+     *   <li>{@code limit} 作用于最终裁剪后的连通节点集合，而不是底层 Cypher 直接限流。</li>
+     * </ul>
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @param maxDepth 可选最大深度。
+     * @param limit 可选节点数量限制。
+     * @return 子树拓扑。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public GraphTopology getChildrenTopology(UUID nodeId, Integer maxDepth, Integer limit) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -265,6 +331,16 @@ public class NodeQueryService {
         return applyChildrenLimit(nodeId, topology, limit);
     }
 
+    /**
+     * 返回共识节点的来源帖子实体。
+     *
+     * <p>该方法适用于需要完整帖子对象而非摘要投影的场景。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @return 来源帖子列表；若目标是帖子节点则返回空列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<HumanPost> getProvenance(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -280,6 +356,16 @@ public class NodeQueryService {
         return humanPostRepository.findProvenance(nodeId);
     }
 
+    /**
+     * 返回单个节点的统一摘要。
+     *
+     * <p>该摘要结构跨越三种节点类型做了字段归一化，便于上层统一渲染。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @return 节点摘要。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public LineageNode getNodeSummaryById(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -291,6 +377,16 @@ public class NodeQueryService {
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
+    /**
+     * 返回共识节点的来源摘要列表。
+     *
+     * <p>相比 {@link #getProvenance(UUID)}，该方法更轻量，更适合 UI 展示与提示词构建。
+     *
+     * <p>
+     *
+     * @param nodeId 节点 ID。
+     * @return 来源摘要列表；若目标本身是帖子节点则返回空列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getProvenanceSummaries(UUID nodeId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
@@ -310,6 +406,16 @@ public class NodeQueryService {
                 .toList();
     }
 
+    /**
+     * 返回当前图谱中的根节点摘要列表。
+     *
+     * <p>该方法服务于全局导航和入口视图，会排除已删除节点以及仅作为挂接来源的特殊节点。
+     *
+     * <p>
+     *
+     * @param limit 可选数量限制。
+     * @return 根节点摘要列表。
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getRoots(Integer limit) {
         int resolvedLimit = limit == null || limit <= 0 ? 50 : limit;
@@ -579,23 +685,45 @@ public class NodeQueryService {
         return null;
     }
 
+    /**
+     * 表示节点读取结果的统一抽象。
+     *
+     * <p>该密封接口让调用方可以在保持类型安全的前提下处理不同底层节点实体。
+     */
     public sealed interface NodeResult permits HumanPostNode, AIConsensusNode, ResultNode {
     }
 
+    /**
+     * 表示帖子节点读取结果。
+     */
     public record HumanPostNode(HumanPost node) implements NodeResult {
     }
 
+    /**
+     * 表示共识节点读取结果。
+     */
     public record AIConsensusNode(AIConsensus node) implements NodeResult {
     }
 
+    /**
+     * 表示结果节点读取结果。
+     */
     public record ResultNode(Result node) implements NodeResult {
     }
 
+    /**
+     * 表示一张完整的查询拓扑。
+     *
+     * <p>该对象将节点集与边集成对返回，适合图组件或上层服务直接消费。
+     */
     public record GraphTopology(
             List<LineageNode> nodes,
             List<LineageEdge> edges) {
     }
 
+    /**
+     * 表示拓扑中的一条边。
+     */
     public record LineageEdge(
             String source,
             String target,
@@ -603,6 +731,11 @@ public class NodeQueryService {
             Instant createdAt) {
     }
 
+    /**
+     * 表示查询层统一使用的节点摘要。
+     *
+     * <p>该对象屏蔽了帖子、共识与结果节点之间的字段差异，供控制器和前端统一使用。
+     */
     public record LineageNode(
             String nodeId,
             String label,
@@ -614,6 +747,11 @@ public class NodeQueryService {
             boolean hasEmbedding,
             Double qualityOverall) {
 
+        /**
+         * 创建一个不包含质量分的节点摘要。
+         *
+         * <p>该重载主要用于兼容只返回基础字段的查询映射结果。
+         */
         public LineageNode(
                 String nodeId, String label, String content, String summaryContent,
                 String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding
