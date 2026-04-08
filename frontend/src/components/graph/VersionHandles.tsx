@@ -9,6 +9,8 @@ export const HIDDEN_HANDLE_STYLE = {
 export const VersionHandles = memo(function VersionHandles() {
   return (
     <>
+      <Handle id="source-center" type="source" position={Position.Top} style={{ top: '50%', left: '50%', opacity: 0, pointerEvents: 'none' }} />
+      <Handle id="target-center" type="target" position={Position.Top} style={{ top: '50%', left: '50%', opacity: 0, pointerEvents: 'none' }} />
       <Handle id="source-top" type="source" position={Position.Top} style={HIDDEN_HANDLE_STYLE} />
       <Handle id="source-right" type="source" position={Position.Right} style={HIDDEN_HANDLE_STYLE} />
       <Handle id="source-bottom" type="source" position={Position.Bottom} style={HIDDEN_HANDLE_STYLE} />

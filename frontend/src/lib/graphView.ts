@@ -30,6 +30,8 @@ function buildExploreBootstrap(
     })),
     edges: lineage.edges.map((edge) => ({
       ...edge,
+      sourceHandle: "source-center",
+      targetHandle: "target-center",
       data: {
         ...edge.data,
         viewMode: "explore",

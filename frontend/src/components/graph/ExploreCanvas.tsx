@@ -43,9 +43,9 @@ function ExploreViewportListener() {
   const onViewportChange = useCallback(
     (viewport: Viewport) => {
       setZoomLevel(viewport.zoom);
-      if (viewport.zoom < 0.5) {
+      if (viewport.zoom < 0.25) {
         setSemanticZoom("micro");
-      } else if (viewport.zoom < 0.8) {
+      } else if (viewport.zoom < 0.45) {
         setSemanticZoom("mini");
       } else {
         setSemanticZoom("normal");

@@ -5,143 +5,106 @@ import {
   forceSimulation,
   forceX,
   forceY,
+  forceCenter,
   type Simulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
 import type { Edge, Node } from "@xyflow/react";
 
-const BRANCH_X_STEP = 340;
-const BRANCH_Y_OFFSET = 60;
-const CONTINUE_Y_STEP = 220;
-const MERGE_Y_STEP = -200;
-const CHARGE_STRENGTH = -900;
-const COLLISION_RADIUS = 160;
-const LINK_DISTANCE = 260;
-const TARGET_FORCE_STRENGTH = 0.28;
-const TARGET_FORCE_Y_STRENGTH = 0.34;
-const ALPHA_DECAY = 0.08;
-
-interface ExploreTarget {
-  x: number;
-  y: number;
-  fixed: boolean;
-}
+const CHARGE_STRENGTH = -2500;
+const COLLIDE_RADIUS = 180; 
+const COLLIDE_ITERATIONS = 4;
+const GRAVITY_STRENGTH = 0.015; // Weak sea-gravity float effect
+const ALPHA_DECAY = 0.05; // Slower decay for organic floating
 
 interface ExploreSimulationNode extends SimulationNodeDatum {
   id: string;
-  targetX: number;
-  targetY: number;
 }
 
 interface ExploreSimulationLink extends SimulationLinkDatum<ExploreSimulationNode> {
   source: string | ExploreSimulationNode;
   target: string | ExploreSimulationNode;
+  edgeData: Edge;
 }
 
-function toTimestamp(edge: Edge) {
-  const value = edge.data?.createdAt;
-  return value ? new Date(String(value)).getTime() : 0;
-}
-
-function stableCompare(left: Edge, right: Edge) {
-  const timestampDiff = toTimestamp(left) - toTimestamp(right);
-  if (timestampDiff !== 0) {
-    return timestampDiff;
-  }
-  return left.id.localeCompare(right.id);
-}
-
-function branchOffset(index: number) {
-  const step = Math.floor(index / 2) + 1;
-  return index % 2 === 0 ? step : -step;
-}
-
-function relationDirection(edge: Edge, anchorNodeId: string) {
-  if (edge.source === anchorNodeId) {
-    return "outgoing";
-  }
-  if (edge.target === anchorNodeId) {
-    return "incoming";
-  }
-  return "disconnected";
-}
-
-function resolveRelationTarget(
-  edge: Edge,
-  anchorNodeId: string,
-  branchIndexMap: Map<string, number>,
-): ExploreTarget | null {
-  const relType = String(edge.data?.relType ?? "");
-  const direction = relationDirection(edge, anchorNodeId);
-  const neighborId = edge.source === anchorNodeId ? edge.target : edge.source;
-
-  if (direction === "disconnected") {
-    return null;
-  }
-
-  if (relType === "CONTINUES_FROM") {
-    const y = direction === "incoming" ? CONTINUE_Y_STEP : -CONTINUE_Y_STEP;
-    return { x: 0, y, fixed: false };
-  }
-
-  if (relType === "BRANCHED_FROM") {
-    const offset = branchOffset(branchIndexMap.get(neighborId) ?? 0);
-    return {
-      x: offset * BRANCH_X_STEP,
-      y: BRANCH_Y_OFFSET * Math.abs(offset),
-      fixed: false,
-    };
-  }
-
-  if (relType === "CONVERGED_FROM" || relType === "MERGED_INTO") {
-    return { x: 0, y: MERGE_Y_STEP, fixed: false };
-  }
-
-  return {
-    x: direction === "incoming" ? BRANCH_X_STEP * 0.6 : -BRANCH_X_STEP * 0.6,
-    y: 0,
-    fixed: false,
-  };
-}
-
-export function buildExploreTargets(
-  nodes: Array<Pick<Node, "id" | "position">>,
+/**
+ * BFS-based radial tree to assign initial node positions.
+ * This guarantees nodes spawn in non-overlapping, outward-expanding 
+ * concentric rings with correctly partitioned angle sweeps, drastically 
+ * avoiding initial tangles and crossed edges before D3 resolves physics.
+ */
+function assignRadialTreeInitialPositions(
+  nodes: Node[],
   edges: Edge[],
   anchorNodeId: string,
-): Record<string, ExploreTarget> {
-  const targets = Object.fromEntries(
-    nodes.map((node) => [
-      node.id,
-      { x: node.position.x, y: node.position.y, fixed: false },
-    ]),
-  ) as Record<string, ExploreTarget>;
-  targets[anchorNodeId] = { x: 0, y: 0, fixed: true };
-
-  const branchEdges = edges
-    .filter(
-      (edge) =>
-        String(edge.data?.relType ?? "") === "BRANCHED_FROM" &&
-        (edge.source === anchorNodeId || edge.target === anchorNodeId),
-    )
-    .sort(stableCompare);
-  const branchIndexMap = new Map(
-    branchEdges.map((edge, index) => [
-      edge.source === anchorNodeId ? edge.target : edge.source,
-      index,
-    ]),
-  );
-
-  for (const edge of edges) {
-    const target = resolveRelationTarget(edge, anchorNodeId, branchIndexMap);
-    if (!target) {
-      continue;
+) {
+  const adj = new Map<string, string[]>();
+  nodes.forEach((n) => adj.set(n.id, []));
+  edges.forEach((e) => {
+    if (adj.has(e.source) && adj.has(e.target)) {
+      adj.get(e.source)!.push(e.target);
+      adj.get(e.target)!.push(e.source);
     }
-    const nodeId = edge.source === anchorNodeId ? edge.target : edge.source;
-    targets[nodeId] = target;
+  });
+
+  const positions = new Map<string, { x: number; y: number }>();
+  positions.set(anchorNodeId, { x: 0, y: 0 });
+
+  const BASE_RADIUS = 300;
+  const queue: Array<{ id: string; startAngle: number; sweep: number; level: number }> = [];
+  const visited = new Set<string>([anchorNodeId]);
+
+  queue.push({
+    id: anchorNodeId,
+    startAngle: 0,
+    sweep: 2 * Math.PI,
+    level: 0,
+  });
+
+  while (queue.length > 0) {
+    const { id, startAngle, sweep, level } = queue.shift()!;
+    const neighbors = (adj.get(id) || []).filter((v) => !visited.has(v));
+    const count = neighbors.length;
+
+    if (count > 0) {
+      const childSweep = sweep / count;
+      neighbors.forEach((childId, i) => {
+        visited.add(childId);
+        const childStartAngle = startAngle + i * childSweep;
+        const middleAngle = childStartAngle + childSweep / 2;
+        const R = BASE_RADIUS * (level + 1);
+
+        positions.set(childId, {
+          x: R * Math.cos(middleAngle),
+          y: R * Math.sin(middleAngle),
+        });
+
+        queue.push({
+          id: childId,
+          startAngle: childStartAngle,
+          sweep: childSweep,
+          level: level + 1,
+        });
+      });
+    }
   }
 
-  return targets;
+  // Handle theoretically possible disconnected island nodes
+  let disconnectedCount = 0;
+  for (const node of nodes) {
+    if (!positions.has(node.id)) {
+      const R = BASE_RADIUS * 2;
+      const angle = disconnectedCount * 0.8;
+      positions.set(node.id, {
+        x: R * Math.cos(angle),
+        y: R * Math.sin(angle),
+      });
+      disconnectedCount++;
+    }
+  }
+
+  return positions;
 }
 
 export function createExploreSimulation(
@@ -149,23 +112,28 @@ export function createExploreSimulation(
   edges: Edge[],
   anchorNodeId: string,
 ): Simulation<ExploreSimulationNode, undefined> {
-  const targets = buildExploreTargets(nodes, edges, anchorNodeId);
+  const initialPositions = assignRadialTreeInitialPositions(nodes, edges, anchorNodeId);
+
+  // Map react-flow nodes to D3-compatible nodes
   const simulationNodes: ExploreSimulationNode[] = nodes.map((node) => {
-    const target = targets[node.id] ?? {
-      x: node.position.x,
-      y: node.position.y,
-      fixed: false,
-    };
+    const isNewGenerativeSpawn = Math.abs(node.position.x) <= 5 && Math.abs(node.position.y) <= 5;
+    const defaultPos = initialPositions.get(node.id) || { x: node.position.x, y: node.position.y };
+    // If the node hasn't been placed (is at origin), or we want to cleanly restart from anchor, 
+    // we use the smart radial position to avoid overlaps.
+    const startX = isNewGenerativeSpawn ? defaultPos.x : node.position.x;
+    const startY = isNewGenerativeSpawn ? defaultPos.y : node.position.y;
+
     return {
       id: node.id,
-      x: node.position.x,
-      y: node.position.y,
-      fx: target.fixed ? target.x : null,
-      fy: target.fixed ? target.y : null,
-      targetX: target.x,
-      targetY: target.y,
+      x: startX,
+      y: startY,
+      // Gently fix the anchor node to completely stabilize the view origin, 
+      // the rest will organically float around it
+      fx: node.id === anchorNodeId ? 0 : null,
+      fy: node.id === anchorNodeId ? 0 : null,
     };
   });
+
   const simulationLinks: ExploreSimulationLink[] = edges
     .filter(
       (edge) =>
@@ -175,32 +143,39 @@ export function createExploreSimulation(
     .map((edge) => ({
       source: edge.source,
       target: edge.target,
+      edgeData: edge,
     }));
 
   return forceSimulation<ExploreSimulationNode>(simulationNodes)
-    .force("charge", forceManyBody().strength(CHARGE_STRENGTH))
+    // 1. Non-linear Growth & Repulsion (Rhizomatic spread)
+    .force(
+      "charge",
+      forceManyBody().strength(CHARGE_STRENGTH),
+    )
+    // 2. Strict overlap prevention
+    .force(
+      "collide",
+      forceCollide(COLLIDE_RADIUS).iterations(COLLIDE_ITERATIONS),
+    )
+    // 3. Elastic Link Distance based on Semantic Edge Type
     .force(
       "link",
       forceLink<ExploreSimulationNode, ExploreSimulationLink>(simulationLinks)
         .id((node) => node.id)
-        .distance(LINK_DISTANCE),
+        .distance((link) => {
+          const relType = String(link.edgeData.data?.relType ?? "");
+          if (relType === "CONTINUES_FROM") {
+            return 160; // Tighter, linear-like connection
+          }
+          if (relType === "BRANCHED_FROM") {
+            return 320; // Looser, branching out widely
+          }
+          return 240; // Default organic distance
+        }),
     )
-    .force("collide", forceCollide(COLLISION_RADIUS))
-    .force(
-      "targetX",
-      forceX<ExploreSimulationNode>(
-        (node: ExploreSimulationNode) => node.targetX,
-      ).strength(
-        TARGET_FORCE_STRENGTH,
-      ),
-    )
-    .force(
-      "targetY",
-      forceY<ExploreSimulationNode>(
-        (node: ExploreSimulationNode) => node.targetY,
-      ).strength(
-        TARGET_FORCE_Y_STRENGTH,
-      ),
-    )
+    // 4. Breathe & Float
+    .force("forceX", forceX(0).strength(GRAVITY_STRENGTH))
+    .force("forceY", forceY(0).strength(GRAVITY_STRENGTH))
+    .force("center", forceCenter(0, 0))
     .alphaDecay(ALPHA_DECAY);
 }
