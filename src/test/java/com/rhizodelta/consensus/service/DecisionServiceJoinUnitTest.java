@@ -49,6 +49,38 @@ class DecisionServiceJoinUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Test
+    void executeJoinShouldBindSourceNodeIdsForJoinUpsert() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        DecisionService decisionService = new DecisionService(
+                neo4jClient, humanPostRepository, aiConsensusRepository,
+                resultRepository, dagIntegrityService, eventPublisher);
+
+        UUID sourceA = UUID.randomUUID();
+        UUID sourceB = UUID.randomUUID();
+        UUID joinNodeId = UUID.randomUUID();
+        JoinDecisionCommand command = newJoinCommand(List.of(sourceA, sourceB));
+        List<String> expectedSourceNodeIds = List.of(sourceA.toString(), sourceB.toString());
+
+        when(humanPostRepository.existsActiveByNodeId(sourceA)).thenReturn(true);
+        when(humanPostRepository.existsActiveByNodeId(sourceB)).thenReturn(true);
+        when(neo4jClient.query(argThat((String q) -> q != null && q.contains("WITH $sourceNodeIds AS sourceIds")))
+                .bindAll(argThat((Map<String, Object> params) ->
+                        expectedSourceNodeIds.equals(params.get("sourceNodeIds"))
+                                && command.decision_id().equals(params.get("decisionId"))))
+                .fetch().one())
+                .thenReturn(Optional.of(Map.of("nodeId", joinNodeId.toString(), "created", true)));
+        when(neo4jClient.query(argThat((String q) -> q != null && q.contains("CONVERGED_FROM")))
+                .bindAll(anyMap()).fetch().one())
+                .thenReturn(Optional.of(Map.of("convergedCount", 2L)));
+
+        DecisionResult result = decisionService.executeJoin(command);
+
+        assertThat(result.decision_id()).isEqualTo(command.decision_id());
+        assertThat(result.node_id()).isEqualTo(joinNodeId);
+        assertThat(result.status()).isEqualTo("QUEUED");
+    }
+
+    @Test
     void executeJoinShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         DecisionService decisionService = new DecisionService(

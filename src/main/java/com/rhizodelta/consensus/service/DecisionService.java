@@ -704,19 +704,24 @@ public class DecisionService {
     }
     private UpsertResult upsertJoinNode(JoinDecisionCommand command) {
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        // JOIN upsert 需要用首个来源节点推导 root_id；漏绑 sourceNodeIds 会在运行时触发 Neo4j ParameterMissing。
         Map<String, Object> result = neo4jClient.query(UPSERT_JOIN_NODE_QUERY)
                 .bindAll(Map.of("decisionId", command.decision_id(), "nodeId", UUID.randomUUID().toString(),
                         "summaryContent", command.summary_content(), "agentVersion", command.agent_version(),
-                        "requestId", command.request_id(), "createdAt", createdAt))
+                        "requestId", command.request_id(), "createdAt", createdAt,
+                        "sourceNodeIds", stringifySourceIds(command)))
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve AI_Consensus node_id from join upsert query"));
         return toUpsertResult(result);
     }
+    private static List<String> stringifySourceIds(JoinDecisionCommand command) {
+        return command.source_node_ids().stream().map(UUID::toString).toList();
+    }
     private void createJoinRelationships(JoinDecisionCommand command, OffsetDateTime relationshipCreatedAt) {
         Map<String, Object> result = neo4jClient.query(JOIN_RELATIONSHIPS_QUERY)
                 .bindAll(Map.of("decisionId", command.decision_id(),
-                        "sourceNodeIds", command.source_node_ids().stream().map(UUID::toString).toList(),
+                        "sourceNodeIds", stringifySourceIds(command),
                         "operatorType", command.operator_type().name(), "operatorId", command.operator_id(),
                         "createdAt", relationshipCreatedAt, "reason", command.reason()))
                 .fetch()
