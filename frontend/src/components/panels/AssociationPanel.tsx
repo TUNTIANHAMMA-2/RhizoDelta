@@ -51,7 +51,7 @@ export function AssociationPanel({ nodeId }: Props) {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetId.trim() || !userId) return;
+    if (!targetId.trim() || !reason.trim() || !userId) return;
     
     setSubmitting(true);
     try {
@@ -107,8 +107,8 @@ export function AssociationPanel({ nodeId }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="rd-label">关联原因</label>
-                  <input className="rd-input" placeholder="为什么建立关联？" value={reason} onChange={e => setReason(e.target.value)} />
+                  <label className="rd-label">关联原因 *</label>
+                  <input className="rd-input" placeholder="为什么建立关联？" value={reason} onChange={e => setReason(e.target.value)} required />
                 </div>
                 <div>
                   <label className="rd-label">置信度: {Math.round(confidence * 100)}%</label>
@@ -116,7 +116,7 @@ export function AssociationPanel({ nodeId }: Props) {
                 </div>
                 <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
                   <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>取消</button>
-                  <button type="submit" className="btn-primary" disabled={submitting || !userId || !targetId.trim()}>{submitting ? "提交中..." : "保存"}</button>
+                  <button type="submit" className="btn-primary" disabled={submitting || !userId || !targetId.trim() || !reason.trim()}>{submitting ? "提交中..." : "保存"}</button>
                 </div>
               </form>
             )}
