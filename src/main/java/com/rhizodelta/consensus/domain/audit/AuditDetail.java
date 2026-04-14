@@ -27,13 +27,15 @@ public record AuditDetail(
         @JsonProperty("operator_id") String operator_id,
         @JsonProperty("reason") String reason,
         @JsonProperty("created_at") Instant created_at,
-        @JsonProperty("synthesized_from") List<UUID> synthesized_from
+        @JsonProperty("synthesized_from") List<UUID> synthesized_from,
+        @JsonProperty("operation_id") String operation_id
 ) {
     /**
      * 创建审计详情并校验字段完整性。
      *
      * <p>这里强制要求 {@code synthesized_from} 非空列表对象而非 {@code null}，
      * 以避免调用方在渲染详情时再做额外的空值分支处理。
+     * {@code operation_id} 仅在 FORK 类型决策中有值，其他类型为 {@code null}。
      */
     public AuditDetail {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
@@ -45,6 +47,7 @@ public record AuditDetail(
         reason = DecisionCommandValidation.requireText(reason, "reason");
         created_at = Objects.requireNonNull(created_at, "created_at must not be null");
         synthesized_from = validateSynthesizedFrom(synthesized_from);
+        // operation_id is nullable — only present for FORK decisions
     }
 
     private static List<UUID> validateSynthesizedFrom(List<UUID> synthesizedFrom) {

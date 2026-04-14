@@ -45,16 +45,18 @@ public class AuditService {
     private static final String LIST_DECISIONS_QUERY = """
             MATCH (decision:GraphNode)-[rel:MERGED_INTO|BRANCHED_FROM|CONTINUES_FROM|CONVERGED_FROM|MATERIALIZED_FROM|CROSS_SYNTHESIZED_FROM]->(source:GraphNode)
             WITH decision, source, rel,
-                 CASE type(rel)
-                   WHEN 'MERGED_INTO' THEN 'MERGE'
-                   WHEN 'BRANCHED_FROM' THEN 'BRANCH'
-                   WHEN 'CONTINUES_FROM' THEN 'INJECT'
-                   WHEN 'CONVERGED_FROM' THEN 'JOIN'
-                   WHEN 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
-                   WHEN 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
+                 CASE
+                   WHEN type(rel) = 'MERGED_INTO' THEN 'MERGE'
+                   WHEN type(rel) = 'BRANCHED_FROM' AND rel.operation_id IS NOT NULL THEN 'FORK'
+                   WHEN type(rel) = 'BRANCHED_FROM' THEN 'BRANCH'
+                   WHEN type(rel) = 'CONTINUES_FROM' THEN 'INJECT'
+                   WHEN type(rel) = 'CONVERGED_FROM' THEN 'JOIN'
+                   WHEN type(rel) = 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
+                   WHEN type(rel) = 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
                  END AS decisionType,
                  coalesce(rel.decision_id, decision.decision_id) AS decisionId,
-                 rel.created_at AS createdAt
+                 rel.created_at AS createdAt,
+                 rel.operation_id AS operationId
             WHERE decisionId IS NOT NULL
               AND NOT coalesce(decision._deleted, false)
               AND NOT coalesce(source._deleted, false)
@@ -75,7 +77,8 @@ public class AuditService {
                    rel.operator_type AS operatorType,
                    rel.operator_id AS operatorId,
                    rel.reason AS reason,
-                   createdAt AS createdAt
+                   createdAt AS createdAt,
+                   operationId AS operationId
             ORDER BY createdAt DESC, decisionId DESC
             LIMIT $fetchSize
             """;
@@ -87,13 +90,14 @@ public class AuditService {
             OPTIONAL MATCH (decision)-[:SYNTHESIZED_FROM]->(contributor:Human_Post)
             WITH decision, source, rel, [id IN collect(DISTINCT contributor.node_id) WHERE id IS NOT NULL] AS synthesizedFrom
             RETURN coalesce(rel.decision_id, decision.decision_id) AS decisionId,
-                   CASE type(rel)
-                     WHEN 'MERGED_INTO' THEN 'MERGE'
-                     WHEN 'BRANCHED_FROM' THEN 'BRANCH'
-                     WHEN 'CONTINUES_FROM' THEN 'INJECT'
-                     WHEN 'CONVERGED_FROM' THEN 'JOIN'
-                     WHEN 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
-                     WHEN 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
+                   CASE
+                     WHEN type(rel) = 'MERGED_INTO' THEN 'MERGE'
+                     WHEN type(rel) = 'BRANCHED_FROM' AND rel.operation_id IS NOT NULL THEN 'FORK'
+                     WHEN type(rel) = 'BRANCHED_FROM' THEN 'BRANCH'
+                     WHEN type(rel) = 'CONTINUES_FROM' THEN 'INJECT'
+                     WHEN type(rel) = 'CONVERGED_FROM' THEN 'JOIN'
+                     WHEN type(rel) = 'MATERIALIZED_FROM' THEN 'MATERIALIZE'
+                     WHEN type(rel) = 'CROSS_SYNTHESIZED_FROM' THEN 'CROSS_SYNTH'
                    END AS decisionType,
                    decision.node_id AS nodeId,
                    source.node_id AS sourceNodeId,
@@ -101,7 +105,8 @@ public class AuditService {
                    rel.operator_id AS operatorId,
                    rel.reason AS reason,
                    rel.created_at AS createdAt,
-                   synthesizedFrom AS synthesizedFrom
+                   synthesizedFrom AS synthesizedFrom,
+                   rel.operation_id AS operationId
             """;
 
     private static final String CURSOR_DELIMITER = "|";
@@ -208,7 +213,8 @@ public class AuditService {
                 parseOperatorType(row.get("operatorType")),
                 requireText(row, "operatorId"),
                 requireText(row, "reason"),
-                toInstant(row.get("createdAt"))
+                toInstant(row.get("createdAt")),
+                (String) row.get("operationId")
         );
     }
 
@@ -222,7 +228,8 @@ public class AuditService {
                 requireText(row, "operatorId"),
                 requireText(row, "reason"),
                 toInstant(row.get("createdAt")),
-                toUuidList(row.get("synthesizedFrom"), "synthesizedFrom")
+                toUuidList(row.get("synthesizedFrom"), "synthesizedFrom"),
+                (String) row.get("operationId")
         );
     }
 

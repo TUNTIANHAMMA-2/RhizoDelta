@@ -59,8 +59,11 @@ export function AuditPanel({ nodeId }: Props) {
     if (!rollbackTarget) return;
     try {
       if (rollbackTarget.decision_type === "FORK") {
-        // Fork rollback uses the node_id as operation_id proxy
-        await rollbackFork(rollbackTarget.node_id);
+        if (!rollbackTarget.operation_id) {
+          addToast({ type: "error", message: "缺少 operation_id，无法回滚 Fork" });
+          return;
+        }
+        await rollbackFork(rollbackTarget.operation_id);
       } else {
         await rollbackDecision(rollbackTarget.decision_id);
       }
@@ -250,7 +253,11 @@ export function AuditPanel({ nodeId }: Props) {
       <ConfirmDialog
         isOpen={rollbackTarget !== null}
         title="确认回滚决策"
-        description={`将回滚决策 ${rollbackTarget?.decision_id.slice(0, 8)}...（${rollbackTarget?.decision_type}），相关节点和关系将被软删除。`}
+        description={
+          rollbackTarget?.decision_type === "FORK"
+            ? `将回滚 Fork 操作 ${rollbackTarget?.operation_id?.slice(0, 8) ?? "?"}...，该批次下所有分支节点及其关系将被批量软删除。`
+            : `将回滚决策 ${rollbackTarget?.decision_id.slice(0, 8)}...（${rollbackTarget?.decision_type}），相关节点和关系将被软删除。`
+        }
         isDestructive
         confirmText="确认回滚"
         onConfirm={handleRollback}

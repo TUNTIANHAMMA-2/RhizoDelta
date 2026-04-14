@@ -180,6 +180,7 @@ export interface AuditRecord {
   operator_id: string;
   reason: string;
   created_at: string;
+  operation_id?: string | null;
 }
 
 export interface AuditDetail extends AuditRecord {

@@ -23,12 +23,14 @@ public record AuditRecord(
         @JsonProperty("operator_type") DecisionOperatorType operator_type,
         @JsonProperty("operator_id") String operator_id,
         @JsonProperty("reason") String reason,
-        @JsonProperty("created_at") Instant created_at
+        @JsonProperty("created_at") Instant created_at,
+        @JsonProperty("operation_id") String operation_id
 ) {
     /**
      * 创建审计摘要记录并校验关键字段完整性。
      *
      * <p>这里在模型层执行非空校验，是为了确保分页结果中的每一项都能直接用于展示与追踪。
+     * {@code operation_id} 仅在 FORK 类型决策中有值，其他类型为 {@code null}。
      */
     public AuditRecord {
         decision_id = DecisionCommandValidation.requireText(decision_id, "decision_id");
@@ -39,5 +41,6 @@ public record AuditRecord(
         operator_id = DecisionCommandValidation.requireText(operator_id, "operator_id");
         reason = DecisionCommandValidation.requireText(reason, "reason");
         created_at = Objects.requireNonNull(created_at, "created_at must not be null");
+        // operation_id is nullable — only present for FORK decisions
     }
 }

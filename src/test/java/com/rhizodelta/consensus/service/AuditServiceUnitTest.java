@@ -222,6 +222,68 @@ class AuditServiceUnitTest {
                 .hasMessageContaining("decision not found");
     }
 
+    @Test
+    void listDecisionsShouldReturnForkTypeWhenOperationIdPresent() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        Map<String, Object> forkRecord = new java.util.HashMap<>();
+        forkRecord.put("decisionId", "fork-branch-001");
+        forkRecord.put("decisionType", "FORK");
+        forkRecord.put("nodeId", UUID.randomUUID().toString());
+        forkRecord.put("sourceNodeId", UUID.randomUUID().toString());
+        forkRecord.put("operatorType", "AGENT");
+        forkRecord.put("operatorId", "agent-fork");
+        forkRecord.put("reason", "fork reason");
+        forkRecord.put("createdAt", Instant.parse("2026-02-01T00:00:00Z"));
+        forkRecord.put("operationId", "op-fork-batch-001");
+        when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all())
+                .thenReturn(List.of(forkRecord));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, null, 10);
+
+        assertThat(response.records()).hasSize(1);
+        assertThat(response.records().get(0).decision_type()).isEqualTo(DecisionType.FORK);
+        assertThat(response.records().get(0).operation_id()).isEqualTo("op-fork-batch-001");
+    }
+
+    @Test
+    void listDecisionsShouldReturnNullOperationIdForNonForkRecords() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).bindAll(anyMap()).fetch().all())
+                .thenReturn(List.of(record(1)));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditListResponse response = auditService.listDecisions(null, null, null, null, null, null, 10);
+
+        assertThat(response.records()).hasSize(1);
+        assertThat(response.records().get(0).decision_type()).isEqualTo(DecisionType.MERGE);
+        assertThat(response.records().get(0).operation_id()).isNull();
+    }
+
+    @Test
+    void getDecisionDetailShouldReturnForkDetailWithOperationId() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        Map<String, Object> detailRow = new java.util.HashMap<>();
+        detailRow.put("decisionId", "fork-branch-detail");
+        detailRow.put("decisionType", "FORK");
+        detailRow.put("nodeId", UUID.randomUUID().toString());
+        detailRow.put("sourceNodeId", UUID.randomUUID().toString());
+        detailRow.put("operatorType", "HUMAN");
+        detailRow.put("operatorId", "human-1");
+        detailRow.put("reason", "fork detail");
+        detailRow.put("createdAt", Instant.parse("2026-02-01T00:00:00Z"));
+        detailRow.put("synthesizedFrom", List.of());
+        detailRow.put("operationId", "op-fork-batch-002");
+        when(neo4jClient.query(anyString()).bind(anyString()).to(anyString()).fetch().one())
+                .thenReturn(Optional.of(detailRow));
+        AuditService auditService = new AuditService(neo4jClient);
+
+        AuditDetail detail = auditService.getDecisionDetail("fork-branch-detail");
+
+        assertThat(detail.decision_type()).isEqualTo(DecisionType.FORK);
+        assertThat(detail.operation_id()).isEqualTo("op-fork-batch-002");
+    }
+
     private static List<Map<String, Object>> buildRecords(int count) {
         return java.util.stream.IntStream.rangeClosed(1, count)
                 .mapToObj(AuditServiceUnitTest::record)
