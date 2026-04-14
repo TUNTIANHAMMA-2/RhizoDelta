@@ -23,9 +23,16 @@ export async function request<T>(
       useAuthStore.getState().clearToken();
     }
     const text = await res.text().catch(() => "");
-    throw new Error(
-      text || `Request failed: ${res.status} ${res.statusText}`,
-    );
+    let message = text || `Request failed: ${res.status} ${res.statusText}`;
+    try {
+      const body = JSON.parse(text);
+      if (body?.message) {
+        message = body.message;
+      }
+    } catch {
+      // Not JSON, use raw text
+    }
+    throw new Error(message);
   }
 
   // Handle empty body (e.g. 202 Accepted, 204 No Content)
