@@ -261,11 +261,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       data: {
         node_id: tempId,
         label,
-        content: null,
-        summary_content: null,
-        author_id: null,
-        agent_version: null,
-        operation_id: null,
         created_at: new Date().toISOString(),
         has_embedding: false,
         isOptimistic: true,

@@ -32,14 +32,13 @@ export type DecisionType =
 export interface GraphNodeDTO {
   node_id: string;
   label: NodeLabel;
-  content: string | null;
-  summary_content: string | null;
-  author_id: string | null;
-  agent_version: string | null;
-  operation_id: string | null;
+  content?: string;
+  summary_content?: string;
+  author_id?: string;
+  agent_version?: string;
   created_at: string;
   has_embedding: boolean;
-  quality_overall?: number | null;
+  quality_overall?: number;
 }
 
 export interface GraphEdgeDTO {
