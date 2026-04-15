@@ -1,15 +1,71 @@
-# RhizoDelta
+# RhizoDeltΔ
 
-RhizoDelta 是一个基于图谱的非线性讨论系统。当前仓库包含：
+RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛的线性聊天记录重塑为一棵有主干、能分叉、可合并的知识之树。用户只需像在论坛一样发言，后台的 AI 智能体会自动将观点清洗、归纳、路由为"共识合并"或"异议分支"，所有演进过程以不可变的有向无环图（DAG）固化在原生图数据库中。
 
-- Spring Boot 后端
-- React + Vite 前端
-- Neo4j / RabbitMQ / Redis 本地依赖
+## 项目概述
 
-如果你是第一次接手这个项目，先看完整手册：
+| 维度 | 说明 |
+|------|------|
+| **核心理念** | 共识主干 + 异议分支的根茎状（Rhizome）知识沉积 |
+| **后端** | Java 17 · Spring Boot 3 · Spring Data Neo4j · LangChain4j / LangGraph4j |
+| **前端** | React 19 · TypeScript · React Flow (@xyflow/react 12) · Zustand 5 · Vite |
+| **图数据库** | Neo4j 5 — 不可变 DAG + 语义关联双层架构 |
+| **异步中间件** | RabbitMQ（消息队列）· Redis（人工复核 TTL 存储） |
+| **实时推送** | Server-Sent Events（SSE）— 编排状态 + 图谱增量 |
+| **AI 编排** | LangGraph4j 10 节点状态机管线，向量召回 + LLM 裁决 + PreCommit 守卫 |
 
-- [项目使用手册](Doc/使用手册.md)
-- [前端说明](frontend/README.md)
+## 架构概览
+
+```
+用户浏览器                         Spring Boot 后端
+┌──────────────┐                ┌─────────────────────────────┐
+│  React 19    │  POST /posts   │  Controller                 │
+│  React Flow  │ ─────────────► │    ↓ 校验 + JWT 鉴权         │
+│  Zustand     │  202 Accepted  │    ↓ RabbitMQ 入队           │
+│              │ ◄───────────── │                             │
+│              │                │  PostConsumer               │
+│              │  SSE stream    │    ↓ 创建 Human_Post 节点    │
+│              │ ◄═════════════ │    ↓ Embedding 生成          │
+│              │  NODE_CREATED  │    ↓ AI 编排管线启动          │
+│              │  EDGE_CREATED  │                             │
+│              │  DECISION_*    │  LangGraph4j 状态机          │
+└──────────────┘                │    VECTOR_RECALL            │
+                                │    → CONTEXT_PRUNE          │
+     Neo4j 5                    │    → LLM_EVALUATE           │
+┌──────────────┐                │    → PRE_COMMIT_GUARD       │
+│ DAG 版本演进  │ ◄──────────── │    → EXECUTE_MERGE/BRANCH   │
+│ 语义关联层    │  Cypher 写入   │                             │
+│ 向量索引      │                └─────────────────────────────┘
+└──────────────┘
+```
+
+## 模块完成度
+
+下表对齐 `openspec/changes/` 中的各变更集与 `Doc/` 文档章节的映射关系。
+
+| 模块 | openspec 变更集 | 对应文档章节 | 完成度 |
+|------|----------------|-------------|--------|
+| 核心图存储 | `core-graph-foundation` | 白皮书 §一、开发文档 §6 | ✅ 已完成 |
+| 决策引擎 | `decision-engine` | 白皮书 §三.3、开发文档 §7.1 | ✅ 基本完成 |
+| 语义关联层 | `semantic-association-layer` | 白皮书 §三.2、开发文档 §6.6 | ✅ 基本完成 |
+| 审计与治理 | `audit-governance-layer` | 白皮书 §五、开发文档 §7.3 | ✅ 基本完成 |
+| 向量嵌入与搜索 | `embedding-vector-search` | 白皮书 §三.1、开发文档 §7.1 | ✅ 已完成 |
+| P0/P1 后端基础 | `p0-p1-backend-foundation` | 开发文档 §2、§5 | ✅ 基本完成 |
+| AI 编排层 | — (见 `Doc/ai-orchestration-execution-plan.md`) | 开发文档 §12 | ⏳ 骨架完成，4 阶段待推进 |
+| 前端 DAG 渲染 | — | 前端开发文档 全文 | ✅ 已完成 |
+| 动态声誉系统 | — | 白皮书 §六 | ❌ 未启动 |
+
+## 文档导航
+
+| 文档 | 路径 | 说明 |
+|------|------|------|
+| **白皮书** | [Doc/RhizoDeltΔ 白皮书.md](Doc/RhizoDeltΔ%20白皮书.md) | 项目愿景、理论框架与实施决策纪要 |
+| **项目开发文档** | [Doc/项目开发文档.md](Doc/项目开发文档.md) | 后端技术架构、API 规范、数据模型、AI 编排路线 |
+| **前端开发文档** | [Doc/前端开发文档.md](Doc/前端开发文档.md) | 前端设计系统、组件规范、React Flow 集成、交互流程 |
+| **使用手册** | [Doc/使用手册.md](Doc/使用手册.md) | 面向开发者的实操指南：启动、调试、API 用法 |
+| **AI 编排实施计划** | [Doc/ai-orchestration-execution-plan.md](Doc/ai-orchestration-execution-plan.md) | AI 编排层 4 阶段文件级实施清单 |
+| **前端 README** | [frontend/README.md](frontend/README.md) | 前端启动、JWT 调试、页面使用说明 |
+| **openspec 任务** | [openspec/changes/](openspec/changes/) | 6 个变更集的 proposal / design / tasks |
 
 ## 快速启动
 
@@ -107,10 +163,20 @@ cd frontend
 npm run build
 ```
 
+前端 Lint：
+
+```bash
+cd frontend
+npm run lint
+```
+
 ## 项目入口
 
-- 后端启动类：`src/main/java/com/rhizodelta/RhizoDeltaApplication.java`
-- 后端配置：`src/main/resources/application.yml`
-- 本地配置：`src/main/resources/application-local.yml`
-- 前端入口：`frontend/src/App.tsx`
-- 主工作区：`frontend/src/components/GraphWorkspace.tsx`
+| 入口 | 路径 |
+|------|------|
+| 后端启动类 | `src/main/java/com/rhizodelta/RhizoDeltaApplication.java` |
+| 后端配置 | `src/main/resources/application.yml` |
+| 本地配置 | `src/main/resources/application-local.yml` |
+| 前端入口 | `frontend/src/App.tsx` |
+| 主工作区 | `frontend/src/components/GraphWorkspace.tsx` |
+| Docker 编排 | `docker-compose.yml` |
