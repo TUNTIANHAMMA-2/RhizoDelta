@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Viewport } from "@xyflow/react";
 
-export type RightPanelMode = "hidden" | "detail" | "edit" | "agent";
+export type RightPanelMode = "hidden" | "detail" | "edit" | "agent" | "review";
 export type NodeTab = "details" | "provenance" | "association" | "audit";
 export type CanvasMode = "lineage" | "explore";
 
@@ -25,6 +25,7 @@ export interface UiState {
   openDetailPanel: (nodeId: string) => void;
   openEditPanel: (nodeId: string, formType: "inject" | "fork") => void;
   openPostPanel: () => void;
+  openReviewPanel: () => void;
   closeRightPanel: () => void;
 
   headerExpanded: boolean;
@@ -68,6 +69,8 @@ export const useUiStore = create<UiState>((set) => ({
     set({ rightPanelMode: "edit", rightPanelPayload: { nodeId, formType }, leftSidebarOpen: false }),
   openPostPanel: () =>
     set({ rightPanelMode: "edit", rightPanelPayload: { nodeId: "", formType: "post" }, leftSidebarOpen: false }),
+  openReviewPanel: () =>
+    set({ rightPanelMode: "review", rightPanelPayload: null, leftSidebarOpen: false }),
   closeRightPanel: () =>
     set({ rightPanelMode: "hidden", rightPanelPayload: null, leftSidebarOpen: true }),
 

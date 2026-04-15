@@ -7,6 +7,7 @@ import { ExploreCanvas } from "./graph/ExploreCanvas";
 import { RhizoneList } from "./sidebar/RhizoneList";
 import { NodeDetailPanel } from "./panels/NodeDetailPanel";
 import { EditDraftPanel } from "./panels/EditDraftPanel";
+import { ReviewPanel } from "./panels/ReviewPanel";
 import { Header } from "./chrome/Header";
 import { ToastContainer } from "./feedback/Toast";
 import { loadGraphForRoot } from "../lib/loadGraphForRoot";
@@ -188,6 +189,7 @@ export function GraphWorkspace() {
       {/* Right panel */}
       {rightPanelMode === "detail" && <NodeDetailPanel />}
       {rightPanelMode === "edit" && <EditDraftPanel />}
+      {rightPanelMode === "review" && <ReviewPanel />}
 
       <ToastContainer />
 

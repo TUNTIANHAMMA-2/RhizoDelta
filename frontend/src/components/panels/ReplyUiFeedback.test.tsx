@@ -40,6 +40,10 @@ vi.mock("./AuditPanel", () => ({
   AuditPanel: () => <div>AuditPanel</div>,
 }));
 
+vi.mock("./ReviewPanel", () => ({
+  ReviewPanel: () => <div>ReviewPanel</div>,
+}));
+
 vi.mock("../editor/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <div>{content}</div>,
 }));
