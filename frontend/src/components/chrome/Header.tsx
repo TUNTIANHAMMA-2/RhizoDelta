@@ -23,9 +23,11 @@ export function Header() {
   const sseStatus = useSseStore((s) => s.status);
   const roles = useAuthStore((s) => s.roles);
   const userId = useAuthStore((s) => s.userId);
+  const username = useAuthStore((s) => s.username);
   const clearToken = useAuthStore((s) => s.clearToken);
   const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
   const rightPanelMode = useUiStore((s) => s.rightPanelMode);
+  const openReviewPanel = useUiStore((s) => s.openReviewPanel);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
 
   const topRole = roles.includes("ADMIN")
@@ -152,8 +154,27 @@ export function Header() {
           }}
         >
           <span style={{ color: "var(--color-text-secondary)" }}>
-            {userId ?? "anonymous"}
+            {username ?? userId ?? "anonymous"}
           </span>
+          {topRole === "ADMIN" && (
+            <button
+              type="button"
+              onClick={openReviewPanel}
+              style={{
+                border: "none",
+                borderRadius: "999px",
+                padding: "6px 10px",
+                background: "var(--color-bg-tertiary)",
+                color: "var(--color-text-primary)",
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--font-size-xs)",
+                fontWeight: 600,
+              }}
+            >
+              复核
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

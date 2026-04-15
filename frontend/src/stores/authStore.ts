@@ -3,6 +3,8 @@ import { create } from "zustand";
 interface JwtPayload {
   sub?: string;
   roles?: string[];
+  username?: string;
+  display_name?: string;
 }
 
 function readStoredToken(): string | null {
@@ -15,6 +17,8 @@ function readStoredToken(): string | null {
 export interface AuthState {
   token: string | null;
   userId: string | null;
+  username: string | null;
+  displayName: string | null;
   roles: string[];
 
   setToken: (token: string) => void;
@@ -38,6 +42,8 @@ function parseJwtPayload(token: string | null): JwtPayload {
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: readStoredToken(),
   userId: parseJwtPayload(readStoredToken()).sub ?? null,
+  username: parseJwtPayload(readStoredToken()).username ?? null,
+  displayName: parseJwtPayload(readStoredToken()).display_name ?? null,
   roles: parseJwtPayload(readStoredToken()).roles ?? [],
 
   setToken: (token: string) => {
@@ -45,14 +51,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem("jwt_token", token);
     }
     const payload = parseJwtPayload(token);
-    set({ token, userId: payload.sub ?? null, roles: payload.roles ?? [] });
+    set({
+      token,
+      userId: payload.sub ?? null,
+      username: payload.username ?? null,
+      displayName: payload.display_name ?? null,
+      roles: payload.roles ?? [],
+    });
   },
 
   clearToken: () => {
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem("jwt_token");
     }
-    set({ token: null, userId: null, roles: [] });
+    set({ token: null, userId: null, username: null, displayName: null, roles: [] });
   },
 
   isAuthenticated: () => get().token !== null,
