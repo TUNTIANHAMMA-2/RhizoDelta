@@ -26,6 +26,7 @@ type ConfirmAction = {
 export function ReviewPanel() {
   const [items, setItems] = useState<ReviewTaskPayload[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const isAdmin = useAuthStore((s) => s.hasRole("ADMIN"));
@@ -34,9 +35,13 @@ export function ReviewPanel() {
 
   const load = () => {
     setLoading(true);
+    setLoadError(false);
     fetchPendingReviews(50)
       .then((res) => setItems(res ?? []))
-      .catch(() => setItems([]))
+      .catch(() => {
+        setItems([]);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -126,6 +131,8 @@ export function ReviewPanel() {
             <Skeleton variant="rectangular" height={60} />
             <Skeleton variant="rectangular" height={60} />
           </div>
+        ) : loadError ? (
+          <EmptyState message="加载复核任务失败，请稍后重试" />
         ) : items.length === 0 ? (
           <EmptyState message="暂无待复核任务" />
         ) : (
@@ -256,7 +263,7 @@ export function ReviewPanel() {
                           ? review.candidate_node_ids.join(", ")
                           : "—"}
                       </div>
-                      {Object.keys(review.draft_payload).length > 0 && (
+                      {review.draft_payload && Object.keys(review.draft_payload).length > 0 && (
                         <div style={{ marginBottom: "var(--space-1)" }}>
                           <strong>draft_payload:</strong>
                           <pre
