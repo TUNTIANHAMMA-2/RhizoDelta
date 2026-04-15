@@ -1,5 +1,7 @@
 package com.rhizodelta.ai.summary.domain;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * 表示一次摘要生成结果。
  *
@@ -7,9 +9,9 @@ package com.rhizodelta.ai.summary.domain;
  * 便于前端展示和审计追踪。
  */
 public record SummaryResult(
-        String summary,
-        int sourceCount,
-        String modelUsed
+        @JsonProperty("summary") String summary,
+        @JsonProperty("source_count") int sourceCount,
+        @JsonProperty("model_used") String modelUsed
 ) {
     /**
      * 创建摘要结果并校验摘要正文。
