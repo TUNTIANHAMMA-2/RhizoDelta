@@ -11,6 +11,7 @@ export const createAssociation = (body: CreateAssociationRequest) =>
   });
 
 export const deleteAssociation = (associationId: string) =>
-  request<{ deleted: boolean }>(`/api/associations/${associationId}`, {
-    method: "DELETE",
-  });
+  request<{ association_id: string; deleted: boolean }>(
+    `/api/associations/${associationId}`,
+    { method: "DELETE" },
+  );

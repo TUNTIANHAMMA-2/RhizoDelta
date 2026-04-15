@@ -107,10 +107,12 @@ export interface DecisionExplanation {
 export interface OrchestrationStatusEvent {
   request_id: string;
   event_id: string;
-  post_node_id: string;
+  post_node_id?: string | null;
   status: string;
   message: string;
   review_id?: string | null;
+  decision_id?: string | null;
+  author_id?: string | null;
   explanation?: string | null;
 }
 
@@ -189,6 +191,23 @@ export interface AuditDetail extends AuditRecord {
 export interface AuditListResponse {
   records: AuditRecord[];
   next_cursor: string | null;
+}
+
+// ────────────────────── 人工复核 ──────────────────────
+
+export interface ReviewTaskPayload {
+  review_id: string;
+  request_id: string;
+  post_node_id: string;
+  workflow_trace_id: string;
+  status: string;
+  suggested_action: string;
+  candidate_node_ids: string[];
+  draft_payload: Record<string, unknown>;
+  review_reason_codes: string[];
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
 }
 
 // ────────────────────── 向量搜索 ──────────────────────
