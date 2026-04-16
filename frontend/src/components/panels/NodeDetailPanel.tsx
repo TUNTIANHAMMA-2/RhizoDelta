@@ -7,7 +7,7 @@ import { AssociationPanel } from "./AssociationPanel";
 import { AuditPanel } from "./AuditPanel";
 import { MarkdownViewer } from "../editor/MarkdownViewer";
 import { DecisionCard } from "./DecisionCard";
-import { summarizeNode } from "../../api/nodes";
+import { summarizeNode, fetchNode } from "../../api/nodes";
 import type { DecisionExplanation } from "../../api/types";
 
 const TABS: { id: NodeTab; label: string }[] = [
@@ -222,8 +222,12 @@ export function NodeDetailPanel() {
                   onClick={() => {
                     setSummarizing(true);
                     summarizeNode(node.node_id)
-                      .then(() => setSummarizing(false))
-                      .catch(() => setSummarizing(false));
+                      .then(() => fetchNode(node.node_id))
+                      .then((updated) => {
+                        useGraphStore.getState().addNode(updated);
+                      })
+                      .catch(() => {})
+                      .finally(() => setSummarizing(false));
                   }}
                   disabled={summarizing}
                   style={{
