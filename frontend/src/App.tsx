@@ -15,7 +15,7 @@ function RequireAuth() {
 
   if (isVerifying) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <div className="flex justify-center items-center h-screen">
         <div className="spinner" aria-label="Verifying session…" />
       </div>
     );

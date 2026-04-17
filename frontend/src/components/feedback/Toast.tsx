@@ -12,35 +12,16 @@ function ToastItem({ toast }: { toast: ToastMessage }) {
 
   return (
     <div
+      className="flex items-center gap-3 px-4 py-3 bg-bg-elevated rounded-md shadow-lg font-ui text-sm text-text-primary mt-2 backdrop-blur-md"
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-3)",
-        padding: "var(--space-3) var(--space-4)",
-        background: "var(--color-bg-elevated)",
         borderLeft: `3px solid ${TYPE_BORDER_COLOR[toast.type]}`,
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-lg)",
-        fontFamily: "var(--font-ui)",
-        fontSize: "var(--font-size-sm)",
-        color: "var(--color-text-primary)",
-        marginTop: "var(--space-2)",
         animation: "toast-slide-in 280ms var(--ease-out)",
-        backdropFilter: "blur(12px)",
       }}
     >
-      <span style={{ flex: 1 }}>{toast.message}</span>
+      <span className="flex-1">{toast.message}</span>
       <button
         onClick={() => removeToast(toast.id)}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "var(--color-text-tertiary)",
-          fontSize: "var(--font-size-md)",
-          lineHeight: 1,
-          padding: 0,
-        }}
+        className="bg-transparent border-none cursor-pointer text-text-tertiary text-md leading-none p-0"
         aria-label="关闭"
       >
         &times;
@@ -64,16 +45,7 @@ export function ToastContainer() {
       `}</style>
       <div
         aria-live="polite"
-        style={{
-          position: "fixed",
-          bottom: "var(--space-6)",
-          right: "var(--space-6)",
-          zIndex: 200,
-          display: "flex",
-          flexDirection: "column",
-          maxWidth: 360,
-          minWidth: 280,
-        }}
+        className="fixed bottom-6 right-6 z-[200] flex flex-col max-w-[360px] min-w-[280px]"
       >
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} />

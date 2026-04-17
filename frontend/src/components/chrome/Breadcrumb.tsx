@@ -18,59 +18,25 @@ export function Breadcrumb() {
   };
 
   const separator = (
-    <span
-      style={{
-        color: "var(--color-text-tertiary)",
-        margin: "0 var(--space-1)",
-        flexShrink: 0,
-      }}
-    >
-      /
-    </span>
+    <span className="text-text-tertiary mx-1 shrink-0">/</span>
   );
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        alignItems: "center",
-        fontFamily: "var(--font-ui)",
-        fontSize: "var(--font-size-sm)",
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        width: "100%",
-      }}
-    >
+    <nav className="flex items-center font-ui text-sm overflow-hidden whitespace-nowrap w-full">
       {rootNodeId && rootNodeId !== selectedNodeId && (
         <>
           <button
             onClick={() => handleClick(rootNodeId)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--color-text-secondary)",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-sm)",
-              padding: 0,
-              flexShrink: 0,
-            }}
+            className="bg-transparent border-none cursor-pointer text-text-secondary font-ui text-sm p-0 shrink-0"
           >
             Root
           </button>
           {separator}
-          <span style={{ color: "var(--color-text-tertiary)", flexShrink: 0 }}>...</span>
+          <span className="text-text-tertiary shrink-0">...</span>
           {separator}
         </>
       )}
-      <span
-        style={{
-          color: "var(--color-text-primary)",
-          fontWeight: 500,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
+      <span className="text-text-primary font-medium overflow-hidden text-ellipsis">
         {selectedNode?.label.replace("_", " ") ?? selectedNodeId.slice(0, 8)}
       </span>
     </nav>

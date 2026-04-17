@@ -24,8 +24,7 @@ export function PostForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 校验去除空壳后的内容
+
     const strippedContent = content.replace(/<[^>]+>/g, "").trim();
     if (!strippedContent) return;
     if (!userId) {
@@ -57,40 +56,13 @@ export function PostForm() {
     <form
       onSubmit={handleSubmit}
       onKeyDown={(e) => e.stopPropagation()}
-      style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+      className="flex flex-col gap-4"
     >
       {selectedNodeId && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "var(--space-3)",
-            padding: "var(--space-3)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-md)",
-            background: "var(--color-bg-primary)",
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--font-size-xs)",
-                color: "var(--color-text-secondary)",
-                marginBottom: "var(--space-1)",
-              }}
-            >
-              正在回复
-            </div>
-            <div
-              style={{
-                fontSize: "var(--font-size-sm)",
-                color: "var(--color-text-primary)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
+        <div className="flex justify-between items-center gap-3 p-3 border border-border-default rounded-md bg-bg-primary">
+          <div className="min-w-0">
+            <div className="text-xs text-text-secondary mb-1">正在回复</div>
+            <div className="text-sm text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
               {targetPreview}
             </div>
           </div>
@@ -103,14 +75,14 @@ export function PostForm() {
           </button>
         </div>
       )}
-      
+
       <MarkdownEditor
         value={content}
         onChange={(val) => setContent(val)}
         minHeight={200}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end">
         <button
           className="btn-primary"
           type="submit"

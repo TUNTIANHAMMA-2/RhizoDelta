@@ -7,50 +7,6 @@ const HIDDEN_HANDLE_STYLE = {
   pointerEvents: "none",
 } as const;
 
-const containerStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 4,
-  cursor: "pointer",
-};
-
-const circleBaseStyle: React.CSSProperties = {
-  width: 48,
-  height: 48,
-  borderRadius: "var(--radius-full)",
-  border: "2px dashed var(--color-border-default)",
-  background: "var(--color-bg-secondary)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "border-color var(--transition-fast)",
-  position: "relative",
-};
-
-const plusStyle: React.CSSProperties = {
-  fontSize: 20,
-  lineHeight: 1,
-  color: "var(--color-text-tertiary)",
-  userSelect: "none",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--font-ui)",
-  fontSize: "var(--font-size-xs)",
-  color: "var(--color-text-tertiary)",
-  userSelect: "none",
-};
-
-const spinnerStyle: React.CSSProperties = {
-  width: 18,
-  height: 18,
-  border: "2px solid var(--color-border-default)",
-  borderTopColor: "var(--color-text-secondary)",
-  borderRadius: "var(--radius-full)",
-  animation: "expand-spin 0.8s linear infinite",
-};
-
 export const ExpandPlaceholder = memo(function ExpandPlaceholder({
   data,
 }: NodeProps) {
@@ -66,50 +22,56 @@ export const ExpandPlaceholder = memo(function ExpandPlaceholder({
 
   return (
     <div
-        style={containerStyle}
-        onClick={handleClick}
-        role="button"
-        tabIndex={0}
-        aria-label="Expand child nodes"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
-      >
-        <div
-          className="expand-placeholder-circle"
-          style={circleBaseStyle}
-        >
-          {expanding ? (
-            <div style={spinnerStyle} />
-          ) : (
-            <span style={plusStyle}>+</span>
-          )}
-          {/* Center handles for edge connection */}
-          <Handle
-            id="source-center"
-            type="source"
-            position={Position.Top}
+      className="flex flex-col items-center gap-1 cursor-pointer"
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      aria-label="Expand child nodes"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+    >
+      <div className="expand-placeholder-circle w-12 h-12 rounded-full border-2 border-dashed border-border-default bg-bg-secondary flex items-center justify-center relative transition-[border-color] duration-[var(--transition-fast)]">
+        {expanding ? (
+          <div
+            className="w-[18px] h-[18px] border-2 border-border-default rounded-full"
             style={{
-              top: "50%",
-              left: "50%",
-              ...HIDDEN_HANDLE_STYLE,
+              borderTopColor: "var(--color-text-secondary)",
+              animation: "expand-spin 0.8s linear infinite",
             }}
           />
-          <Handle
-            id="target-center"
-            type="target"
-            position={Position.Top}
-            style={{
-              top: "50%",
-              left: "50%",
-              ...HIDDEN_HANDLE_STYLE,
-            }}
-          />
-        </div>
-        <span style={labelStyle}>{"\u5C55\u5F00"}</span>
+        ) : (
+          <span className="text-[20px] leading-none text-text-tertiary select-none">
+            +
+          </span>
+        )}
+        <Handle
+          id="source-center"
+          type="source"
+          position={Position.Top}
+          style={{
+            top: "50%",
+            left: "50%",
+            ...HIDDEN_HANDLE_STYLE,
+          }}
+        />
+        <Handle
+          id="target-center"
+          type="target"
+          position={Position.Top}
+          style={{
+            top: "50%",
+            left: "50%",
+            ...HIDDEN_HANDLE_STYLE,
+          }}
+        />
       </div>
+      <span className="font-ui text-xs text-text-tertiary select-none">
+        展开
+      </span>
+    </div>
   );
 });

@@ -5,25 +5,21 @@ export interface SkeletonProps {
   className?: string;
 }
 
+const VARIANT_RADIUS: Record<NonNullable<SkeletonProps["variant"]>, string> = {
+  circular: "rounded-full",
+  text: "rounded-sm",
+  rectangular: "rounded-md",
+};
+
 export function Skeleton({
   variant = "text",
   width,
   height,
   className = "",
 }: SkeletonProps) {
-  const baseStyle: React.CSSProperties = {
-    background: "var(--color-bg-hover)",
-    animation: "skeleton-pulse 1.5s ease-in-out infinite",
-    borderRadius:
-      variant === "circular"
-        ? "var(--radius-full)"
-        : variant === "text"
-          ? "var(--radius-sm)"
-          : "var(--radius-md)",
-    width: width ?? (variant === "circular" ? 40 : "100%"),
-    height:
-      height ?? (variant === "circular" ? 40 : variant === "text" ? 14 : 80),
-  };
+  const resolvedWidth = width ?? (variant === "circular" ? 40 : "100%");
+  const resolvedHeight =
+    height ?? (variant === "circular" ? 40 : variant === "text" ? 14 : 80);
 
   return (
     <>
@@ -33,7 +29,14 @@ export function Skeleton({
           50% { opacity: 0.4; }
         }
       `}</style>
-      <div className={className} style={baseStyle} />
+      <div
+        className={`bg-bg-hover ${VARIANT_RADIUS[variant]} ${className}`}
+        style={{
+          animation: "skeleton-pulse 1.5s ease-in-out infinite",
+          width: resolvedWidth,
+          height: resolvedHeight,
+        }}
+      />
     </>
   );
 }

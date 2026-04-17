@@ -18,19 +18,10 @@ export const QualityBadge = memo(function QualityBadge({ qualityOverall }: Quali
   return (
     <span
       title={`质量评分: ${percent}% (${label})`}
+      className="inline-flex items-center gap-[2px] text-[9px] font-semibold bg-bg-primary rounded-lg px-1 leading-4 whitespace-nowrap"
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 2,
-        fontSize: 9,
-        fontWeight: 600,
         color,
-        background: "var(--color-bg-primary, #fff)",
         border: `1px solid ${color}`,
-        borderRadius: 8,
-        padding: "0 4px",
-        lineHeight: "16px",
-        whiteSpace: "nowrap",
       }}
     >
       {percent}

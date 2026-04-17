@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { Panel } from "@xyflow/react";
+import clsx from "clsx";
 import { useGraphStore } from "../../stores/graphStore";
 
 export function AssociationToggle() {
@@ -22,25 +23,12 @@ export function AssociationToggle() {
       <button
         type="button"
         onClick={handleClick}
-        style={{
-          border: "1px solid var(--color-border-default)",
-          borderRadius: "var(--radius-sm)",
-          padding: "var(--space-2) var(--space-4)",
-          background: showAssociations
-            ? "var(--color-text-primary)"
-            : "rgba(255, 255, 255, 0.88)",
-          color: showAssociations
-            ? "var(--color-bg-primary)"
-            : "var(--color-text-secondary)",
-          fontWeight: showAssociations ? 600 : 500,
-          cursor: "pointer",
-          fontFamily: "var(--font-ui)",
-          fontSize: "var(--font-size-sm)",
-          transition: "all var(--transition-fast)",
-          boxShadow: "var(--shadow-sm)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-        }}
+        className={clsx(
+          "border border-border-default rounded-sm px-4 py-2 cursor-pointer font-ui text-sm shadow-sm backdrop-blur-md transition-[all] duration-[var(--transition-fast)]",
+          showAssociations
+            ? "bg-text-primary text-bg-primary font-semibold"
+            : "bg-[rgba(255,255,255,0.88)] text-text-secondary font-medium",
+        )}
       >
         关联
       </button>

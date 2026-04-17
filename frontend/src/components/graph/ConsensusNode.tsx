@@ -26,7 +26,7 @@ export const ConsensusNode = memo(function ConsensusNode({ data, selected }: Nod
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ position: "relative", width: "100%", height: "100%" }}
+      className="relative w-full h-full"
       role="article"
       tabIndex={0}
       aria-label={`AI Consensus: ${plainText.slice(0, 50)}`}
@@ -48,22 +48,18 @@ export const ConsensusNode = memo(function ConsensusNode({ data, selected }: Nod
           <div className="node-content-normal">
             <div className="node-header">
               <span>AI Consensus</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span className="flex items-center gap-1">
                 {node.quality_overall != null && <QualityBadge qualityOverall={node.quality_overall} />}
                 &middot; {new Date(node.created_at).toLocaleDateString()}
               </span>
             </div>
-            <div className="node-body">
-              {plainText}
-            </div>
+            <div className="node-body">{plainText}</div>
           </div>
         )}
       </div>
-      {hovered && zoom === "normal" && (
-        <NodeEdgeInfo nodeId={node.node_id} />
-      )}
+      {hovered && zoom === "normal" && <NodeEdgeInfo nodeId={node.node_id} />}
       {selected && zoom === "normal" && (
-        <div style={{ position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)", zIndex: 30 }}>
+        <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 z-30">
           <NodeActionToolbar nodeId={node.node_id} />
         </div>
       )}

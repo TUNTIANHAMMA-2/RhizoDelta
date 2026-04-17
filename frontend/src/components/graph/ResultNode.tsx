@@ -25,7 +25,7 @@ export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ position: "relative", width: "100%", height: "100%" }}
+      className="relative w-full h-full"
       role="article"
       tabIndex={0}
       aria-label={`Result: ${plainText.slice(0, 50)}`}
@@ -49,17 +49,13 @@ export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps
               <span>Result</span>
               <span>&middot; {new Date(node.created_at).toLocaleDateString()}</span>
             </div>
-            <div className="node-body">
-              {plainText}
-            </div>
+            <div className="node-body">{plainText}</div>
           </div>
         )}
       </div>
-      {hovered && zoom === "normal" && (
-        <NodeEdgeInfo nodeId={node.node_id} />
-      )}
+      {hovered && zoom === "normal" && <NodeEdgeInfo nodeId={node.node_id} />}
       {selected && zoom === "normal" && (
-        <div style={{ position: "absolute", top: "calc(100% + 12px)", left: "50%", transform: "translateX(-50%)", zIndex: 30 }}>
+        <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 z-30">
           <NodeActionToolbar nodeId={node.node_id} />
         </div>
       )}

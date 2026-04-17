@@ -44,7 +44,7 @@ export function ConfirmDialog({
         if (!focusables || focusables.length === 0) return;
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
-        
+
         if (e.shiftKey) {
           if (document.activeElement === first) {
             last.focus();
@@ -66,15 +66,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(55, 53, 47, 0.4)",
-      }}
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(55,53,47,0.4)]"
       onClick={onCancel}
     >
       <div
@@ -83,46 +75,17 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--color-bg-primary)",
-          borderRadius: "var(--radius-lg)",
-          boxShadow: "var(--shadow-lg)",
-          padding: "var(--space-6)",
-          maxWidth: 400,
-          width: "90%",
-          fontFamily: "var(--font-ui)",
-        }}
+        className="bg-bg-primary rounded-lg shadow-lg p-6 max-w-[400px] w-[90%] font-ui"
       >
         <h3
-          style={{
-            margin: 0,
-            marginBottom: "var(--space-3)",
-            fontSize: "var(--font-size-md)",
-            fontWeight: 600,
-            color: isDestructive
-              ? "var(--color-danger)"
-              : "var(--color-text-primary)",
-          }}
+          className={`m-0 mb-3 text-md font-semibold ${isDestructive ? "text-danger" : "text-text-primary"}`}
         >
           {title}
         </h3>
-        <div
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-secondary)",
-            lineHeight: 1.5,
-            marginBottom: "var(--space-6)",
-          }}
-        >
+        <div className="text-sm text-text-secondary leading-[1.5] mb-6">
           {description}
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "var(--space-3)",
-          }}
-        >
+        <div className="flex justify-end gap-3">
           <button
             ref={cancelRef}
             onClick={onCancel}

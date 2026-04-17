@@ -230,7 +230,7 @@ export function ExploreCanvas() {
         <MiniMap
           nodeColor={MINIMAP_NODE_COLOR}
           maskColor="rgba(255, 255, 255, 0.7)"
-          style={{ borderRadius: 8 }}
+          className="rounded-lg"
         />
       )}
     </ReactFlow>

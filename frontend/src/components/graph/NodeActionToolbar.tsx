@@ -20,33 +20,8 @@ export function NodeActionToolbar({ nodeId }: Props) {
   }
 
   return (
-    <div
-      style={{
-        position: "relative",
-        display: "flex",
-        gap: "var(--space-2)",
-        padding: "var(--space-2) var(--space-3)",
-        background: "var(--color-bg-primary)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--shadow-md)",
-        fontFamily: "var(--font-ui)",
-        border: "1px solid var(--color-border-default)",
-        fontSize: "var(--font-size-sm)",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: -6,
-          left: "50%",
-          transform: "translateX(-50%) rotate(45deg)",
-          width: 10,
-          height: 10,
-          background: "var(--color-bg-primary)",
-          borderLeft: "1px solid var(--color-border-default)",
-          borderTop: "1px solid var(--color-border-default)",
-        }}
-      />
+    <div className="relative flex gap-2 px-3 py-2 bg-bg-primary rounded-md shadow-md font-ui border border-border-default text-sm">
+      <div className="absolute -top-[6px] left-1/2 w-[10px] h-[10px] bg-bg-primary border-l border-t border-border-default -translate-x-1/2 rotate-45" />
       {canReply && (
         <button
           onClick={(e) => {
@@ -59,26 +34,28 @@ export function NodeActionToolbar({ nodeId }: Props) {
           回复
         </button>
       )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          openEditPanel(nodeId, "inject");
-        }}
-        className="btn-primary"
-        style={{ display: canEdit ? undefined : "none" }}
-      >
-        延续注入
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          openEditPanel(nodeId, "fork");
-        }}
-        className="btn-secondary"
-        style={{ display: canEdit ? undefined : "none" }}
-      >
-        分叉
-      </button>
+      {canEdit && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditPanel(nodeId, "inject");
+            }}
+            className="btn-primary"
+          >
+            延续注入
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditPanel(nodeId, "fork");
+            }}
+            className="btn-secondary"
+          >
+            分叉
+          </button>
+        </>
+      )}
     </div>
   );
 }

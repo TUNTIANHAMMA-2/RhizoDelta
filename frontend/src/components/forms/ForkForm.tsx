@@ -15,6 +15,10 @@ interface Props {
   onSuccess: () => void;
 }
 
+const INPUT_CLASS =
+  "w-full px-3 py-2 border border-border-default rounded-sm font-ui text-sm bg-bg-primary";
+const LABEL_CLASS = "block mb-1 font-ui text-xs text-text-secondary";
+
 export function ForkForm({ sourceNodeId, onSuccess }: Props) {
   const [reason, setReason] = useState("");
   const [branches, setBranches] = useState<Branch[]>([
@@ -79,89 +83,44 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "var(--space-2) var(--space-3)",
-    border: "1px solid var(--color-border-default)",
-    borderRadius: "var(--radius-sm)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "var(--font-size-sm)",
-    background: "var(--color-bg-primary)",
-  };
-
   return (
     <form
       onSubmit={handleSubmit}
       onKeyDown={(e) => e.stopPropagation()}
-      style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+      className="flex flex-col gap-4"
     >
       <div>
-        <label
-          style={{
-            display: "block",
-            marginBottom: "var(--space-1)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          分叉原因 *
-        </label>
+        <label className={LABEL_CLASS}>分叉原因 *</label>
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="为什么分叉"
           required
-          style={inputStyle}
+          className={INPUT_CLASS}
         />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div className="flex flex-col gap-4">
         {branches.map((branch, idx) => (
           <div
             key={branch.id}
-            style={{
-              border: "1px solid var(--color-border-default)",
-              borderRadius: "var(--radius-sm)",
-              padding: "var(--space-3)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-2)"
-            }}
+            className="border border-border-default rounded-sm p-3 flex flex-col gap-2"
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--font-size-xs)",
-                  fontWeight: 500,
-                }}
-              >
+            <div className="flex justify-between items-center">
+              <span className="font-ui text-xs font-medium">
                 分支 {idx + 1}
               </span>
               {branches.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeBranch(idx)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--color-danger)",
-                    fontSize: "var(--font-size-xs)",
-                  }}
+                  className="bg-transparent border-none cursor-pointer text-danger text-xs"
                 >
                   删除
                 </button>
               )}
             </div>
-            
+
             <MarkdownEditor
               value={branch.content}
               onChange={(val) => updateBranch(idx, "content", val)}
@@ -172,7 +131,7 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
               value={branch.author_id}
               onChange={(e) => updateBranch(idx, "author_id", e.target.value)}
               placeholder="作者 ID（可选）"
-              style={inputStyle}
+              className={INPUT_CLASS}
             />
           </div>
         ))}
@@ -181,20 +140,11 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
       <button
         type="button"
         onClick={addBranch}
-        style={{
-          background: "none",
-          border: "1px dashed var(--color-border-default)",
-          borderRadius: "var(--radius-sm)",
-          padding: "var(--space-2)",
-          cursor: "pointer",
-          fontFamily: "var(--font-ui)",
-          fontSize: "var(--font-size-sm)",
-          color: "var(--color-text-secondary)",
-        }}
+        className="bg-transparent border border-dashed border-border-default rounded-sm p-2 cursor-pointer font-ui text-sm text-text-secondary"
       >
         + 添加分支
       </button>
-      <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+      <div className="flex gap-3 justify-end">
         <button
           className="btn-secondary"
           type="button"

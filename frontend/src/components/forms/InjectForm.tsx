@@ -9,6 +9,11 @@ interface Props {
   onSuccess: () => void;
 }
 
+const INPUT_CLASS =
+  "w-full px-3 py-2 border border-border-default rounded-sm font-ui text-sm bg-bg-primary";
+const LABEL_CLASS =
+  "block mb-1 font-ui text-xs text-text-secondary";
+
 export function InjectForm({ sourceNodeId, onSuccess }: Props) {
   const [content, setContent] = useState("");
   const [reason, setReason] = useState("");
@@ -49,79 +54,39 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "var(--space-2) var(--space-3)",
-    border: "1px solid var(--color-border-default)",
-    borderRadius: "var(--radius-sm)",
-    fontFamily: "var(--font-ui)",
-    fontSize: "var(--font-size-sm)",
-    background: "var(--color-bg-primary)",
-  };
-
   return (
     <form
       onSubmit={handleSubmit}
       onKeyDown={(e) => e.stopPropagation()}
-      style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+      className="flex flex-col gap-4"
     >
       <div>
-        <label
-          style={{
-            display: "block",
-            marginBottom: "var(--space-1)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          来源节点
-        </label>
+        <label className={LABEL_CLASS}>来源节点</label>
         <input
           value={sourceNodeId}
           readOnly
-          style={{ ...inputStyle, color: "var(--color-text-tertiary)" }}
+          className={`${INPUT_CLASS} text-text-tertiary`}
         />
       </div>
       <div>
-        <label
-          style={{
-            display: "block",
-            marginBottom: "var(--space-1)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          延续原因 *
-        </label>
+        <label className={LABEL_CLASS}>延续原因 *</label>
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="为什么延续这个观点"
           required
-          style={inputStyle}
+          className={INPUT_CLASS}
         />
       </div>
       <div>
-        <label
-          style={{
-            display: "block",
-            marginBottom: "var(--space-1)",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          内容 *
-        </label>
+        <label className={LABEL_CLASS}>内容 *</label>
         <MarkdownEditor
           value={content}
           onChange={(val) => setContent(val)}
           minHeight={180}
         />
       </div>
-      <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end" }}>
+      <div className="flex gap-3 justify-end">
         <button
           className="btn-secondary"
           type="button"

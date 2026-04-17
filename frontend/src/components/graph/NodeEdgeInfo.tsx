@@ -65,7 +65,7 @@ export const NodeEdgeInfo = memo(function NodeEdgeInfo({
           <span className="node-edge-target">
             "{edge.otherNodeText}"
           </span>
-          <span className="node-edge-time" style={{ marginLeft: "auto", opacity: 0.6 }}>
+          <span className="node-edge-time">
             {new Date(edge.createdAt).toLocaleDateString()}
           </span>
         </div>

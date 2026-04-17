@@ -3,7 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import { Markdown } from "tiptap-markdown";
 import { useEffect, useState } from "react";
-import "../../styles/editor.css"; // We will create this
+import "../../styles/editor.css";
 
 interface MarkdownEditorProps {
   value: string;
@@ -12,113 +12,104 @@ interface MarkdownEditorProps {
   minHeight?: number;
 }
 
+const MENU_BTN_BASE =
+  "border-none rounded-sm px-2 py-1 cursor-pointer text-sm font-ui";
+
 const MenuBar = ({ editor }: { editor: any }) => {
   if (!editor) {
     return null;
   }
 
-  const btnStyle = (isActive: boolean) => ({
-    background: isActive ? "var(--color-bg-hover)" : "transparent",
-    border: "none",
-    borderRadius: "var(--radius-sm)",
-    padding: "var(--space-1) var(--space-2)",
-    cursor: "pointer",
-    fontSize: "var(--font-size-sm)",
-    color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-    fontWeight: isActive ? 600 : 400,
-    fontFamily: "var(--font-ui)",
-  });
+  const btnClass = (isActive: boolean) =>
+    `${MENU_BTN_BASE} ${
+      isActive
+        ? "bg-bg-hover text-text-primary font-semibold"
+        : "bg-transparent text-text-secondary font-normal"
+    }`;
+
+  const Divider = () => (
+    <span className="w-px bg-border-default mx-1 self-stretch" />
+  );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "var(--space-1)",
-        padding: "var(--space-2)",
-        borderBottom: "1px solid var(--color-border-default)",
-        background: "var(--color-bg-secondary)",
-        borderTopLeftRadius: "var(--radius-sm)",
-        borderTopRightRadius: "var(--radius-sm)",
-      }}
-    >
+    <div className="flex flex-wrap gap-1 p-2 border-b border-border-default bg-bg-secondary rounded-t-sm">
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleBold().run()}
-        style={btnStyle(editor.isActive("bold"))}
+        className={btnClass(editor.isActive("bold"))}
       >
         B
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleItalic().run()}
-        style={btnStyle(editor.isActive("italic"))}
+        className={btnClass(editor.isActive("italic"))}
       >
         I
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleStrike().run()}
-        style={btnStyle(editor.isActive("strike"))}
+        className={btnClass(editor.isActive("strike"))}
       >
         S
       </button>
-      <span style={{ width: 1, background: "var(--color-border-default)", margin: "0 var(--space-1)" }} />
+      <Divider />
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        style={btnStyle(editor.isActive("heading", { level: 1 }))}
+        className={btnClass(editor.isActive("heading", { level: 1 }))}
       >
         H1
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        style={btnStyle(editor.isActive("heading", { level: 2 }))}
+        className={btnClass(editor.isActive("heading", { level: 2 }))}
       >
         H2
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        style={btnStyle(editor.isActive("heading", { level: 3 }))}
+        className={btnClass(editor.isActive("heading", { level: 3 }))}
       >
         H3
       </button>
-      <span style={{ width: 1, background: "var(--color-border-default)", margin: "0 var(--space-1)" }} />
+      <Divider />
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleBulletList().run()}
-        style={btnStyle(editor.isActive("bulletList"))}
+        className={btnClass(editor.isActive("bulletList"))}
       >
         UL
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        style={btnStyle(editor.isActive("orderedList"))}
+        className={btnClass(editor.isActive("orderedList"))}
       >
         OL
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        style={btnStyle(editor.isActive("blockquote"))}
+        className={btnClass(editor.isActive("blockquote"))}
       >
         Quote
       </button>
-      <span style={{ width: 1, background: "var(--color-border-default)", margin: "0 var(--space-1)" }} />
+      <Divider />
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        style={btnStyle(editor.isActive("codeBlock"))}
+        className={btnClass(editor.isActive("codeBlock"))}
       >
         Code
       </button>
       <button
         type="button"
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
-        style={btnStyle(false)}
+        className={btnClass(false)}
       >
         ---
       </button>
@@ -153,7 +144,6 @@ export function MarkdownEditor({ value, onChange, minHeight = 180 }: MarkdownEdi
     },
   });
 
-  // Handle external value changes (e.g. form reset)
   useEffect(() => {
     if (editor && value !== internalValue) {
       editor.commands.setContent(value);
@@ -162,24 +152,10 @@ export function MarkdownEditor({ value, onChange, minHeight = 180 }: MarkdownEdi
   }, [value, editor, internalValue]);
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--color-border-default)",
-        borderRadius: "var(--radius-sm)",
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--color-bg-primary)",
-        overflow: "hidden",
-      }}
-    >
+    <div className="border border-border-default rounded-sm flex flex-col bg-bg-primary overflow-hidden">
       <MenuBar editor={editor} />
       <div
-        className="rd-markdown-container"
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          cursor: "text",
-        }}
+        className="rd-markdown-container flex-1 overflow-y-auto cursor-text"
         onClick={() => editor?.commands.focus()}
       >
         <EditorContent editor={editor} />

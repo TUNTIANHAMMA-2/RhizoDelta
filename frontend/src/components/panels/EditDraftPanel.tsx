@@ -19,42 +19,17 @@ export function EditDraftPanel() {
 
   return (
     <aside
-      className="rd-panel"
+      className="rd-panel w-[45vw] min-w-[460px] relative overflow-y-auto p-4 border-l border-border-default bg-bg-primary"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
-      style={{
-        width: "45vw",
-        minWidth: 460,
-        position: "relative",
-        overflowY: "auto",
-        padding: "var(--space-4)",
-        borderLeft: "1px solid var(--color-border-default)",
-        background: "var(--color-bg-primary)",
-      }}
     >
       <div className="rd-marker-edit" />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "var(--space-4)",
-          paddingLeft: "var(--space-6)",
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)" }}>
-          {title}
-        </span>
+      <div className="flex justify-between items-center mb-4 pl-6">
+        <span className="font-semibold text-md">{title}</span>
         <button
           onClick={closePanel}
           aria-label="关闭面板"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "var(--font-size-md)",
-            color: "var(--color-text-secondary)",
-          }}
+          className="bg-transparent border-none cursor-pointer text-md text-text-secondary"
         >
           &times;
         </button>

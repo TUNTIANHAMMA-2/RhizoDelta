@@ -57,7 +57,6 @@ export const AssociationEdge = memo(function AssociationEdge(props: EdgeProps) {
 
   return (
     <>
-      {/* Invisible wider hit area for hover detection */}
       <path
         d={edgePath}
         fill="none"
@@ -65,7 +64,7 @@ export const AssociationEdge = memo(function AssociationEdge(props: EdgeProps) {
         strokeWidth={12}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        style={{ cursor: "default" }}
+        className="cursor-default"
       />
       <BaseEdge
         id={props.id}
@@ -84,37 +83,17 @@ export const AssociationEdge = memo(function AssociationEdge(props: EdgeProps) {
           y={labelY - 50}
           width={160}
           height={80}
-          style={{ overflow: "visible", pointerEvents: "none" }}
+          className="overflow-visible pointer-events-none"
         >
-          <div
-            style={{
-              background: "var(--color-bg-primary)",
-              border: "1px solid var(--color-border-default)",
-              borderRadius: "var(--radius-sm)",
-              boxShadow: "var(--shadow-sm)",
-              padding: "var(--space-2)",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-xs)",
-              color: "var(--color-text-primary)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "2px",
-              whiteSpace: "nowrap",
-              width: "fit-content",
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>
-              {typeLabel(data.associationType)}
-            </span>
+          <div className="bg-bg-primary border border-border-default rounded-sm shadow-sm p-2 font-ui text-xs text-text-primary flex flex-col gap-[2px] whitespace-nowrap w-fit">
+            <span className="font-semibold">{typeLabel(data.associationType)}</span>
             {data.confidence != null && (
-              <span style={{ color: "var(--color-text-secondary)" }}>
+              <span className="text-text-secondary">
                 置信度: {(data.confidence * 100).toFixed(0)}%
               </span>
             )}
             {data.createdAt && (
-              <span style={{ color: "var(--color-text-tertiary)" }}>
-                {formatDate(data.createdAt)}
-              </span>
+              <span className="text-text-tertiary">{formatDate(data.createdAt)}</span>
             )}
           </div>
         </foreignObject>
