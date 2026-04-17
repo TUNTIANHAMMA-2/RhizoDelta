@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { useUiStore } from "../stores/uiStore";
 import { useGraphStore } from "../stores/graphStore";
 import { useSse } from "../hooks/useSse";
+import { useCommandPalette } from "../hooks/useCommandPalette";
 import { DagCanvas } from "./graph/DagCanvas";
 import { ExploreCanvas } from "./graph/ExploreCanvas";
 import { RhizoneList } from "./sidebar/RhizoneList";
 import { NodeDetailPanel } from "./panels/NodeDetailPanel";
 import { EditDraftPanel } from "./panels/EditDraftPanel";
 import { ReviewPanel } from "./panels/ReviewPanel";
+import { CommandPalette } from "./search/CommandPalette";
 import { Header } from "./chrome/Header";
 import { ToastContainer } from "./feedback/Toast";
 import { loadGraphForRoot } from "../lib/loadGraphForRoot";
@@ -72,6 +74,8 @@ export function GraphWorkspace() {
   const setMobileMenuOpen = useUiStore((s) => s.setMobileMenuOpen);
   const toggleLeftSidebar = useUiStore((s) => s.toggleLeftSidebar);
   const canvasMode = useUiStore((s) => s.canvasMode);
+
+  const commandPalette = useCommandPalette();
 
   const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
   const loadLineage = useGraphStore((s) => s.loadLineage);
@@ -190,6 +194,8 @@ export function GraphWorkspace() {
       {rightPanelMode === "detail" && <NodeDetailPanel />}
       {rightPanelMode === "edit" && <EditDraftPanel />}
       {rightPanelMode === "review" && <ReviewPanel />}
+
+      <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
 
       <ToastContainer />
 
