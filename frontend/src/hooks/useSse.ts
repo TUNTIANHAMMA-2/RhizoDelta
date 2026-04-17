@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useSseStore } from "../stores/sseStore";
 import { useGraphStore } from "../stores/graphStore";
+import { useNotificationStore } from "../stores/notificationStore";
 import { fetchNode } from "../api/nodes";
 import type {
   NodeCreatedEvent,
@@ -143,6 +144,7 @@ export function useSse() {
 
 function handleSseEvent(event: SseEvent) {
   const graphStore = useGraphStore.getState();
+  const notifStore = useNotificationStore.getState();
 
   switch (event.type) {
     case "NODE_CREATED": {
@@ -156,6 +158,12 @@ function handleSseEvent(event: SseEvent) {
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
         graphStore.loadRhizomes(); // Always refresh in case it's a new root
+      });
+      notifStore.addNotification({
+        type: "node_created",
+        nodeId: payload.node_id,
+        message: "新节点已创建",
+        timestamp: new Date().toISOString(),
       });
       break;
     }
@@ -196,6 +204,12 @@ function handleSseEvent(event: SseEvent) {
         graphStore.addEdge(edge);
         graphStore.scheduleFlushLayout();
       }
+      notifStore.addNotification({
+        type: "edge_created",
+        nodeId: payload.target,
+        message: "新关系已建立",
+        timestamp: new Date().toISOString(),
+      });
       break;
     }
     case "EDGE_REMOVED": {
@@ -221,6 +235,12 @@ function handleSseEvent(event: SseEvent) {
         graphStore.addNode(node);
         graphStore.resolveOptimisticNode(`temp-${payload.decision_id}`, node);
       });
+      notifStore.addNotification({
+        type: "decision_complete",
+        nodeId: payload.node_id,
+        message: `决策已完成: ${payload.decision_type}`,
+        timestamp: new Date().toISOString(),
+      });
       break;
     }
     case "ORCHESTRATION_STATUS": {
@@ -232,6 +252,12 @@ function handleSseEvent(event: SseEvent) {
         break;
       }
       useSseStore.getState().setOrchestrationStatus(payload);
+      notifStore.addNotification({
+        type: "orchestration_status",
+        nodeId: payload.post_node_id ?? undefined,
+        message: `编排状态: ${payload.status}`,
+        timestamp: new Date().toISOString(),
+      });
       break;
     }
     case "SUMMARY_GENERATED": {
@@ -246,6 +272,12 @@ function handleSseEvent(event: SseEvent) {
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
       });
+      notifStore.addNotification({
+        type: "summary_generated",
+        nodeId: payload.node_id,
+        message: "摘要已生成",
+        timestamp: new Date().toISOString(),
+      });
       break;
     }
     case "QUALITY_SCORED": {
@@ -259,6 +291,12 @@ function handleSseEvent(event: SseEvent) {
       // Refresh the node to get the updated quality score
       fetchNode(payload.node_id).then((node) => {
         graphStore.addNode(node);
+      });
+      notifStore.addNotification({
+        type: "quality_scored",
+        nodeId: payload.node_id,
+        message: "质量评分已更新",
+        timestamp: new Date().toISOString(),
       });
       break;
     }
