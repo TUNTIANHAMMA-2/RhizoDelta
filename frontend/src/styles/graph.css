@@ -1,10 +1,15 @@
+/* ═══════════════════════════════════════════════════════════
+   RhizoDelta Graph & Component Styles
+   "Botanical Observatory" — organic precision
+   ═══════════════════════════════════════════════════════════ */
+
 /* ── 设计图几何标记 (Geometric Markers) ── */
 .rd-marker-selected {
   position: absolute;
   top: 12px;
   left: 12px;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid var(--color-danger);
   display: flex;
@@ -12,12 +17,13 @@
   justify-content: center;
   z-index: 10;
   pointer-events: none;
+  opacity: 0.8;
 }
 .rd-marker-selected::after {
   content: "";
   position: absolute;
   width: 2px;
-  height: 24px;
+  height: 22px;
   background-color: var(--color-danger);
   transform: rotate(45deg);
 }
@@ -29,70 +35,99 @@
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 40px 40px 0 0;
+  border-width: 36px 36px 0 0;
   border-color: var(--color-warning) transparent transparent transparent;
   z-index: 10;
   pointer-events: none;
+  opacity: 0.85;
 }
 
 /* ── 节点通用动画容器 ── */
 .node-base {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(253, 252, 249, 0.72);
+  border: 1px solid rgba(221, 217, 206, 0.6);
   box-sizing: border-box;
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 1px 3px rgba(26, 29, 27, 0.04),
+    0 4px 16px rgba(26, 29, 27, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
   transition:
     background var(--transition-fast),
-    box-shadow var(--transition-fast),
-    border-color var(--transition-fast);
+    box-shadow var(--transition-normal),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .node-base:hover {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-border-focus), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  background: rgba(253, 252, 249, 0.92);
+  box-shadow:
+    0 2px 6px rgba(26, 29, 27, 0.05),
+    0 8px 24px rgba(26, 29, 27, 0.07),
+    0 0 0 1px var(--color-border-focus),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   border-color: var(--color-border-focus);
+  transform: translateY(-1px);
 }
 
 .node-base.selected {
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: var(--shadow-node-selected), 0 8px 24px rgba(59, 130, 246, 0.15);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    var(--shadow-node-selected),
+    0 8px 24px rgba(74, 124, 89, 0.1);
   border-color: var(--color-border-focus);
 }
 
-/* 节点类型色：用纯净清爽的细描边代替粗线条和渐变光斑 */
+/* 节点类型色 */
 .node-human {
-  border: 1px solid rgba(59, 130, 246, 0.5);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(59, 125, 216, 0.4);
+  box-shadow:
+    0 2px 8px rgba(59, 125, 216, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
-.node-consensus {
-  border: 1px solid rgba(139, 92, 246, 0.5);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-}
-.node-result {
-  border: 1px solid rgba(16, 185, 129, 0.5);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+.node-human:hover {
+  box-shadow: var(--shadow-glow-human), 0 0 0 1px rgba(59, 125, 216, 0.5);
 }
 
-/* 微观圆点 (mini/micro)：极简纯色外观 */
+.node-consensus {
+  border: 1px solid rgba(124, 92, 191, 0.4);
+  box-shadow:
+    0 2px 8px rgba(124, 92, 191, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.node-consensus:hover {
+  box-shadow: var(--shadow-glow-consensus), 0 0 0 1px rgba(124, 92, 191, 0.5);
+}
+
+.node-result {
+  border: 1px solid rgba(45, 143, 111, 0.4);
+  box-shadow:
+    0 2px 8px rgba(45, 143, 111, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.node-result:hover {
+  box-shadow: var(--shadow-glow-result), 0 0 0 1px rgba(45, 143, 111, 0.5);
+}
+
+/* 微观圆点 (mini/micro) */
 .node-micro.node-human, .node-mini.node-human {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border: 2px solid var(--color-node-human);
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 2px 8px rgba(59, 125, 216, 0.15);
 }
 .node-micro.node-consensus, .node-mini.node-consensus {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border: 2px solid var(--color-node-consensus);
-  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.15);
+  box-shadow: 0 2px 8px rgba(124, 92, 191, 0.15);
 }
 .node-micro.node-result, .node-mini.node-result {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border: 2px solid var(--color-node-result);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 2px 8px rgba(45, 143, 111, 0.15);
 }
 
 /* ── 缩放状态 (Zoom States) ── */
@@ -129,7 +164,7 @@
   display: flex;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity 180ms var(--ease-out);
 }
 
 .node-micro .node-content-micro { opacity: 1; pointer-events: auto; }
@@ -164,13 +199,14 @@
   color: var(--color-text-secondary);
   font-family: var(--font-ui);
   flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .node-body {
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--color-text-primary);
-  line-height: 1.5;
+  line-height: 1.55;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -183,7 +219,7 @@
 .version-edge-group .edge-path {
   stroke-width: 1.5px;
   stroke: var(--color-edge-default);
-  transition: stroke-width 120ms ease, stroke 120ms ease;
+  transition: stroke-width 150ms var(--ease-out), stroke 150ms var(--ease-out);
   fill: none;
 }
 .version-edge-group:hover .edge-path {
@@ -191,21 +227,17 @@
   stroke: var(--color-text-secondary);
 }
 
-/* 能量流转光效 (克制的流动感) */
+/* 能量流转光效 */
 .edge-path--flow {
   stroke-dasharray: 6 18;
   animation: root-edge-flow 30s linear infinite;
-  opacity: 0.5;
+  opacity: 0.4;
   mix-blend-mode: overlay;
 }
 
 @keyframes root-edge-flow {
-  from {
-    stroke-dashoffset: 1000;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
 }
 
 /* ── 节点悬停：关联边信息 ── */
@@ -214,7 +246,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-default);
   border-top: none;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
@@ -227,6 +259,7 @@
   max-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
+  animation: slide-up 150ms var(--ease-out);
 }
 
 .node-edge-item {
@@ -258,18 +291,12 @@
   color: var(--color-text-primary);
 }
 
-.node-edge-type {
-  flex-shrink: 0;
-}
-
-.node-edge-time {
-  opacity: 0.6;
-  margin-left: auto;
-}
+.node-edge-type { flex-shrink: 0; }
+.node-edge-time { opacity: 0.6; margin-left: auto; }
 
 /* ── 占位节点（乐观更新） ── */
 .node-optimistic {
-  opacity: 0.6;
+  opacity: 0.55;
   border-style: dashed;
   pointer-events: none;
 }
@@ -277,7 +304,7 @@
 /* ── 邻居高亮：非相关节点/边淡化 ── */
 .node-card--dimmed,
 .node-circle--dimmed {
-  opacity: 0.2;
+  opacity: 0.15;
   transition: opacity var(--transition-normal);
 }
 
@@ -290,7 +317,7 @@
 }
 @keyframes sse-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.35; }
 }
 @keyframes sse-blink {
   to { visibility: hidden; }
@@ -309,9 +336,10 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-sm);
+  letter-spacing: 0.01em;
 }
 .btn-primary:hover {
-  background: var(--color-text-secondary);
+  background: #2A3D2E;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -320,14 +348,14 @@
   box-shadow: var(--shadow-sm);
 }
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
 }
 
 .btn-secondary {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-default);
   color: var(--color-text-primary);
   border-radius: var(--radius-sm);
@@ -339,9 +367,14 @@
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-sm);
 }
-.btn-secondary:hover { 
+.btn-secondary:hover {
   background: var(--color-bg-hover);
-  border-color: var(--color-text-secondary);
+  border-color: var(--color-text-tertiary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.btn-secondary:active {
+  transform: translateY(0);
 }
 
 .btn-danger {
@@ -358,7 +391,7 @@
   box-shadow: var(--shadow-sm);
 }
 .btn-danger:hover {
-  background: #DC2626; /* Red 600 */
+  background: #A83830;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -374,8 +407,9 @@
   color: var(--color-danger);
   font-family: var(--font-ui);
   font-size: var(--font-size-xs);
+  transition: opacity var(--transition-fast);
 }
-.btn-text-danger:hover { text-decoration: underline; }
+.btn-text-danger:hover { opacity: 0.7; text-decoration: underline; }
 
 /* ── 面板通用 ── */
 .rd-panel {
@@ -386,7 +420,7 @@
   animation: panel-slide-in var(--transition-normal);
 }
 
-/* 覆盖 React Flow 默认节点包裹器在选中/聚焦时的方形高亮框 */
+/* 覆盖 React Flow 默认节点包裹器 */
 .react-flow__node {
   outline: none !important;
 }
@@ -399,8 +433,8 @@
 }
 
 @keyframes panel-slide-in {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from { transform: translateX(100%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .rd-panel-scroll {
@@ -420,7 +454,7 @@
   cursor: pointer;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--color-border-subtle);
   border-left: 3px solid transparent;
   border-radius: 0;
   text-align: left;
@@ -431,6 +465,7 @@
 
 .rd-list-item:hover {
   background: var(--color-bg-hover);
+  border-left-color: var(--color-border-default);
 }
 
 .rd-list-item[aria-current="true"] {
@@ -446,13 +481,13 @@
   border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   font-size: var(--font-size-sm);
-  background: var(--color-bg-primary);
-  transition: border-color var(--transition-fast);
+  background: var(--color-bg-elevated);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 .rd-input:focus {
   outline: none;
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.12);
 }
 
 .rd-label {
@@ -461,6 +496,7 @@
   font-family: var(--font-ui);
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
 }
 
 .rd-md-editor-wrapper {

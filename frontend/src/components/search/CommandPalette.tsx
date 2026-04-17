@@ -253,10 +253,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         position: "fixed",
         inset: 0,
         zIndex: 200,
-        background: "rgba(55, 53, 47, 0.4)",
+        background: "rgba(26, 29, 27, 0.3)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
+        animation: "fade-in 150ms var(--ease-out)",
       }}
       onClick={onClose}
     >
@@ -269,13 +271,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         style={{
           maxWidth: 560,
           width: "90%",
-          marginTop: "20vh",
-          background: "var(--color-bg-primary)",
-          borderRadius: "var(--radius-lg)",
-          boxShadow: "var(--shadow-lg)",
-          backdropFilter: "blur(12px)",
+          marginTop: "18vh",
+          background: "var(--color-bg-elevated)",
+          borderRadius: "var(--radius-xl)",
+          boxShadow: "var(--shadow-xl)",
+          border: "1px solid var(--color-border-default)",
           overflow: "hidden",
           fontFamily: "var(--font-ui)",
+          animation: "scale-in 200ms var(--ease-out)",
         }}
       >
         {/* ── Search input ─────────────────────────── */}
@@ -570,11 +573,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 // Shared kbd style for the footer
 const kbdStyle: React.CSSProperties = {
   display: "inline-block",
-  padding: "0 4px",
+  padding: "0 5px",
   border: "1px solid var(--color-border-default)",
   borderRadius: "var(--radius-sm)",
   fontSize: 10,
-  fontFamily: "var(--font-ui)",
+  fontFamily: "var(--font-mono)",
   lineHeight: "16px",
-  background: "var(--color-bg-secondary, #F1F0ED)",
+  background: "var(--color-bg-secondary)",
+  boxShadow: "0 1px 0 var(--color-border-default)",
 };

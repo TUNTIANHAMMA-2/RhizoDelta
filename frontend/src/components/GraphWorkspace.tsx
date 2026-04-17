@@ -26,14 +26,14 @@ function CanvasModeSwitch() {
         left: "var(--space-4)",
         zIndex: 20,
         display: "flex",
-        gap: "var(--space-2)",
-        padding: "var(--space-2)",
-        background: "rgba(255, 255, 255, 0.88)",
+        gap: "2px",
+        padding: "4px",
+        background: "rgba(253, 252, 249, 0.88)",
         border: "1px solid var(--color-border-default)",
         borderRadius: "var(--radius-lg)",
         boxShadow: "var(--shadow-md)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        backdropFilter: "blur(16px) saturate(1.3)",
+        WebkitBackdropFilter: "blur(16px) saturate(1.3)",
       }}
     >
       {[
@@ -48,7 +48,7 @@ function CanvasModeSwitch() {
             onClick={() => setCanvasMode(mode as "lineage" | "explore")}
             style={{
               border: "none",
-              borderRadius: "var(--radius-sm)",
+              borderRadius: "var(--radius-md)",
               padding: "var(--space-2) var(--space-4)",
               background: active ? "var(--color-text-primary)" : "transparent",
               color: active ? "var(--color-bg-primary)" : "var(--color-text-secondary)",
@@ -57,6 +57,7 @@ function CanvasModeSwitch() {
               fontFamily: "var(--font-ui)",
               fontSize: "var(--font-size-sm)",
               transition: "all var(--transition-fast)",
+              letterSpacing: "0.01em",
             }}
           >
             {label}
@@ -100,7 +101,7 @@ export function GraphWorkspace() {
   useSse();
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--color-bg-canvas)" }}>
       <Header />
 
       {/* Mobile hamburger */}
@@ -116,14 +117,15 @@ export function GraphWorkspace() {
           top: "var(--space-2)",
           right: "var(--space-4)",
           zIndex: 101,
-          background: "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(8px)",
+          background: "rgba(253, 252, 249, 0.88)",
+          backdropFilter: "blur(16px)",
           border: "1px solid var(--color-border-default)",
           borderRadius: "var(--radius-sm)",
           padding: "var(--space-2)",
           cursor: "pointer",
           fontFamily: "var(--font-ui)",
           fontSize: "var(--font-size-md)",
+          color: "var(--color-text-secondary)",
         }}
       >
         ☰
@@ -146,7 +148,8 @@ export function GraphWorkspace() {
               position: "fixed",
               inset: 0,
               zIndex: 49,
-              background: "rgba(55, 53, 47, 0.3)",
+              background: "rgba(26, 29, 27, 0.25)",
+              backdropFilter: "blur(2px)",
             }}
           />
         </>
@@ -166,13 +169,13 @@ export function GraphWorkspace() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(8px)",
+            background: "rgba(253, 252, 249, 0.88)",
+            backdropFilter: "blur(16px)",
             border: "1px solid var(--color-border-default)",
             borderLeft: "none",
             borderRadius: "0 var(--radius-full) var(--radius-full) 0",
             cursor: "pointer",
-            color: "var(--color-text-secondary)",
+            color: "var(--color-text-tertiary)",
             boxShadow: "var(--shadow-sm)",
             padding: 0,
           }}

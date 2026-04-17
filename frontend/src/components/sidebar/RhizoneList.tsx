@@ -51,10 +51,10 @@ export function RhizoneList() {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "var(--space-4)",
-          borderBottom: "1px solid var(--color-border-default)",
+          borderBottom: "1px solid var(--color-border-subtle)",
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>
+        <span style={{ fontWeight: 600, fontSize: "var(--font-size-sm)", letterSpacing: "0.02em", color: "var(--color-text-secondary)" }}>
           Rhizones
         </span>
       </div>
@@ -74,13 +74,14 @@ export function RhizoneList() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-bg-primary)",
+          background: "var(--color-bg-elevated)",
           border: "1px solid var(--color-border-default)",
           borderRadius: "var(--radius-full)",
           cursor: "pointer",
-          color: "var(--color-text-secondary)",
+          color: "var(--color-text-tertiary)",
           boxShadow: "var(--shadow-sm)",
           padding: 0,
+          transition: "all var(--transition-fast)",
         }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -155,7 +156,7 @@ export function RhizoneList() {
       <div
         style={{
           padding: "var(--space-3) var(--space-4)",
-          borderTop: "1px solid var(--color-border-default)",
+          borderTop: "1px solid var(--color-border-subtle)",
         }}
       >
         <button
@@ -164,7 +165,7 @@ export function RhizoneList() {
             selectNode(null);
             openPostPanel();
           }}
-          style={{ width: "100%" }}
+          style={{ width: "100%", borderRadius: "var(--radius-md)" }}
         >
           + 发起新话题
         </button>

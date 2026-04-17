@@ -17,15 +17,16 @@ function ToastItem({ toast }: { toast: ToastMessage }) {
         alignItems: "center",
         gap: "var(--space-3)",
         padding: "var(--space-3) var(--space-4)",
-        background: "var(--color-bg-primary)",
-        borderLeft: `4px solid ${TYPE_BORDER_COLOR[toast.type]}`,
-        borderRadius: "var(--radius-sm)",
-        boxShadow: "var(--shadow-md)",
+        background: "var(--color-bg-elevated)",
+        borderLeft: `3px solid ${TYPE_BORDER_COLOR[toast.type]}`,
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-lg)",
         fontFamily: "var(--font-ui)",
         fontSize: "var(--font-size-sm)",
         color: "var(--color-text-primary)",
         marginTop: "var(--space-2)",
-        animation: "toast-slide-in 200ms ease",
+        animation: "toast-slide-in 280ms var(--ease-out)",
+        backdropFilter: "blur(12px)",
       }}
     >
       <span style={{ flex: 1 }}>{toast.message}</span>
@@ -57,8 +58,8 @@ export function ToastContainer() {
     <>
       <style>{`
         @keyframes toast-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
+          from { transform: translateX(100%) scale(0.95); opacity: 0; }
+          to { transform: translateX(0) scale(1); opacity: 1; }
         }
       `}</style>
       <div

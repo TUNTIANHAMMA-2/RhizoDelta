@@ -80,15 +80,15 @@ export function Header() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", position: "relative", width: "100%", height: 40 }}>
-        {/* Logo 胶囊 (紧凑尺寸) */}
+        {/* Logo 胶囊 */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             height: 40,
-            background: "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            background: "rgba(253, 252, 249, 0.88)",
+            backdropFilter: "blur(16px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
             border: "1px solid var(--color-border-default)",
             borderRadius: "var(--radius-lg)",
             padding: "0 var(--space-4)",
@@ -105,10 +105,10 @@ export function Header() {
               display: "flex",
               alignItems: "center",
               fontFamily: "var(--font-content)",
-              fontWeight: 600,
+              fontWeight: 400,
               color: "var(--color-text-primary)",
               fontSize: "var(--font-size-md)",
-              letterSpacing: "-0.2px",
+              letterSpacing: "-0.02em",
             }}
           >
             RhizoDelt
@@ -137,9 +137,9 @@ export function Header() {
             display: "flex",
             alignItems: "center",
             height: 40,
-            background: "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            background: "rgba(253, 252, 249, 0.88)",
+            backdropFilter: "blur(16px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
             border: selectedNodeId ? "1px solid var(--color-border-default)" : "1px solid transparent",
             borderRadius: "var(--radius-lg)",
             padding: selectedNodeId ? "0 var(--space-4)" : "0",
@@ -148,7 +148,7 @@ export function Header() {
             opacity: selectedNodeId ? 1 : 0,
             maxWidth: selectedNodeId ? 400 : 0,
             overflow: "hidden",
-            transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "all 300ms var(--ease-out)",
             zIndex: 1,
           }}
         >
@@ -163,7 +163,7 @@ export function Header() {
           display: "flex",
           alignItems: "center",
           gap: "var(--space-2)",
-          transition: "transform 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+          transition: "transform 300ms var(--ease-out)",
           transform: rightPanelMode !== "hidden" ? "translateX(calc(-1 * max(45vw, 460px)))" : "translateX(0)",
         }}
       >
@@ -177,17 +177,19 @@ export function Header() {
               alignItems: "center",
               height: 36,
               border: "1px solid var(--color-border-default)",
-              borderRadius: "999px",
-              padding: "0 12px",
-              background: "rgba(255, 255, 255, 0.85)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              borderRadius: "var(--radius-full)",
+              padding: "0 14px",
+              background: "rgba(253, 252, 249, 0.88)",
+              backdropFilter: "blur(16px) saturate(1.3)",
+              WebkitBackdropFilter: "blur(16px) saturate(1.3)",
               boxShadow: "var(--shadow-sm)",
               cursor: "pointer",
               fontFamily: "var(--font-ui)",
               fontSize: "var(--font-size-xs)",
               fontWeight: 600,
               color: "var(--color-text-secondary)",
+              transition: "all var(--transition-fast)",
+              letterSpacing: "0.01em",
             }}
           >
             复核
@@ -216,13 +218,13 @@ export function Header() {
             border: userHovered
               ? "1px solid var(--color-danger)"
               : "1px solid var(--color-border-default)",
-            borderRadius: "999px",
+            borderRadius: "var(--radius-full)",
             padding: "0 14px",
             background: userHovered
-              ? "rgba(235, 87, 87, 0.08)"
-              : "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+              ? "rgba(196, 69, 58, 0.06)"
+              : "rgba(253, 252, 249, 0.88)",
+            backdropFilter: "blur(16px) saturate(1.3)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
             boxShadow: "var(--shadow-sm)",
             cursor: userHovered ? "pointer" : "default",
             fontFamily: "var(--font-ui)",
@@ -268,12 +270,13 @@ export function Header() {
               height: 36,
               border: "1px solid var(--color-border-default)",
               borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.85)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              background: "rgba(253, 252, 249, 0.88)",
+              backdropFilter: "blur(16px) saturate(1.3)",
+              WebkitBackdropFilter: "blur(16px) saturate(1.3)",
               boxShadow: "var(--shadow-sm)",
               cursor: "pointer",
               padding: 0,
+              transition: "all var(--transition-fast)",
             }}
           >
             <svg
