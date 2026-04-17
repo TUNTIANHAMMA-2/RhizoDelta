@@ -53,6 +53,17 @@ export function useGraphInteractions() {
     // Caller resets opacity via store
   }, []);
 
+  // ── Consume pendingFocusNodeId from store ──
+  const pendingFocusNodeId = useGraphStore((s) => s.pendingFocusNodeId);
+  const clearPendingFocus = useGraphStore((s) => s.clearPendingFocus);
+
+  useEffect(() => {
+    if (!pendingFocusNodeId) return;
+    clearPendingFocus();
+    // Small delay to let layout settle after selection
+    focusNode(pendingFocusNodeId, 100);
+  }, [pendingFocusNodeId, clearPendingFocus, focusNode]);
+
   // ── Auto-expand boundary nodes after selection dwell ──
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const expandChildren = useGraphStore((s) => s.expandChildren);

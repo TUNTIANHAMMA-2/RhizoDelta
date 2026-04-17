@@ -6,6 +6,7 @@ import com.rhizodelta.ai.context.domain.embedding.EmbeddingWriteRequest;
 import com.rhizodelta.ai.context.domain.embedding.EmbeddingWriteResult;
 import com.rhizodelta.ai.context.domain.embedding.SimilaritySearchRequest;
 import com.rhizodelta.ai.context.domain.embedding.SimilaritySearchResult;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 暴露 embedding 写入与相似度检索接口。
@@ -34,6 +36,19 @@ public class EmbeddingController {
 
     public EmbeddingController(EmbeddingService embeddingService) {
         this.embeddingService = embeddingService;
+    }
+
+    /**
+     * 读取指定节点的 embedding 向量。
+     *
+     * @param id 节点 UUID 字符串。
+     * @return 包含 vector 字段的响应，若节点无 embedding 则返回 404。
+     */
+    @GetMapping("/{id}/embedding")
+    public ApiResponse<Map<String, Object>> getEmbedding(@PathVariable("id") String id) {
+        List<Float> vector = embeddingService.getEmbedding(id)
+                .orElseThrow(() -> new java.util.NoSuchElementException("embedding not found for node: " + id));
+        return ApiResponse.ok(Map.of("node_id", id, "vector", vector, "dimension", vector.size()));
     }
 
     /**

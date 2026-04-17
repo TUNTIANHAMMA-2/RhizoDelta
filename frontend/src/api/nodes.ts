@@ -10,6 +10,11 @@ import type {
 export const fetchNode = (id: string) =>
   request<GraphNodeDTO>(`/api/nodes/${id}`);
 
+export const fetchEmbedding = (id: string) =>
+  request<{ node_id: string; vector: number[]; dimension: number }>(
+    `/api/nodes/${id}/embedding`,
+  );
+
 export const fetchRhizomes = (limit?: number) => {
   const qs = limit ? `?limit=${limit}` : "";
   return request<GraphNodeDTO[]>(`/api/nodes/roots${qs}`);

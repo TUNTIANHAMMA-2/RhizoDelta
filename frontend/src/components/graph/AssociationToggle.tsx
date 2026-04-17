@@ -18,7 +18,7 @@ export function AssociationToggle() {
   }, [showAssociations, rootNodeId, loadAssociations, toggleAssociations]);
 
   return (
-    <Panel position="top-left" style={{ marginTop: 60, marginLeft: 500 }}>
+    <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
       <button
         type="button"
         onClick={handleClick}

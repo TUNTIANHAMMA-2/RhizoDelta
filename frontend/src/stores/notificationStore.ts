@@ -35,6 +35,17 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   addNotification: (item) => {
     const id = String(++notificationId);
     set((s) => {
+      // Merge orchestration_status notifications for the same nodeId
+      if (item.type === "orchestration_status" && item.nodeId) {
+        const existingIdx = s.items.findIndex(
+          (n) => n.type === "orchestration_status" && n.nodeId === item.nodeId && !n.read,
+        );
+        if (existingIdx >= 0) {
+          const items = [...s.items];
+          items[existingIdx] = { ...items[existingIdx], message: item.message, timestamp: item.timestamp };
+          return { items, unreadCount: items.filter((n) => !n.read).length };
+        }
+      }
       const items = [{ ...item, id, read: false }, ...s.items].slice(
         0,
         MAX_ITEMS,

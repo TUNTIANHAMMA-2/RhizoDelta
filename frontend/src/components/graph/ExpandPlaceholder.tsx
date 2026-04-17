@@ -51,16 +51,6 @@ const spinnerStyle: React.CSSProperties = {
   animation: "expand-spin 0.8s linear infinite",
 };
 
-/**
- * Inline <style> for the spinner keyframes and hover effect.
- * Rendered once per mount; React deduplicates identical <style> tags.
- */
-const KEYFRAMES = `
-@keyframes expand-spin {
-  to { transform: rotate(360deg); }
-}
-`;
-
 export const ExpandPlaceholder = memo(function ExpandPlaceholder({
   data,
 }: NodeProps) {
@@ -75,9 +65,7 @@ export const ExpandPlaceholder = memo(function ExpandPlaceholder({
   };
 
   return (
-    <>
-      <style>{KEYFRAMES}</style>
-      <div
+    <div
         style={containerStyle}
         onClick={handleClick}
         role="button"
@@ -123,6 +111,5 @@ export const ExpandPlaceholder = memo(function ExpandPlaceholder({
         </div>
         <span style={labelStyle}>{"\u5C55\u5F00"}</span>
       </div>
-    </>
   );
 });

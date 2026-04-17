@@ -44,6 +44,12 @@ public class EmbeddingService {
             RETURN node.node_id AS nodeId
             """;
 
+    private static final String GET_EMBEDDING_QUERY = """
+            MATCH (node:GraphNode {node_id: $nodeId})
+            WHERE node.embedding IS NOT NULL
+            RETURN node.embedding AS embedding
+            """;
+
     private static final String SIMILARITY_SEARCH_QUERY = """
             CALL db.index.vector.queryNodes('%s', $topK, $vector)
             YIELD node, score
@@ -117,6 +123,33 @@ public class EmbeddingService {
                 .one()
                 .orElseThrow(() -> new NoSuchElementException("node not found: " + validatedNodeId));
         return new EmbeddingWriteResult(parsedNodeId, actualDimension);
+    }
+
+    /**
+     * 读取指定节点的 embedding 向量。
+     *
+     * @param nodeId 节点 ID。
+     * @return embedding 向量，若节点无 embedding 则返回空 Optional。
+     */
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    @SuppressWarnings("unchecked")
+    public java.util.Optional<List<Float>> getEmbedding(String nodeId) {
+        String validatedNodeId = DecisionCommandValidation.requireText(nodeId, "node_id");
+        parseNodeId(validatedNodeId); // validate UUID format
+
+        return neo4jClient.query(GET_EMBEDDING_QUERY)
+                .bind(validatedNodeId).to("nodeId")
+                .fetch()
+                .one()
+                .map(row -> {
+                    Object raw = row.get("embedding");
+                    if (raw instanceof List<?> list) {
+                        return list.stream()
+                                .map(v -> v instanceof Number n ? n.floatValue() : Float.parseFloat(v.toString()))
+                                .toList();
+                    }
+                    return List.<Float>of();
+                });
     }
 
     /**

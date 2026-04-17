@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useSseStore } from "../../stores/sseStore";
 import { useAuthStore } from "../../stores/authStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -35,6 +35,20 @@ export function Header() {
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const [userHovered, setUserHovered] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifContainerRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside to close notification panel
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [notifOpen]);
 
   const topRole = roles.includes("ADMIN")
     ? "ADMIN"
@@ -183,8 +197,16 @@ export function Header() {
         {/* 用户名胶囊 — hover 变退出按钮 */}
         <button
           type="button"
-          onMouseEnter={() => setUserHovered(true)}
-          onMouseLeave={() => setUserHovered(false)}
+          onMouseEnter={() => {
+            hoverTimerRef.current = setTimeout(() => setUserHovered(true), 300);
+          }}
+          onMouseLeave={() => {
+            if (hoverTimerRef.current) {
+              clearTimeout(hoverTimerRef.current);
+              hoverTimerRef.current = null;
+            }
+            setUserHovered(false);
+          }}
           onClick={userHovered ? handleLogout : undefined}
           style={{
             display: "flex",
@@ -232,7 +254,7 @@ export function Header() {
         </button>
 
         {/* 通知铃铛 */}
-        <div style={{ position: "relative" }}>
+        <div ref={notifContainerRef} style={{ position: "relative" }}>
           <button
             type="button"
             onClick={() => setNotifOpen(!notifOpen)}

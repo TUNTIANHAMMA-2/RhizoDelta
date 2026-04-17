@@ -125,7 +125,7 @@ export function AuditPanel({ nodeId }: Props) {
             color: "var(--color-text-primary)",
           }}
         >
-          <option value="">All types</option>
+          <option value="">所有类型</option>
           <option value="MERGE">MERGE</option>
           <option value="BRANCH">BRANCH</option>
           <option value="INJECT">INJECT</option>
@@ -134,9 +134,7 @@ export function AuditPanel({ nodeId }: Props) {
           <option value="CROSS_SYNTH">CROSS_SYNTH</option>
           <option value="JOIN">JOIN</option>
         </select>
-        <input
-          type="text"
-          placeholder="Operator ID"
+        <select
           value={filterOperator}
           onChange={(e) => setFilterOperator(e.target.value)}
           style={{
@@ -147,9 +145,14 @@ export function AuditPanel({ nodeId }: Props) {
             borderRadius: "var(--radius-sm)",
             background: "var(--color-bg-primary)",
             color: "var(--color-text-primary)",
-            width: 120,
+            minWidth: 120,
           }}
-        />
+        >
+          <option value="">所有操作者</option>
+          {Array.from(new Set(items.map((i) => i.operator_id).filter(Boolean))).map((op) => (
+            <option key={op} value={op}>{op}</option>
+          ))}
+        </select>
         <input
           type="date"
           value={filterSince}

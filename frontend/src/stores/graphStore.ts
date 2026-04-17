@@ -28,6 +28,7 @@ export interface GraphState {
   showAssociations: boolean;
   associationRfEdges: Edge[];
   expandingNodeIds: Set<string>;
+  pendingFocusNodeId: string | null;
 
   selectedNodeId: string | null;
   rootNodeId: string | null;
@@ -43,6 +44,8 @@ export interface GraphState {
   toggleAssociations: () => void;
   expandChildren: (nodeId: string) => Promise<void>;
   getBoundaryNodeIds: () => string[];
+  requestFocusNode: (nodeId: string) => void;
+  clearPendingFocus: () => void;
 
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
@@ -75,6 +78,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   showAssociations: false,
   associationRfEdges: [],
   expandingNodeIds: new Set<string>(),
+  pendingFocusNodeId: null,
   selectedNodeId: null,
   rootNodeId: null,
   lineageRequestId: 0,
@@ -212,6 +216,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }
     return boundary;
   },
+
+  requestFocusNode: (nodeId) => set({ pendingFocusNodeId: nodeId }),
+  clearPendingFocus: () => set({ pendingFocusNodeId: null }),
 
   addNode: (node) => {
     const nodesMap = new Map(get().nodes);
