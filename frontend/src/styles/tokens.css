@@ -1,75 +1,66 @@
 /* ═══════════════════════════════════════════════════════════
    RhizoDelta Design Tokens — "Botanical Observatory"
    Warm parchment meets scientific precision.
+
+   @theme 块供 Tailwind v4 生成 utility classes；
+   :root 块中的别名供 graph.css 及遗留内联样式使用。
+   (Google Fonts @import 已前置到 index.css)
    ═══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@theme {
+  /* ── Colors (→ bg-*, text-*, border-*) ── */
+  --color-bg-primary:       #FDFCF9;
+  --color-bg-secondary:     #F6F4EF;
+  --color-bg-hover:         #F0EDE6;
+  --color-bg-selected:      #EBE8DF;
+  --color-bg-canvas:        #FAF9F6;
+  --color-bg-elevated:      #FFFFFF;
 
-:root {
-  /* ── 色板 / Color Palette ── */
-  --color-bg-primary:       #FDFCF9;   /* 暖白纸张 / Warm parchment white */
-  --color-bg-secondary:     #F6F4EF;   /* 侧边栏/面板暖灰 / Warm sidebar */
-  --color-bg-hover:         #F0EDE6;   /* 悬浮背景 / Hover state */
-  --color-bg-selected:      #EBE8DF;   /* 选中背景 / Selected state */
-  --color-bg-canvas:        #FAF9F6;   /* 画布背景 / Canvas background */
-  --color-bg-elevated:      #FFFFFF;   /* 浮层背景 / Elevated surface */
+  --color-text-primary:     #1A1D1B;
+  --color-text-secondary:   #5C6B5E;
+  --color-text-tertiary:    #9CA89E;
 
-  --color-text-primary:     #1A1D1B;   /* 主文字色 (深森林) */
-  --color-text-secondary:   #5C6B5E;   /* 次要文字 (苔藓灰绿) */
-  --color-text-tertiary:    #9CA89E;   /* 占位/禁用文字 (淡灰绿) */
+  --color-border-default:   #DDD9CE;
+  --color-border-subtle:    #EAE7DE;
+  --color-border-focus:     #4A7C59;
 
-  --color-border-default:   #DDD9CE;   /* 默认边框 (暖灰) */
-  --color-border-subtle:    #EAE7DE;   /* 微妙边框 */
-  --color-border-focus:     #4A7C59;   /* 聚焦边框 (深翠绿) */
+  --color-node-human:       #3B7DD8;
+  --color-node-consensus:   #7C5CBF;
+  --color-node-result:      #2D8F6F;
 
-  --color-node-human:       #3B7DD8;   /* Human_Post 矢车菊蓝 */
-  --color-node-consensus:   #7C5CBF;   /* AI_Consensus 鸢尾紫 */
-  --color-node-result:      #2D8F6F;   /* Result 翡翠绿 */
+  --color-edge-default:     #C8C3B8;
 
-  --color-edge-default:     #C8C3B8;   /* 边默认色 (暖灰) */
+  --color-accent:           #4A7C59;
+  --color-accent-warm:      #C4713B;
+  --color-danger:           #C4453A;
+  --color-warning:          #C4913B;
+  --color-success:          #2D8F6F;
 
-  /* 强调色 (Accents) */
-  --color-accent:           #4A7C59;   /* 默认强调 — 深翠绿 */
-  --color-accent-warm:      #C4713B;   /* 暖强调 — 赤陶橙 */
-  --color-danger:           #C4453A;   /* 红色警示 (砖红) */
-  --color-warning:          #C4913B;   /* 黄色警告 (琥珀) */
-  --color-success:          #2D8F6F;   /* 成功绿 (翡翠) */
-
-  /* 有机拟态化 (Rhizomatic Vibrant) 光晕 */
   --color-glow-human:       rgba(59, 125, 216, 0.35);
   --color-glow-consensus:   rgba(124, 92, 191, 0.35);
   --color-glow-result:      rgba(45, 143, 111, 0.35);
 
-  /* ── 字体 / Typography ── */
+  /* ── Fonts (→ font-*) ── */
   --font-content:           "Fraunces", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
   --font-ui:                "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:              "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
 
-  --font-size-xs:           11.5px;
-  --font-size-sm:           13px;
-  --font-size-base:         14.5px;
-  --font-size-md:           16px;
-  --font-size-lg:           18px;
-  --font-size-xl:           24px;
-  --font-size-2xl:          32px;
+  /* ── Font sizes (→ text-*) ── */
+  --text-xs:                11.5px;
+  --text-sm:                13px;
+  --text-base:              14.5px;
+  --text-md:                16px;
+  --text-lg:                18px;
+  --text-xl:                24px;
+  --text-2xl:               32px;
 
-  /* ── 间距 / Spacing ── */
-  --space-1:                4px;
-  --space-2:                8px;
-  --space-3:                12px;
-  --space-4:                16px;
-  --space-5:                20px;
-  --space-6:                24px;
-  --space-8:                32px;
-
-  /* ── 圆角 / Radii ── */
+  /* ── Radii (→ rounded-*) ── */
   --radius-sm:              6px;
   --radius-md:              10px;
   --radius-lg:              14px;
   --radius-xl:              20px;
-  --radius-full:            9999px;
 
-  /* ── 阴影 / Shadows — layered for depth ── */
+  /* ── Shadows (→ shadow-*) ── */
   --shadow-sm:              0 1px 2px rgb(26 29 27 / 0.04),
                             0 1px 3px rgb(26 29 27 / 0.03);
   --shadow-md:              0 2px 4px rgb(26 29 27 / 0.03),
@@ -84,16 +75,45 @@
   --shadow-glow-consensus:  0 0 20px rgb(124 92 191 / 0.12);
   --shadow-glow-result:     0 0 20px rgb(45 143 111 / 0.12);
 
-  /* ── 动画 / Transitions — spring-like easing ── */
+  /* ── Easings (→ ease-*) ── */
   --ease-out:               cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out:            cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring:            cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Animations (→ animate-*) ── */
+  --animate-fade-in:        fade-in 150ms var(--ease-out);
+  --animate-slide-up:       slide-up 200ms var(--ease-out);
+  --animate-slide-down:     slide-down 200ms var(--ease-out);
+  --animate-scale-in:       scale-in 200ms var(--ease-out);
+  --animate-shimmer:        shimmer 1.5s linear infinite;
+  --animate-spin-slow:      expand-spin 0.7s linear infinite;
+}
+
+/* Legacy 别名 — 供 graph.css 与遗留内联样式使用 */
+:root {
+  --font-size-xs:           var(--text-xs);
+  --font-size-sm:           var(--text-sm);
+  --font-size-base:         var(--text-base);
+  --font-size-md:           var(--text-md);
+  --font-size-lg:           var(--text-lg);
+  --font-size-xl:           var(--text-xl);
+  --font-size-2xl:          var(--text-2xl);
+
+  --space-1:                4px;
+  --space-2:                8px;
+  --space-3:                12px;
+  --space-4:                16px;
+  --space-5:                20px;
+  --space-6:                24px;
+  --space-8:                32px;
+
+  --radius-full:            9999px;
+
   --transition-fast:        120ms var(--ease-out);
   --transition-normal:      220ms var(--ease-out);
   --transition-slow:        380ms var(--ease-out);
   --transition-spring:      400ms var(--ease-spring);
 
-  /* ── 纹理 / Texture ── */
   --grain-opacity:          0.025;
 }
 
