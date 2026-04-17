@@ -6,7 +6,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { Skeleton } from "../feedback/Skeleton";
 import { EmptyState } from "../feedback/EmptyState";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
-import type { AuditRecord, AuditDetail } from "../../api/types";
+import type { AuditRecord, AuditDetail, DecisionType } from "../../api/types";
 import { fetchAuditDetail } from "../../api/audit";
 
 const DECISION_TYPE_COLOR: Record<string, string> = {
@@ -30,6 +30,10 @@ export function AuditPanel({ nodeId }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<AuditDetail | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<AuditRecord | null>(null);
+  const [filterType, setFilterType] = useState<string>("");
+  const [filterOperator, setFilterOperator] = useState<string>("");
+  const [filterSince, setFilterSince] = useState<string>("");
+  const [filterUntil, setFilterUntil] = useState<string>("");
   const isAdmin = useAuthStore((s) => s.hasRole("ADMIN"));
   const addToast = useUiStore((s) => s.addToast);
 
@@ -39,6 +43,10 @@ export function AuditPanel({ nodeId }: Props) {
       node_id: nodeId,
       after: cursor,
       limit: 20,
+      ...(filterType ? { type: filterType as DecisionType } : {}),
+      ...(filterOperator ? { operator_id: filterOperator } : {}),
+      ...(filterSince ? { since: filterSince } : {}),
+      ...(filterUntil ? { until: filterUntil } : {}),
     })
       .then((res) => {
         const newItems = res?.records ?? [];
@@ -51,9 +59,12 @@ export function AuditPanel({ nodeId }: Props) {
 
   useEffect(() => {
     setItems([]);
+    setNextCursor(null);
+    setExpandedId(null);
+    setExpandedDetail(null);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeId]);
+  }, [filterType, filterOperator, filterSince, filterUntil, nodeId]);
 
   const handleRollback = async () => {
     if (!rollbackTarget) return;
@@ -92,6 +103,82 @@ export function AuditPanel({ nodeId }: Props) {
 
   return (
     <>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "var(--space-2)",
+          marginBottom: "var(--space-3)",
+          alignItems: "center",
+        }}
+      >
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-xs)",
+            padding: "2px var(--space-2)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--color-bg-primary)",
+            color: "var(--color-text-primary)",
+          }}
+        >
+          <option value="">All types</option>
+          <option value="MERGE">MERGE</option>
+          <option value="BRANCH">BRANCH</option>
+          <option value="INJECT">INJECT</option>
+          <option value="MATERIALIZE">MATERIALIZE</option>
+          <option value="FORK">FORK</option>
+          <option value="CROSS_SYNTH">CROSS_SYNTH</option>
+          <option value="JOIN">JOIN</option>
+        </select>
+        <input
+          type="text"
+          placeholder="Operator ID"
+          value={filterOperator}
+          onChange={(e) => setFilterOperator(e.target.value)}
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-xs)",
+            padding: "2px var(--space-2)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--color-bg-primary)",
+            color: "var(--color-text-primary)",
+            width: 120,
+          }}
+        />
+        <input
+          type="date"
+          value={filterSince}
+          onChange={(e) => setFilterSince(e.target.value)}
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-xs)",
+            padding: "2px var(--space-2)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--color-bg-primary)",
+            color: "var(--color-text-primary)",
+          }}
+        />
+        <input
+          type="date"
+          value={filterUntil}
+          onChange={(e) => setFilterUntil(e.target.value)}
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--font-size-xs)",
+            padding: "2px var(--space-2)",
+            border: "1px solid var(--color-border-default)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--color-bg-primary)",
+            color: "var(--color-text-primary)",
+          }}
+        />
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
         {items.map((audit) => {
           const expanded = expandedId === audit.decision_id;
