@@ -80,53 +80,24 @@ export function ReviewPanel() {
 
   return (
     <aside
-      className="rd-panel"
+      className="rd-panel w-[45vw] min-w-[460px] relative border-l border-border-default bg-bg-primary flex flex-col font-ui h-full"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
-      style={{
-        width: "45vw",
-        minWidth: 460,
-        position: "relative",
-        borderLeft: "1px solid var(--color-border-default)",
-        background: "var(--color-bg-primary)",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "var(--font-ui)",
-        height: "100%",
-      }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: "var(--space-4)",
-          borderBottom: "1px solid var(--color-border-default)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)" }}>
-          人工复核
-        </span>
+      <div className="p-4 border-b border-border-default flex justify-between items-center">
+        <span className="font-semibold text-md">人工复核</span>
         <button
           onClick={closePanel}
           aria-label="关闭面板"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "var(--font-size-md)",
-            color: "var(--color-text-secondary)",
-          }}
+          className="bg-transparent border-none cursor-pointer text-md text-text-secondary"
         >
           &times;
         </button>
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-4)" }}>
+      <div className="flex-1 overflow-y-auto p-4">
         {loading && items.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <div className="flex flex-col gap-3">
             <Skeleton variant="rectangular" height={60} />
             <Skeleton variant="rectangular" height={60} />
             <Skeleton variant="rectangular" height={60} />
@@ -136,172 +107,91 @@ export function ReviewPanel() {
         ) : items.length === 0 ? (
           <EmptyState message="暂无待复核任务" />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          <div className="flex flex-col gap-0">
             {items.map((review) => {
               const expanded = expandedId === review.review_id;
+              const statusColor = STATUS_COLOR[review.status] ?? "var(--color-text-tertiary)";
               return (
                 <div
                   key={review.review_id}
-                  style={{
-                    borderLeft: "2px solid var(--color-border-default)",
-                    paddingLeft: "var(--space-4)",
-                    paddingBottom: "var(--space-4)",
-                    position: "relative",
-                  }}
+                  className="border-l-2 border-border-default pl-4 pb-4 relative"
                 >
-                  {/* Timeline dot */}
                   <span
-                    style={{
-                      position: "absolute",
-                      left: -5,
-                      top: 2,
-                      width: 8,
-                      height: 8,
-                      borderRadius: "var(--radius-full)",
-                      background: STATUS_COLOR[review.status] ?? "var(--color-text-tertiary)",
-                    }}
+                    className="absolute -left-[5px] top-[2px] w-2 h-2 rounded-full"
+                    style={{ background: statusColor }}
                   />
 
                   <button
                     onClick={() => setExpandedId(expanded ? null : review.review_id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      padding: 0,
-                      width: "100%",
-                    }}
+                    className="bg-transparent border-none cursor-pointer text-left p-0 w-full"
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "var(--space-2)",
-                        marginBottom: "var(--space-1)",
-                      }}
-                    >
-                      {/* Status badge */}
+                    <div className="flex items-center gap-2 mb-1">
                       <span
+                        className="inline-flex px-2 py-[1px] rounded-full text-xs font-medium"
                         style={{
-                          display: "inline-flex",
-                          padding: "1px var(--space-2)",
-                          borderRadius: "var(--radius-full)",
                           background: (STATUS_COLOR[review.status] ?? "#ccc") + "1a",
                           color: STATUS_COLOR[review.status] ?? "var(--color-text-secondary)",
-                          fontSize: "var(--font-size-xs)",
-                          fontWeight: 500,
                         }}
                       >
                         {review.status}
                       </span>
-                      {/* Suggested action */}
-                      <span
-                        style={{
-                          fontSize: "var(--font-size-xs)",
-                          color: "var(--color-text-tertiary)",
-                        }}
-                      >
+                      <span className="text-xs text-text-tertiary">
                         {ACTION_LABEL[review.suggested_action] ?? review.suggested_action}
                       </span>
                     </div>
-                    {/* Reason codes */}
                     {review.review_reason_codes.length > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "var(--space-1)",
-                          marginBottom: "var(--space-1)",
-                        }}
-                      >
+                      <div className="flex flex-wrap gap-1 mb-1">
                         {review.review_reason_codes.map((code) => (
                           <span
                             key={code}
-                            style={{
-                              fontSize: "var(--font-size-xs)",
-                              padding: "0 var(--space-1)",
-                              borderRadius: "var(--radius-sm)",
-                              background: "var(--color-bg-tertiary)",
-                              color: "var(--color-text-secondary)",
-                            }}
+                            className="text-xs px-1 rounded-sm bg-bg-hover text-text-secondary"
                           >
                             {code}
                           </span>
                         ))}
                       </div>
                     )}
-                    <div
-                      style={{
-                        fontSize: "var(--font-size-xs)",
-                        color: "var(--color-text-tertiary)",
-                      }}
-                    >
+                    <div className="text-xs text-text-tertiary">
                       {new Date(review.created_at).toLocaleString()}
                     </div>
                   </button>
 
                   {expanded && (
-                    <div
-                      style={{
-                        marginTop: "var(--space-2)",
-                        padding: "var(--space-3)",
-                        background: "var(--color-bg-secondary)",
-                        borderRadius: "var(--radius-sm)",
-                        fontSize: "var(--font-size-xs)",
-                      }}
-                    >
-                      <div style={{ marginBottom: "var(--space-1)" }}>
+                    <div className="mt-2 p-3 bg-bg-secondary rounded-sm text-xs">
+                      <div className="mb-1">
                         <strong>review_id:</strong> {review.review_id}
                       </div>
-                      <div style={{ marginBottom: "var(--space-1)" }}>
+                      <div className="mb-1">
                         <strong>post_node_id:</strong> {review.post_node_id}
                       </div>
-                      <div style={{ marginBottom: "var(--space-1)" }}>
+                      <div className="mb-1">
                         <strong>candidate_node_ids:</strong>{" "}
                         {review.candidate_node_ids.length > 0
                           ? review.candidate_node_ids.join(", ")
                           : "—"}
                       </div>
                       {review.draft_payload && Object.keys(review.draft_payload).length > 0 && (
-                        <div style={{ marginBottom: "var(--space-1)" }}>
+                        <div className="mb-1">
                           <strong>draft_payload:</strong>
-                          <pre
-                            style={{
-                              margin: "var(--space-1) 0 0",
-                              padding: "var(--space-2)",
-                              background: "var(--color-bg-primary)",
-                              borderRadius: "var(--radius-sm)",
-                              overflow: "auto",
-                              maxHeight: 120,
-                              fontSize: "var(--font-size-xs)",
-                            }}
-                          >
+                          <pre className="mt-1 p-2 bg-bg-primary rounded-sm overflow-auto max-h-[120px] text-xs">
                             {JSON.stringify(review.draft_payload, null, 2)}
                           </pre>
                         </div>
                       )}
-                      <div style={{ marginBottom: "var(--space-1)" }}>
+                      <div className="mb-1">
                         <strong>expires_at:</strong>{" "}
                         {new Date(review.expires_at).toLocaleString()}
                       </div>
 
                       {isAdmin && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "var(--space-2)",
-                            marginTop: "var(--space-3)",
-                          }}
-                        >
+                        <div className="flex gap-2 mt-3">
                           {review.suggested_action === "MERGE" && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setConfirmAction({ type: "approve-merge", reviewId: review.review_id });
                               }}
-                              className="btn-primary"
-                              style={{ fontSize: "var(--font-size-xs)" }}
+                              className="btn-primary text-xs"
                             >
                               批准合并
                             </button>
@@ -312,8 +202,7 @@ export function ReviewPanel() {
                                 e.stopPropagation();
                                 setConfirmAction({ type: "approve-branch", reviewId: review.review_id });
                               }}
-                              className="btn-primary"
-                              style={{ fontSize: "var(--font-size-xs)" }}
+                              className="btn-primary text-xs"
                             >
                               批准分支
                             </button>
@@ -323,14 +212,7 @@ export function ReviewPanel() {
                               e.stopPropagation();
                               setConfirmAction({ type: "reject", reviewId: review.review_id });
                             }}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              color: "var(--color-danger)",
-                              fontSize: "var(--font-size-xs)",
-                              fontWeight: 500,
-                            }}
+                            className="bg-transparent border-none cursor-pointer text-danger text-xs font-medium"
                           >
                             拒绝
                           </button>

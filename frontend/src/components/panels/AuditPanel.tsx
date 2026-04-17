@@ -19,6 +19,9 @@ const DECISION_TYPE_COLOR: Record<string, string> = {
   JOIN: "var(--color-node-consensus)",
 };
 
+const FILTER_CTRL_CLASS =
+  "font-ui text-xs px-2 py-[2px] border border-border-default rounded-sm bg-bg-primary text-text-primary";
+
 interface Props {
   nodeId: string;
 }
@@ -89,7 +92,7 @@ export function AuditPanel({ nodeId }: Props) {
 
   if (loading && (!items || items.length === 0)) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div className="flex flex-col gap-3">
         <Skeleton variant="rectangular" height={60} />
         <Skeleton variant="rectangular" height={60} />
         <Skeleton variant="rectangular" height={60} />
@@ -103,27 +106,11 @@ export function AuditPanel({ nodeId }: Props) {
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "var(--space-2)",
-          marginBottom: "var(--space-3)",
-          alignItems: "center",
-        }}
-      >
+      <div className="flex flex-wrap gap-2 mb-3 items-center">
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            padding: "2px var(--space-2)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-            background: "var(--color-bg-primary)",
-            color: "var(--color-text-primary)",
-          }}
+          className={FILTER_CTRL_CLASS}
         >
           <option value="">所有类型</option>
           <option value="MERGE">MERGE</option>
@@ -137,16 +124,7 @@ export function AuditPanel({ nodeId }: Props) {
         <select
           value={filterOperator}
           onChange={(e) => setFilterOperator(e.target.value)}
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            padding: "2px var(--space-2)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-            background: "var(--color-bg-primary)",
-            color: "var(--color-text-primary)",
-            minWidth: 120,
-          }}
+          className={`${FILTER_CTRL_CLASS} min-w-[120px]`}
         >
           <option value="">所有操作者</option>
           {Array.from(new Set(items.map((i) => i.operator_id).filter(Boolean))).map((op) => (
@@ -157,57 +135,28 @@ export function AuditPanel({ nodeId }: Props) {
           type="date"
           value={filterSince}
           onChange={(e) => setFilterSince(e.target.value)}
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            padding: "2px var(--space-2)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-            background: "var(--color-bg-primary)",
-            color: "var(--color-text-primary)",
-          }}
+          className={FILTER_CTRL_CLASS}
         />
         <input
           type="date"
           value={filterUntil}
           onChange={(e) => setFilterUntil(e.target.value)}
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            padding: "2px var(--space-2)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-            background: "var(--color-bg-primary)",
-            color: "var(--color-text-primary)",
-          }}
+          className={FILTER_CTRL_CLASS}
         />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <div className="flex flex-col gap-0">
         {items.map((audit) => {
           const expanded = expandedId === audit.decision_id;
+          const dotColor =
+            DECISION_TYPE_COLOR[audit.decision_type] ?? "var(--color-text-tertiary)";
           return (
             <div
               key={audit.decision_id}
-              style={{
-                borderLeft: "2px solid var(--color-border-default)",
-                paddingLeft: "var(--space-4)",
-                paddingBottom: "var(--space-4)",
-                position: "relative",
-              }}
+              className="border-l-2 border-border-default pl-4 pb-4 relative"
             >
-              {/* Timeline dot */}
               <span
-                style={{
-                  position: "absolute",
-                  left: -5,
-                  top: 2,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "var(--radius-full)",
-                  background:
-                    DECISION_TYPE_COLOR[audit.decision_type] ??
-                    "var(--color-text-tertiary)",
-                }}
+                className="absolute -left-[5px] top-[2px] w-2 h-2 rounded-full"
+                style={{ background: dotColor }}
               />
 
               <button
@@ -219,73 +168,34 @@ export function AuditPanel({ nodeId }: Props) {
                     fetchAuditDetail(newId).then((d) => setExpandedDetail(d ?? null)).catch(() => {});
                   }
                 }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  padding: 0,
-                  width: "100%",
-                }}
+                className="bg-transparent border-none cursor-pointer text-left p-0 w-full"
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--space-2)",
-                    marginBottom: "var(--space-1)",
-                  }}
-                >
+                <div className="flex items-center gap-2 mb-1">
                   <span
+                    className="inline-flex px-2 py-[1px] rounded-full text-xs font-medium"
                     style={{
-                      display: "inline-flex",
-                      padding: "1px var(--space-2)",
-                      borderRadius: "var(--radius-full)",
                       background:
-                        (DECISION_TYPE_COLOR[audit.decision_type] ?? "#ccc") +
-                        "1a",
-                      color:
-                        DECISION_TYPE_COLOR[audit.decision_type] ??
-                        "var(--color-text-secondary)",
-                      fontSize: "var(--font-size-xs)",
-                      fontWeight: 500,
+                        (DECISION_TYPE_COLOR[audit.decision_type] ?? "#ccc") + "1a",
+                      color: dotColor,
                     }}
                   >
                     {audit.decision_type}
                   </span>
-                  <span
-                    style={{
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-tertiary)",
-                    }}
-                  >
+                  <span className="text-xs text-text-tertiary">
                     {audit.operator_id}
                   </span>
                 </div>
-                <div
-                  style={{
-                    fontSize: "var(--font-size-xs)",
-                    color: "var(--color-text-tertiary)",
-                  }}
-                >
+                <div className="text-xs text-text-tertiary">
                   {new Date(audit.created_at).toLocaleString()}
                 </div>
               </button>
 
               {expanded && (
-                <div
-                  style={{
-                    marginTop: "var(--space-2)",
-                    padding: "var(--space-3)",
-                    background: "var(--color-bg-secondary)",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "var(--font-size-xs)",
-                  }}
-                >
-                  <div style={{ marginBottom: "var(--space-1)" }}>
+                <div className="mt-2 p-3 bg-bg-secondary rounded-sm text-xs">
+                  <div className="mb-1">
                     <strong>reason:</strong> {audit.reason}
                   </div>
-                  <div style={{ marginBottom: "var(--space-1)" }}>
+                  <div className="mb-1">
                     <strong>operator:</strong> {audit.operator_type} /{" "}
                     {audit.operator_id}
                   </div>
@@ -301,15 +211,7 @@ export function AuditPanel({ nodeId }: Props) {
                         e.stopPropagation();
                         setRollbackTarget(audit);
                       }}
-                      style={{
-                        marginTop: "var(--space-2)",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--color-danger)",
-                        fontSize: "var(--font-size-xs)",
-                        fontWeight: 500,
-                      }}
+                      className="mt-2 bg-transparent border-none cursor-pointer text-danger text-xs font-medium"
                     >
                       回滚此决策
                     </button>
@@ -324,16 +226,7 @@ export function AuditPanel({ nodeId }: Props) {
           <button
             onClick={() => load(nextCursor)}
             disabled={loading}
-            style={{
-              background: "none",
-              border: "1px solid var(--color-border-default)",
-              borderRadius: "var(--radius-sm)",
-              padding: "var(--space-2)",
-              cursor: "pointer",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-xs)",
-              color: "var(--color-text-secondary)",
-            }}
+            className="bg-transparent border border-border-default rounded-sm p-2 cursor-pointer font-ui text-xs text-text-secondary"
           >
             {loading ? "加载中..." : "加载更多"}
           </button>

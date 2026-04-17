@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { fetchEmbedding } from "../../api/nodes";
@@ -6,13 +7,11 @@ import { searchSimilar } from "../../api/search";
 import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
 import type { GraphNodeDTO, NodeLabel, SimilaritySearchResult } from "../../api/types";
 
-// ─── Props ───────────────────────────────────────────────────
 export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// ─── Label → colour mapping ──────────────────────────────────
 const LABEL_COLOR: Record<NodeLabel, string> = {
   Human_Post: "var(--color-node-human)",
   AI_Consensus: "var(--color-node-consensus)",
@@ -25,7 +24,6 @@ const LABEL_DISPLAY: Record<NodeLabel, string> = {
   Result: "结果",
 };
 
-// ─── Helpers ─────────────────────────────────────────────────
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return text.slice(0, max) + "...";
@@ -48,7 +46,9 @@ const MAX_RESULTS = 20;
 const RECENT_LIMIT = 10;
 const DEBOUNCE_MS = 150;
 
-// ─── Component ───────────────────────────────────────────────
+const KBD_CLASS =
+  "inline-block px-[5px] border border-border-default rounded-sm text-[10px] font-mono leading-4 bg-bg-secondary shadow-[0_1px_0_var(--color-border-default)]";
+
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -62,20 +62,16 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const selectNode = useGraphStore((s) => s.selectNode);
   const requestFocusNode = useGraphStore((s) => s.requestFocusNode);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
-  const rootNodeId = useGraphStore((s) => s.rootNodeId);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
 
-  // Vector search state
   const [similarResults, setSimilarResults] = useState<SimilaritySearchResult[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [showSimilar, setShowSimilar] = useState(false);
 
-  // Check if selected node has embedding
   const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : undefined;
   const canSearchSimilar = selectedNode?.has_embedding === true;
 
-  // Reset state whenever the palette opens
   useEffect(() => {
     if (isOpen) {
       setQuery("");
@@ -89,7 +85,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     }
   }, [isOpen]);
 
-  // Debounce the query string
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
@@ -100,12 +95,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     };
   }, [query]);
 
-  // ── Search logic ─────────────────────────────────────────
   const results: GraphNodeDTO[] = useMemo(() => {
     const all = Array.from(nodes.values());
 
     if (!debouncedQuery.trim()) {
-      // No query → show recently created nodes
       return all
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
         .slice(0, RECENT_LIMIT);
@@ -126,13 +119,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     return matched;
   }, [nodes, debouncedQuery]);
 
-  // Reset active index when results change
   useEffect(() => {
     setActiveIndex(-1);
     activeIndexRef.current = -1;
   }, [results]);
 
-  // ── Select a result ──────────────────────────────────────
   const handleSelect = useCallback(
     (nodeId: string) => {
       selectNode(nodeId);
@@ -143,7 +134,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     [selectNode, openDetailPanel, requestFocusNode, onClose],
   );
 
-  // ── Vector search ──────────────────────────────────────
   const handleFindSimilar = useCallback(async () => {
     if (!selectedNodeId) return;
     setSimilarLoading(true);
@@ -166,7 +156,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       const targetNodeId = result.node_id;
       const existsLocally = nodes.has(targetNodeId);
       if (!existsLocally) {
-        // Cross-Rhizone: load the target graph first
         const { loadLineage, loadChildren } = useGraphStore.getState();
         try {
           await loadGraphForRoot(targetNodeId, {
@@ -175,7 +164,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             onChildrenError: console.error,
           });
         } catch {
-          // If loadGraphForRoot fails, still try to select
+          // swallow — still try to select
         }
       }
       selectNode(targetNodeId);
@@ -186,7 +175,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     [nodes, selectNode, openDetailPanel, requestFocusNode, onClose],
   );
 
-  // ── Keyboard navigation ──────────────────────────────────
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -237,29 +225,17 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     [results, similarResults, showSimilar, onClose, handleSelect, handleSelectSimilar],
   );
 
-  // Scroll active item into view
   useEffect(() => {
     if (activeIndex < 0 || !listRef.current) return;
     const item = listRef.current.children[activeIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
-  // ── Render nothing when closed ───────────────────────────
   if (!isOpen) return null;
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        background: "rgba(26, 29, 27, 0.3)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        animation: "fade-in 150ms var(--ease-out)",
-      }}
+      className="fixed inset-0 z-[200] bg-[rgba(26,29,27,0.3)] backdrop-blur-[4px] flex justify-center items-start animate-fade-in"
       onClick={onClose}
     >
       <div
@@ -268,20 +244,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         aria-label="搜索节点"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
-        style={{
-          maxWidth: 560,
-          width: "90%",
-          marginTop: "18vh",
-          background: "var(--color-bg-elevated)",
-          borderRadius: "var(--radius-xl)",
-          boxShadow: "var(--shadow-xl)",
-          border: "1px solid var(--color-border-default)",
-          overflow: "hidden",
-          fontFamily: "var(--font-ui)",
-          animation: "scale-in 200ms var(--ease-out)",
-        }}
+        className="max-w-[560px] w-[90%] mt-[18vh] bg-bg-elevated rounded-xl shadow-xl border border-border-default overflow-hidden font-ui animate-scale-in"
       >
-        {/* ── Search input ─────────────────────────── */}
+        {/* Search input */}
         <input
           ref={inputRef}
           type="text"
@@ -289,80 +254,60 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索节点..."
           autoFocus
-          style={{
-            display: "block",
-            width: "100%",
-            border: "none",
-            borderBottom: "1px solid var(--color-border-default)",
-            outline: "none",
-            background: "transparent",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-md)",
-            padding: "var(--space-4)",
-            color: "var(--color-text-primary)",
-            boxSizing: "border-box",
-          }}
+          className="block w-full border-none border-b border-border-default outline-none bg-transparent font-ui text-md p-4 text-text-primary box-border"
         />
 
-        {/* ── Results list ─────────────────────────── */}
-        <div
-          ref={listRef}
-          role="listbox"
-          style={{
-            maxHeight: 400,
-            overflowY: "auto",
-          }}
-        >
+        {/* Results list */}
+        <div ref={listRef} role="listbox" className="max-h-[400px] overflow-y-auto">
           {showSimilar ? (
             <>
               {similarLoading && (
-                <div style={{ padding: "var(--space-4)", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-sm)" }}>
-                  搜索相似节点中...
-                </div>
+                <div className="p-4 text-center text-text-tertiary text-sm">搜索相似节点中...</div>
               )}
               {similarError && (
-                <div style={{ padding: "var(--space-4)", textAlign: "center", color: "var(--color-danger)", fontSize: "var(--font-size-sm)" }}>
-                  {similarError}
-                </div>
+                <div className="p-4 text-center text-danger text-sm">{similarError}</div>
               )}
               {!similarLoading && !similarError && similarResults.length === 0 && (
-                <div style={{ padding: "var(--space-4)", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-sm)" }}>
-                  未找到相似节点
-                </div>
+                <div className="p-4 text-center text-text-tertiary text-sm">未找到相似节点</div>
               )}
               {similarResults.map((item, i) => {
                 const isOtherRhizone = !nodes.has(item.node_id);
+                const labelColor = LABEL_COLOR[item.label as NodeLabel] ?? "var(--color-text-tertiary)";
                 return (
                   <div
                     key={item.node_id}
                     role="option"
                     aria-selected={i === activeIndex}
                     onClick={() => handleSelectSimilar(item)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--space-3)",
-                      padding: "var(--space-3) var(--space-4)",
-                      cursor: "pointer",
-                      background: i === activeIndex ? "var(--color-bg-hover, rgba(55,53,47,0.04))" : "transparent",
-                      transition: "background 80ms ease",
-                    }}
                     onMouseEnter={() => { setActiveIndex(i); activeIndexRef.current = i; }}
+                    className={clsx(
+                      "flex items-center gap-3 px-4 py-3 cursor-pointer transition-[background] duration-[80ms]",
+                      i === activeIndex ? "bg-bg-hover" : "bg-transparent",
+                    )}
                   >
-                    <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: LABEL_COLOR[item.label as NodeLabel] ?? "var(--color-text-tertiary)", flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontFamily: "var(--font-content)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div
+                      className="w-[3px] self-stretch rounded-[2px] shrink-0"
+                      style={{ background: labelColor }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-text-primary font-content whitespace-nowrap overflow-hidden text-ellipsis">
                         {truncate(item.content ?? item.node_id, 80)}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: 2 }}>
-                        <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: "var(--radius-sm)", fontSize: 11, fontWeight: 500, color: LABEL_COLOR[item.label as NodeLabel] ?? "var(--color-text-secondary)", background: `color-mix(in srgb, ${LABEL_COLOR[item.label as NodeLabel] ?? "var(--color-text-secondary)"} 10%, transparent)`, lineHeight: 1.5 }}>
+                      <div className="flex items-center gap-2 mt-[2px]">
+                        <span
+                          className="inline-block px-[6px] py-[1px] rounded-sm text-[11px] font-medium leading-[1.5]"
+                          style={{
+                            color: labelColor,
+                            background: `color-mix(in srgb, ${labelColor} 10%, transparent)`,
+                          }}
+                        >
                           {LABEL_DISPLAY[item.label as NodeLabel] ?? item.label}
                         </span>
-                        <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+                        <span className="text-[11px] text-text-tertiary">
                           {(item.score * 100).toFixed(0)}% 相似
                         </span>
                         {isOtherRhizone && (
-                          <span style={{ fontSize: 10, padding: "0 4px", borderRadius: "var(--radius-sm)", background: "var(--color-bg-tertiary)", color: "var(--color-text-tertiary)" }}>
+                          <span className="text-[10px] px-1 rounded-sm bg-bg-hover text-text-tertiary">
                             跨话题
                           </span>
                         )}
@@ -375,210 +320,99 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           ) : (
             <>
               {results.length === 0 && debouncedQuery.trim() && (
-            <div
-              style={{
-                padding: "var(--space-4)",
-                color: "var(--color-text-tertiary)",
-                fontSize: "var(--font-size-sm)",
-                textAlign: "center",
-              }}
-            >
-              没有匹配的节点
-            </div>
-          )}
-
-          {results.length === 0 && !debouncedQuery.trim() && (
-            <div
-              style={{
-                padding: "var(--space-4)",
-                color: "var(--color-text-tertiary)",
-                fontSize: "var(--font-size-sm)",
-                textAlign: "center",
-              }}
-            >
-              当前无节点数据
-            </div>
-          )}
-
-          {results.map((node, i) => (
-            <div
-              key={node.node_id}
-              role="option"
-              aria-selected={i === activeIndex}
-              onClick={() => handleSelect(node.node_id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-3)",
-                padding: "var(--space-3) var(--space-4)",
-                cursor: "pointer",
-                background:
-                  i === activeIndex
-                    ? "var(--color-bg-hover, rgba(55,53,47,0.04))"
-                    : "transparent",
-                transition: "background 80ms ease",
-              }}
-              onMouseEnter={() => {
-                setActiveIndex(i);
-                activeIndexRef.current = i;
-              }}
-            >
-              {/* Left color bar */}
-              <div
-                style={{
-                  width: 3,
-                  alignSelf: "stretch",
-                  borderRadius: 2,
-                  background: LABEL_COLOR[node.label] ?? "var(--color-text-tertiary)",
-                  flexShrink: 0,
-                }}
-              />
-
-              {/* Content */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: "var(--font-size-sm)",
-                    color: "var(--color-text-primary)",
-                    fontFamily: "var(--font-content)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {truncate(node.content ?? node.summary_content ?? node.node_id, 80)}
+                <div className="p-4 text-text-tertiary text-sm text-center">
+                  没有匹配的节点
                 </div>
+              )}
 
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--space-2)",
-                    marginTop: 2,
-                  }}
-                >
-                  {/* Label badge */}
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "1px 6px",
-                      borderRadius: "var(--radius-sm)",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: LABEL_COLOR[node.label] ?? "var(--color-text-secondary)",
-                      background: `color-mix(in srgb, ${LABEL_COLOR[node.label] ?? "var(--color-text-secondary)"} 10%, transparent)`,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {LABEL_DISPLAY[node.label] ?? node.label}
-                  </span>
-
-                  {/* Date */}
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: "var(--color-text-tertiary)",
-                    }}
-                  >
-                    {formatDate(node.created_at)}
-                  </span>
+              {results.length === 0 && !debouncedQuery.trim() && (
+                <div className="p-4 text-text-tertiary text-sm text-center">
+                  当前无节点数据
                 </div>
-              </div>
-            </div>
-          ))}
+              )}
+
+              {results.map((node, i) => {
+                const labelColor = LABEL_COLOR[node.label] ?? "var(--color-text-tertiary)";
+                return (
+                  <div
+                    key={node.node_id}
+                    role="option"
+                    aria-selected={i === activeIndex}
+                    onClick={() => handleSelect(node.node_id)}
+                    onMouseEnter={() => {
+                      setActiveIndex(i);
+                      activeIndexRef.current = i;
+                    }}
+                    className={clsx(
+                      "flex items-center gap-3 px-4 py-3 cursor-pointer transition-[background] duration-[80ms]",
+                      i === activeIndex ? "bg-bg-hover" : "bg-transparent",
+                    )}
+                  >
+                    <div
+                      className="w-[3px] self-stretch rounded-[2px] shrink-0"
+                      style={{ background: labelColor }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-text-primary font-content whitespace-nowrap overflow-hidden text-ellipsis">
+                        {truncate(node.content ?? node.summary_content ?? node.node_id, 80)}
+                      </div>
+                      <div className="flex items-center gap-2 mt-[2px]">
+                        <span
+                          className="inline-block px-[6px] py-[1px] rounded-sm text-[11px] font-medium leading-[1.5]"
+                          style={{
+                            color: labelColor,
+                            background: `color-mix(in srgb, ${labelColor} 10%, transparent)`,
+                          }}
+                        >
+                          {LABEL_DISPLAY[node.label] ?? node.label}
+                        </span>
+                        <span className="text-[11px] text-text-tertiary">
+                          {formatDate(node.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
         </div>
 
-        {/* ── Find Similar button ─────────────────── */}
         {canSearchSimilar && !showSimilar && (
-          <div
-            style={{
-              borderTop: "1px solid var(--color-border-default)",
-              padding: "var(--space-2) var(--space-4)",
-            }}
-          >
+          <div className="border-t border-border-default px-4 py-2">
             <button
               type="button"
               onClick={handleFindSimilar}
-              style={{
-                width: "100%",
-                border: "1px solid var(--color-border-default)",
-                borderRadius: "var(--radius-sm)",
-                padding: "var(--space-2)",
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-text-secondary)",
-                cursor: "pointer",
-                fontFamily: "var(--font-ui)",
-                fontSize: "var(--font-size-xs)",
-                fontWeight: 500,
-              }}
+              className="w-full border border-border-default rounded-sm p-2 bg-bg-secondary text-text-secondary cursor-pointer font-ui text-xs font-medium"
             >
               查找相似节点
             </button>
           </div>
         )}
         {showSimilar && (
-          <div
-            style={{
-              borderTop: "1px solid var(--color-border-default)",
-              padding: "var(--space-2) var(--space-4)",
-            }}
-          >
+          <div className="border-t border-border-default px-4 py-2">
             <button
               type="button"
               onClick={() => { setShowSimilar(false); setSimilarResults([]); setSimilarError(null); }}
-              style={{
-                border: "none",
-                background: "none",
-                color: "var(--color-text-tertiary)",
-                cursor: "pointer",
-                fontFamily: "var(--font-ui)",
-                fontSize: "var(--font-size-xs)",
-                padding: "2px 0",
-              }}
+              className="border-none bg-transparent text-text-tertiary cursor-pointer font-ui text-xs py-[2px]"
             >
               ← 返回文本搜索
             </button>
           </div>
         )}
 
-        {/* ── Footer hint ──────────────────────────── */}
-        <div
-          style={{
-            borderTop: "1px solid var(--color-border-default)",
-            padding: "var(--space-2) var(--space-4)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-3)",
-            fontSize: 11,
-            color: "var(--color-text-tertiary)",
-          }}
-        >
+        <div className="border-t border-border-default px-4 py-2 flex items-center gap-3 text-[11px] text-text-tertiary">
           <span>
-            <kbd style={kbdStyle}>↑↓</kbd> 导航
+            <kbd className={KBD_CLASS}>↑↓</kbd> 导航
           </span>
           <span>
-            <kbd style={kbdStyle}>↵</kbd> 选择
+            <kbd className={KBD_CLASS}>↵</kbd> 选择
           </span>
           <span>
-            <kbd style={kbdStyle}>esc</kbd> 关闭
+            <kbd className={KBD_CLASS}>esc</kbd> 关闭
           </span>
         </div>
       </div>
     </div>
   );
 }
-
-// Shared kbd style for the footer
-const kbdStyle: React.CSSProperties = {
-  display: "inline-block",
-  padding: "0 5px",
-  border: "1px solid var(--color-border-default)",
-  borderRadius: "var(--radius-sm)",
-  fontSize: 10,
-  fontFamily: "var(--font-mono)",
-  lineHeight: "16px",
-  background: "var(--color-bg-secondary)",
-  boxShadow: "0 1px 0 var(--color-border-default)",
-};

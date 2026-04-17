@@ -1,4 +1,5 @@
 import { useState } from "react";
+import clsx from "clsx";
 import { useUiStore, type NodeTab } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { useSseStore } from "../../stores/sseStore";
@@ -38,6 +39,12 @@ const ORCHESTRATION_STATUS_LABELS: Record<string, string> = {
   FAILED: "处理失败",
 };
 
+function statusColor(status: string | undefined): string {
+  if (status === "FAILED") return "var(--color-danger)";
+  if (status === "EMBEDDING_READY") return "var(--color-success)";
+  return "var(--color-text-primary)";
+}
+
 export function NodeDetailPanel() {
   const payload = useUiStore((s) => s.rightPanelPayload);
   const closePanel = useUiStore((s) => s.closeRightPanel);
@@ -67,70 +74,33 @@ export function NodeDetailPanel() {
 
   return (
     <aside
-      className="rd-panel"
+      className="rd-panel w-[45vw] min-w-[460px] relative border-l border-border-default bg-bg-primary flex flex-col font-ui h-full"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
-      style={{
-        width: "45vw",
-        minWidth: 460,
-        position: "relative",
-        borderLeft: "1px solid var(--color-border-default)",
-        background: "var(--color-bg-primary)",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "var(--font-ui)",
-        height: "100%",
-      }}
     >
       <div className="rd-marker-selected" style={{ top: 20, left: 16 }} />
+
       {/* Header */}
-      <div
-        style={{
-          padding: "var(--space-4)",
-          borderBottom: "1px solid var(--color-border-default)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "var(--space-2)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginLeft: 36 }}>
+      <div className="p-4 border-b border-border-default">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-2 ml-9">
             <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "var(--radius-full)",
-                background: TYPE_COLOR[node.label] ?? "var(--color-text-tertiary)",
-              }}
+              className="w-2 h-2 rounded-full"
+              style={{ background: TYPE_COLOR[node.label] ?? "var(--color-text-tertiary)" }}
             />
-            <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)" }}>
+            <span className="font-semibold text-md">
               {node.label.replace("_", " ")}
             </span>
           </div>
           <button
             onClick={closePanel}
             aria-label="关闭面板"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "var(--font-size-md)",
-              color: "var(--color-text-secondary)",
-            }}
+            className="bg-transparent border-none cursor-pointer text-md text-text-secondary"
           >
             &times;
           </button>
         </div>
-        <div
-          style={{
-            fontSize: "var(--font-size-xs)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
+        <div className="text-xs text-text-secondary">
           {node.author_id ?? node.agent_version ?? "System"} &middot;{" "}
           {new Date(node.created_at).toLocaleString()}
         </div>
@@ -140,42 +110,29 @@ export function NodeDetailPanel() {
       <div
         role="tablist"
         aria-label="节点详情分类"
-        style={{
-          display: "flex",
-          borderBottom: "1px solid var(--color-border-default)",
-          padding: "0 var(--space-4)",
-        }}
+        className="flex border-b border-border-default px-4"
       >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            aria-controls={`tabpanel-${tab.id}`}
-            id={`tab-${tab.id}`}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: "var(--space-3) var(--space-3)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              borderBottom:
-                activeTab === tab.id
-                  ? "2px solid var(--color-accent)"
-                  : "2px solid transparent",
-              color:
-                activeTab === tab.id
-                  ? "var(--color-text-primary)"
-                  : "var(--color-text-tertiary)",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-xs)",
-              fontWeight: activeTab === tab.id ? 600 : 400,
-              transition: "var(--transition-fast)",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={active}
+              aria-controls={`tabpanel-${tab.id}`}
+              id={`tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={clsx(
+                "px-3 py-3 bg-transparent border-none cursor-pointer font-ui text-xs transition-[all] duration-[var(--transition-fast)] border-b-2",
+                active
+                  ? "border-accent text-text-primary font-semibold"
+                  : "border-transparent text-text-tertiary font-normal",
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
@@ -183,35 +140,20 @@ export function NodeDetailPanel() {
         id={`tabpanel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`tab-${activeTab}`}
-        style={{ flex: 1, overflowY: "auto", padding: "var(--space-4)" }}
+        className="flex-1 overflow-y-auto p-4"
       >
         {activeTab === "details" && (
           <>
-            <div style={{ marginBottom: "var(--space-6)" }}>
+            <div className="mb-6">
               {node.content || node.summary_content ? (
                 <MarkdownViewer content={node.content ?? node.summary_content ?? ""} />
               ) : (
-                <div style={{
-                  fontFamily: "var(--font-content)",
-                  fontSize: "var(--font-size-base)",
-                  color: "var(--color-text-tertiary)",
-                  fontStyle: "italic",
-                }}>
+                <div className="font-content text-base text-text-tertiary italic">
                   No content
                 </div>
               )}
             </div>
-            <div
-              style={{
-                fontSize: "var(--font-size-xs)",
-                color: "var(--color-text-secondary)",
-                borderTop: "1px solid var(--color-border-default)",
-                paddingTop: "var(--space-3)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-1)",
-              }}
-            >
+            <div className="text-xs text-text-secondary border-t border-border-default pt-3 flex flex-col gap-1">
               <div>node_id: {node.node_id}</div>
               <div>has_embedding: {String(node.has_embedding)}</div>
               {node.quality_overall != null && (
@@ -230,59 +172,44 @@ export function NodeDetailPanel() {
                       .finally(() => setSummarizing(false));
                   }}
                   disabled={summarizing}
-                  style={{
-                    marginTop: "var(--space-2)",
-                    padding: "var(--space-1) var(--space-3)",
-                    fontSize: "var(--font-size-xs)",
-                    cursor: summarizing ? "not-allowed" : "pointer",
-                    background: "var(--color-bg-secondary)",
-                    border: "1px solid var(--color-border-default)",
-                    borderRadius: "var(--radius-md, 4px)",
-                    color: "var(--color-text-primary)",
-                    opacity: summarizing ? 0.6 : 1,
-                  }}
+                  className={clsx(
+                    "mt-2 px-3 py-1 text-xs bg-bg-secondary border border-border-default rounded-md text-text-primary",
+                    summarizing ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                  )}
                 >
                   {summarizing ? "生成中..." : "生成摘要"}
                 </button>
               )}
-              
-              <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--color-border-default)" }}>
-                <div style={{ fontWeight: 600, marginBottom: "var(--space-2)", fontSize: "var(--font-size-sm)" }}>编排状态</div>
+
+              <div className="mt-4 pt-2 border-t border-dashed border-border-default">
+                <div className="font-semibold mb-2 text-sm">编排状态</div>
                 {orchestrationStatus ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                      <span style={{ color: "var(--color-text-secondary)" }}>状态:</span>
-                      <span style={{ 
-                        color: orchestrationStatus.status === "FAILED" ? "var(--color-danger)" :
-                               orchestrationStatus.status === "EMBEDDING_READY" ? "var(--color-success)" :
-                               "var(--color-text-primary)",
-                        fontWeight: 600
-                      }}>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-2">
+                      <span className="text-text-secondary">状态:</span>
+                      <span
+                        className="font-semibold"
+                        style={{ color: statusColor(orchestrationStatus.status) }}
+                      >
                         {statusLabel}
                       </span>
                     </div>
                     {orchestrationStatus.message && (
-                      <div style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-xs)" }}>
+                      <div className="text-text-secondary text-xs">
                         {orchestrationStatus.message}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div style={{ color: "var(--color-text-tertiary)", fontStyle: "italic" }}>
-                    暂无编排状态
-                  </div>
+                  <div className="text-text-tertiary italic">暂无编排状态</div>
                 )}
               </div>
               {parsedExplanation && <DecisionCard explanation={parsedExplanation} />}
             </div>
           </>
         )}
-        {activeTab === "provenance" && (
-          <ProvenancePanel nodeId={payload.nodeId} />
-        )}
-        {activeTab === "association" && (
-          <AssociationPanel nodeId={payload.nodeId} />
-        )}
+        {activeTab === "provenance" && <ProvenancePanel nodeId={payload.nodeId} />}
+        {activeTab === "association" && <AssociationPanel nodeId={payload.nodeId} />}
         {activeTab === "audit" && <AuditPanel nodeId={payload.nodeId} />}
       </div>
     </aside>
