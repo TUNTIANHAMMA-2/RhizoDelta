@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { fetchMe } from "../api/auth";
 
 interface JwtPayload {
   sub?: string;
@@ -20,9 +21,11 @@ export interface AuthState {
   username: string | null;
   displayName: string | null;
   roles: string[];
+  isVerifying: boolean;
 
   setToken: (token: string) => void;
   clearToken: () => void;
+  verifyToken: () => Promise<void>;
 
   isAuthenticated: () => boolean;
   hasRole: (role: string) => boolean;
@@ -45,6 +48,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   username: parseJwtPayload(readStoredToken()).username ?? null,
   displayName: parseJwtPayload(readStoredToken()).display_name ?? null,
   roles: parseJwtPayload(readStoredToken()).roles ?? [],
+  isVerifying: true,
 
   setToken: (token: string) => {
     if (typeof localStorage !== "undefined") {
@@ -65,6 +69,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem("jwt_token");
     }
     set({ token: null, userId: null, username: null, displayName: null, roles: [] });
+  },
+
+  verifyToken: async () => {
+    const { token, clearToken } = get();
+    if (!token) {
+      set({ isVerifying: false });
+      return;
+    }
+    try {
+      const user = await fetchMe();
+      set({
+        userId: user.user_id,
+        username: user.username,
+        displayName: user.display_name,
+        roles: user.roles,
+        isVerifying: false,
+      });
+    } catch {
+      clearToken();
+      set({ isVerifying: false });
+    }
   },
 
   isAuthenticated: () => get().token !== null,
