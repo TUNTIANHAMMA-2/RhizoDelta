@@ -123,7 +123,7 @@ export function NodeDetailPanel() {
               id={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                "px-3 py-3 bg-transparent border-none cursor-pointer font-ui text-xs transition-[all] duration-[var(--transition-fast)] border-b-2",
+                "px-3 py-3 bg-transparent cursor-pointer font-ui text-xs transition-[all] duration-[var(--transition-fast)] border-b-2",
                 active
                   ? "border-accent text-text-primary font-semibold"
                   : "border-transparent text-text-tertiary font-normal",

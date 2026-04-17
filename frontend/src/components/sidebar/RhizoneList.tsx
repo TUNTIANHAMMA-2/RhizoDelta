@@ -84,7 +84,7 @@ export function RhizoneList() {
 
       <div className="px-4 py-3 border-t border-border-subtle">
         <button
-          className="btn-primary w-full rounded-md"
+          className="btn-primary w-full rounded-md!"
           onClick={() => {
             selectNode(null);
             openPostPanel();

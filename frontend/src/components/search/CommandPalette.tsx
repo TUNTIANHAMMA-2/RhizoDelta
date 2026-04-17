@@ -254,7 +254,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索节点..."
           autoFocus
-          className="block w-full border-none border-b border-border-default outline-none bg-transparent font-ui text-md p-4 text-text-primary box-border"
+          className="block w-full border-b border-border-default outline-none bg-transparent font-ui text-md p-4 text-text-primary box-border"
         />
 
         {/* Results list */}

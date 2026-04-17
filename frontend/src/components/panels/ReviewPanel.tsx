@@ -191,7 +191,7 @@ export function ReviewPanel() {
                                 e.stopPropagation();
                                 setConfirmAction({ type: "approve-merge", reviewId: review.review_id });
                               }}
-                              className="btn-primary text-xs"
+                              className="btn-primary text-xs!"
                             >
                               批准合并
                             </button>
@@ -202,7 +202,7 @@ export function ReviewPanel() {
                                 e.stopPropagation();
                                 setConfirmAction({ type: "approve-branch", reviewId: review.review_id });
                               }}
-                              className="btn-primary text-xs"
+                              className="btn-primary text-xs!"
                             >
                               批准分支
                             </button>
