@@ -7,7 +7,7 @@ import type {
 } from "../api/types";
 import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
 import { toRfNode } from "../lib/mapping";
-import { buildGraphViews } from "../lib/graphView";
+import { buildGraphViews, associationToRfEdge } from "../lib/graphView";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
 
@@ -25,6 +25,9 @@ export interface GraphState {
   exploreRfEdges: Edge[];
   rfNodes: Node[];
   rfEdges: Edge[];
+  showAssociations: boolean;
+  associationRfEdges: Edge[];
+  expandingNodeIds: Set<string>;
 
   selectedNodeId: string | null;
   rootNodeId: string | null;
@@ -37,6 +40,9 @@ export interface GraphState {
   loadAssociations: (nodeId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setSemanticZoom: (zoom: SemanticZoom) => void;
+  toggleAssociations: () => void;
+  expandChildren: (nodeId: string) => Promise<void>;
+  getBoundaryNodeIds: () => string[];
 
   addNode: (node: GraphNodeDTO) => void;
   addEdge: (edge: GraphEdgeDTO) => void;
@@ -66,6 +72,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   exploreRfEdges: [],
   rfNodes: [],
   rfEdges: [],
+  showAssociations: false,
+  associationRfEdges: [],
+  expandingNodeIds: new Set<string>(),
   selectedNodeId: null,
   rootNodeId: null,
   lineageRequestId: 0,
@@ -156,6 +165,54 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }
   },
 
+  toggleAssociations: () => {
+    set((s) => ({ showAssociations: !s.showAssociations }));
+    get().flushLayout();
+  },
+
+  expandChildren: async (nodeId) => {
+    const expanding = new Set(get().expandingNodeIds);
+    if (expanding.has(nodeId)) return; // already expanding
+    expanding.add(nodeId);
+    set({ expandingNodeIds: expanding });
+
+    try {
+      const topo = await fetchChildren(nodeId, 2);
+      const nodesMap = new Map(get().nodes);
+      topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
+
+      const edgeMap = new Map(
+        get().edges.map((e) => [`${e.source}-${e.type}-${e.target}`, e]),
+      );
+      for (const e of topo.edges) {
+        edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+      }
+      const allEdges = [...edgeMap.values()];
+
+      set({ nodes: nodesMap, edges: allEdges });
+      get().flushLayout();
+    } finally {
+      const next = new Set(get().expandingNodeIds);
+      next.delete(nodeId);
+      set({ expandingNodeIds: next });
+    }
+  },
+
+  getBoundaryNodeIds: () => {
+    const { nodes, edges, rootNodeId } = get();
+    // Nodes that appear as target in edges but never as source
+    const sourceIds = new Set(edges.map((e) => e.source));
+    const targetIds = new Set(edges.map((e) => e.target));
+    const boundary: string[] = [];
+    for (const nodeId of nodes.keys()) {
+      if (nodeId === rootNodeId) continue;
+      if (targetIds.has(nodeId) && !sourceIds.has(nodeId)) {
+        boundary.push(nodeId);
+      }
+    }
+    return boundary;
+  },
+
   addNode: (node) => {
     const nodesMap = new Map(get().nodes);
     nodesMap.set(node.node_id, node);
@@ -189,6 +246,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       allEdges,
       priorExplorePositions,
     );
+
+    // Build association RF edges when toggled on
+    let associationRfEdges: Edge[] = [];
+    if (get().showAssociations && get().rootNodeId) {
+      const anchorId = get().rootNodeId!;
+      const nodeIds = new Set(nodesMap.keys());
+      associationRfEdges = get()
+        .associations.map((assoc) => associationToRfEdge(assoc, anchorId))
+        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+    }
+
     set({
       lineageRfNodes: views.lineage.nodes,
       lineageRfEdges: views.lineage.edges,
@@ -196,6 +264,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       exploreRfEdges: views.explore.edges,
       rfNodes: views.lineage.nodes,
       rfEdges: views.lineage.edges,
+      associationRfEdges,
     });
   },
 

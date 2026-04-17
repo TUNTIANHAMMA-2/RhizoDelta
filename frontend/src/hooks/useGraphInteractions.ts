@@ -1,10 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
+import { useGraphStore } from "../stores/graphStore";
 
 /**
  * Hook for graph canvas interactions:
  * - Center view on selected node
  * - Highlight neighbor nodes/edges, dim the rest
+ * - Auto-expand boundary nodes after selection dwell
  */
 export function useGraphInteractions() {
   const { setCenter, getEdges, getNode, getViewport } = useReactFlow();
@@ -50,6 +52,37 @@ export function useGraphInteractions() {
   const resetFocus = useCallback(() => {
     // Caller resets opacity via store
   }, []);
+
+  // ── Auto-expand boundary nodes after selection dwell ──
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const expandChildren = useGraphStore((s) => s.expandChildren);
+  const getBoundaryNodeIds = useGraphStore((s) => s.getBoundaryNodeIds);
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Clear any pending timer when selectedNodeId changes
+    if (expandTimerRef.current) {
+      clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+
+    if (!selectedNodeId) return;
+
+    const boundaryIds = getBoundaryNodeIds();
+    if (!boundaryIds.includes(selectedNodeId)) return;
+
+    expandTimerRef.current = setTimeout(() => {
+      expandTimerRef.current = null;
+      expandChildren(selectedNodeId);
+    }, 1500);
+
+    return () => {
+      if (expandTimerRef.current) {
+        clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    };
+  }, [selectedNodeId, expandChildren, getBoundaryNodeIds]);
 
   return { focusNode, resetFocus };
 }

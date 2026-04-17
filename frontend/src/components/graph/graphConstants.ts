@@ -1,16 +1,20 @@
 import { HumanPostNode } from "./HumanPostNode";
 import { ConsensusNode } from "./ConsensusNode";
 import { ResultNode } from "./ResultNode";
+import { ExpandPlaceholder } from "./ExpandPlaceholder";
 import { VersionEdge } from "./VersionEdge";
+import { AssociationEdge } from "./AssociationEdge";
 
 export const nodeTypes = {
   humanPost: HumanPostNode,
   consensus: ConsensusNode,
   result: ResultNode,
+  expandPlaceholder: ExpandPlaceholder,
 };
 
 export const edgeTypes = {
   versionEdge: VersionEdge,
+  association: AssociationEdge,
 };
 
 export const MINIMAP_NODE_COLOR = (node: { type?: string }) => {
