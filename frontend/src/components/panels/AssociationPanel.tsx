@@ -21,7 +21,7 @@ export function AssociationPanel({ nodeId }: Props) {
   const isAdmin = useAuthStore((s) => s.hasRole("ADMIN"));
   const canCreate = useAuthStore((s) => s.hasRole("AGENT") || s.hasRole("ADMIN"));
   const userId = useAuthStore((s) => s.userId);
-  
+
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<AssociationInfo | null>(null);
 
@@ -52,7 +52,7 @@ export function AssociationPanel({ nodeId }: Props) {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetId.trim() || !reason.trim() || !userId) return;
-    
+
     setSubmitting(true);
     try {
       await createAssociation({
@@ -77,7 +77,7 @@ export function AssociationPanel({ nodeId }: Props) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div className="flex flex-col gap-3">
         <Skeleton variant="rectangular" height={56} />
         <Skeleton variant="rectangular" height={56} />
       </div>
@@ -86,15 +86,18 @@ export function AssociationPanel({ nodeId }: Props) {
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div className="flex flex-col gap-3">
         {canCreate && (
-          <div style={{ marginBottom: "var(--space-1)" }}>
+          <div className="mb-1">
             {!showForm ? (
-              <button className="btn-secondary" style={{ width: "100%" }} onClick={() => setShowForm(true)}>
+              <button className="btn-secondary w-full" onClick={() => setShowForm(true)}>
                 + 添加语义关联
               </button>
             ) : (
-              <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", padding: "var(--space-3)", border: "1px solid var(--color-border-default)", borderRadius: "var(--radius-sm)", background: "var(--color-bg-secondary)" }}>
+              <form
+                onSubmit={handleCreate}
+                className="flex flex-col gap-3 p-3 border border-border-default rounded-sm bg-bg-secondary"
+              >
                 <div>
                   <label className="rd-label">目标节点 ID *</label>
                   <input className="rd-input" placeholder="输入 node_id" value={targetId} onChange={e => setTargetId(e.target.value)} required />
@@ -112,11 +115,21 @@ export function AssociationPanel({ nodeId }: Props) {
                 </div>
                 <div>
                   <label className="rd-label">置信度: {Math.round(confidence * 100)}%</label>
-                  <input type="range" min="0" max="1" step="0.1" value={confidence} onChange={e => setConfidence(Number(e.target.value))} style={{ width: "100%" }} />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={confidence}
+                    onChange={e => setConfidence(Number(e.target.value))}
+                    className="w-full"
+                  />
                 </div>
-                <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+                <div className="flex gap-2 justify-end">
                   <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>取消</button>
-                  <button type="submit" className="btn-primary" disabled={submitting || !userId || !targetId.trim() || !reason.trim()}>{submitting ? "提交中..." : "保存"}</button>
+                  <button type="submit" className="btn-primary" disabled={submitting || !userId || !targetId.trim() || !reason.trim()}>
+                    {submitting ? "提交中..." : "保存"}
+                  </button>
                 </div>
               </form>
             )}
@@ -126,42 +139,17 @@ export function AssociationPanel({ nodeId }: Props) {
         {associations.length === 0 ? (
           <EmptyState message="暂无语义关联" />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <div className="flex flex-col gap-3">
             {associations.map((assoc) => (
               <div
                 key={assoc.association_id}
-                style={{
-                  border: "1px solid var(--color-border-default)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "var(--space-3)",
-                }}
+                className="border border-border-default rounded-sm p-3"
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "var(--space-2)",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      padding: "1px var(--space-2)",
-                      borderRadius: "var(--radius-full)",
-                      background: "var(--color-bg-hover)",
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-secondary)",
-                    }}
-                  >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="inline-flex px-2 py-[1px] rounded-full bg-bg-hover text-xs text-text-secondary">
                     {assoc.type} &middot; {assoc.direction}
                   </span>
-                  <span
-                    style={{
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-tertiary)",
-                    }}
-                  >
+                  <span className="text-xs text-text-tertiary">
                     {Math.round(assoc.confidence * 100)}%
                   </span>
                 </div>
@@ -170,43 +158,21 @@ export function AssociationPanel({ nodeId }: Props) {
                     selectNode(assoc.related_node.node_id);
                     openDetailPanel(assoc.related_node.node_id);
                   }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    padding: 0,
-                    fontSize: "var(--font-size-sm)",
-                    color: "var(--color-accent)",
-                    fontFamily: "var(--font-ui)",
-                  }}
+                  className="bg-transparent border-none cursor-pointer text-left p-0 text-sm text-accent font-ui"
                 >
                   {assoc.related_node.content?.slice(0, 50) ??
                     assoc.related_node.summary_content?.slice(0, 50) ??
                     assoc.related_node.node_id.slice(0, 8)}
                 </button>
                 {assoc.reason && (
-                  <div
-                    style={{
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-tertiary)",
-                      marginTop: "var(--space-1)",
-                    }}
-                  >
+                  <div className="text-xs text-text-tertiary mt-1">
                     {assoc.reason}
                   </div>
                 )}
                 {isAdmin && (
                   <button
                     onClick={() => setDeleteTarget(assoc)}
-                    style={{
-                      marginTop: "var(--space-2)",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--color-danger)",
-                      fontSize: "var(--font-size-xs)",
-                    }}
+                    className="mt-2 bg-transparent border-none cursor-pointer text-danger text-xs"
                   >
                     删除关联
                   </button>

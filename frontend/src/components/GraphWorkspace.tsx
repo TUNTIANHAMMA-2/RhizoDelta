@@ -13,29 +13,14 @@ import { CommandPalette } from "./search/CommandPalette";
 import { Header } from "./chrome/Header";
 import { ToastContainer } from "./feedback/Toast";
 import { loadGraphForRoot } from "../lib/loadGraphForRoot";
+import clsx from "clsx";
 
 function CanvasModeSwitch() {
   const canvasMode = useUiStore((s) => s.canvasMode);
   const setCanvasMode = useUiStore((s) => s.setCanvasMode);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 72,
-        left: "var(--space-4)",
-        zIndex: 20,
-        display: "flex",
-        gap: "2px",
-        padding: "4px",
-        background: "rgba(253, 252, 249, 0.88)",
-        border: "1px solid var(--color-border-default)",
-        borderRadius: "var(--radius-lg)",
-        boxShadow: "var(--shadow-md)",
-        backdropFilter: "blur(16px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-      }}
-    >
+    <div className="absolute top-[72px] left-4 z-20 flex gap-[2px] p-1 bg-[rgba(253,252,249,0.88)] border border-border-default rounded-lg shadow-md backdrop-blur-md backdrop-saturate-150">
       {[
         ["lineage", "版本视图"],
         ["explore", "探索视图"],
@@ -46,19 +31,12 @@ function CanvasModeSwitch() {
             key={mode}
             type="button"
             onClick={() => setCanvasMode(mode as "lineage" | "explore")}
-            style={{
-              border: "none",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-2) var(--space-4)",
-              background: active ? "var(--color-text-primary)" : "transparent",
-              color: active ? "var(--color-bg-primary)" : "var(--color-text-secondary)",
-              fontWeight: active ? 600 : 500,
-              cursor: "pointer",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-sm)",
-              transition: "all var(--transition-fast)",
-              letterSpacing: "0.01em",
-            }}
+            className={clsx(
+              "border-none rounded-md px-4 py-2 cursor-pointer font-ui text-sm transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
+              active
+                ? "bg-text-primary text-bg-primary font-semibold"
+                : "bg-transparent text-text-secondary font-medium",
+            )}
           >
             {label}
           </button>
@@ -101,32 +79,17 @@ export function GraphWorkspace() {
   useSse();
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--color-bg-canvas)" }}>
+    <div className="flex h-screen overflow-hidden bg-bg-canvas">
       <Header />
 
       {/* Mobile hamburger */}
       <button
-        className="mobile-menu-btn"
+        className="mobile-menu-btn fixed top-2 right-4 z-[101] bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default rounded-sm p-2 cursor-pointer font-ui text-md text-text-secondary"
         onClick={() => {
           if (!leftSidebarOpen) toggleLeftSidebar();
           setMobileMenuOpen(!isMobileMenuOpen);
         }}
         aria-label="打开菜单"
-        style={{
-          position: "fixed",
-          top: "var(--space-2)",
-          right: "var(--space-4)",
-          zIndex: 101,
-          background: "rgba(253, 252, 249, 0.88)",
-          backdropFilter: "blur(16px)",
-          border: "1px solid var(--color-border-default)",
-          borderRadius: "var(--radius-sm)",
-          padding: "var(--space-2)",
-          cursor: "pointer",
-          fontFamily: "var(--font-ui)",
-          fontSize: "var(--font-size-md)",
-          color: "var(--color-text-secondary)",
-        }}
       >
         ☰
       </button>
@@ -137,58 +100,38 @@ export function GraphWorkspace() {
           <div className="sidebar-container">
             <RhizoneList />
           </div>
-          {/* Mobile backdrop */}
           <div
-            className="mobile-backdrop"
+            className="mobile-backdrop fixed inset-0 z-[49] bg-[rgba(26,29,27,0.25)] backdrop-blur-[2px]"
             onClick={() => {
               toggleLeftSidebar();
               setMobileMenuOpen(false);
             }}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 49,
-              background: "rgba(26, 29, 27, 0.25)",
-              backdropFilter: "blur(2px)",
-            }}
           />
         </>
       ) : (
-        /* Collapsed: show expand button */
         <button
-          className="sidebar-toggle-btn"
+          className="sidebar-toggle-btn fixed top-1/2 left-0 -translate-y-1/2 z-50 w-6 h-12 flex items-center justify-center bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default border-l-0 rounded-r-full cursor-pointer text-text-tertiary shadow-sm p-0"
           onClick={toggleLeftSidebar}
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: 0,
-            transform: "translateY(-50%)",
-            zIndex: 50,
-            width: 24,
-            height: 48,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(253, 252, 249, 0.88)",
-            backdropFilter: "blur(16px)",
-            border: "1px solid var(--color-border-default)",
-            borderLeft: "none",
-            borderRadius: "0 var(--radius-full) var(--radius-full) 0",
-            cursor: "pointer",
-            color: "var(--color-text-tertiary)",
-            boxShadow: "var(--shadow-sm)",
-            padding: 0,
-          }}
           aria-label="展开侧边栏"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -2 }}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="-ml-[2px]"
+          >
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </button>
       )}
 
       {/* Canvas */}
-      <div style={{ flex: 1, position: "relative" }}>
+      <div className="flex-1 relative">
         <CanvasModeSwitch />
         {canvasMode === "lineage" ? <DagCanvas /> : <ExploreCanvas />}
       </div>
@@ -202,7 +145,7 @@ export function GraphWorkspace() {
 
       <ToastContainer />
 
-      {/* Responsive CSS */}
+      {/* Responsive CSS (media-query-based, keep as raw CSS) */}
       <style>{`
         .sidebar-toggle-btn { transition: all var(--transition-fast); }
         .sidebar-toggle-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }

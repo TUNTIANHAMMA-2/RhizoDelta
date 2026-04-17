@@ -32,7 +32,7 @@ export function ProvenancePanel({ nodeId }: Props) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div className="flex flex-col gap-3">
         <Skeleton variant="rectangular" height={48} />
         <Skeleton variant="rectangular" height={48} />
         <Skeleton variant="rectangular" height={48} />
@@ -45,7 +45,7 @@ export function ProvenancePanel({ nodeId }: Props) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+    <div className="flex flex-col gap-2">
       {items.map((item) => (
         <button
           key={item.node_id}
@@ -53,53 +53,19 @@ export function ProvenancePanel({ nodeId }: Props) {
             selectNode(item.node_id);
             openDetailPanel(item.node_id);
           }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-3)",
-            padding: "var(--space-3)",
-            background: "none",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-sm)",
-            cursor: "pointer",
-            textAlign: "left",
-            width: "100%",
-            transition: "var(--transition-fast)",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "var(--color-bg-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "none")
-          }
+          className="flex items-center gap-3 p-3 bg-transparent hover:bg-bg-hover border border-border-default rounded-sm cursor-pointer text-left w-full transition-[background] duration-[var(--transition-fast)]"
         >
           <span
+            className="w-[6px] h-[6px] rounded-full shrink-0"
             style={{
-              width: 6,
-              height: 6,
-              borderRadius: "var(--radius-full)",
               background: TYPE_COLOR[item.label] ?? "var(--color-text-tertiary)",
-              flexShrink: 0,
             }}
           />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--font-size-sm)",
-                color: "var(--color-text-primary)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-text-primary overflow-hidden text-ellipsis whitespace-nowrap">
               {item.content?.slice(0, 60) ?? item.summary_content?.slice(0, 60) ?? "—"}
             </div>
-            <div
-              style={{
-                fontSize: "var(--font-size-xs)",
-                color: "var(--color-text-tertiary)",
-              }}
-            >
+            <div className="text-xs text-text-tertiary">
               {item.author_id ?? "Agent"} &middot;{" "}
               {new Date(item.created_at).toLocaleDateString()}
             </div>

@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
@@ -9,7 +10,7 @@ export function RhizoneList() {
   const toggleSidebar = useUiStore((s) => s.toggleLeftSidebar);
   const openPostPanel = useUiStore((s) => s.openPostPanel);
   const closeRightPanel = useUiStore((s) => s.closeRightPanel);
-  
+
   const rhizomes = useGraphStore((s) => s.rhizomes);
   const rootNodeId = useGraphStore((s) => s.rootNodeId);
   const loadLineage = useGraphStore((s) => s.loadLineage);
@@ -30,84 +31,26 @@ export function RhizoneList() {
   };
 
   return (
-    <aside
-      style={{
-        position: "relative",
-        width: 260,
-        minWidth: 260,
-        height: "100%",
-        background: "var(--color-bg-secondary)",
-        borderRight: "1px solid var(--color-border-default)",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "var(--font-ui)",
-        paddingTop: 80,
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "var(--space-4)",
-          borderBottom: "1px solid var(--color-border-subtle)",
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: "var(--font-size-sm)", letterSpacing: "0.02em", color: "var(--color-text-secondary)" }}>
+    <aside className="relative w-[260px] min-w-[260px] h-full bg-bg-secondary border-r border-border-default flex flex-col font-ui pt-20 box-border">
+      <div className="flex justify-between items-center p-4 border-b border-border-subtle">
+        <span className="font-semibold text-sm tracking-[0.02em] text-text-secondary">
           Rhizones
         </span>
       </div>
 
       <button
-        className="sidebar-toggle-btn"
+        className="sidebar-toggle-btn absolute top-1/2 -right-[14px] -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center bg-bg-elevated border border-border-default rounded-full cursor-pointer text-text-tertiary shadow-sm p-0 transition-[all] duration-[var(--transition-fast)]"
         onClick={toggleSidebar}
         aria-label="折叠侧边栏"
-        style={{
-          position: "absolute",
-          top: "50%",
-          right: -14,
-          transform: "translateY(-50%)",
-          zIndex: 10,
-          width: 28,
-          height: 28,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--color-bg-elevated)",
-          border: "1px solid var(--color-border-default)",
-          borderRadius: "var(--radius-full)",
-          cursor: "pointer",
-          color: "var(--color-text-tertiary)",
-          boxShadow: "var(--shadow-sm)",
-          padding: 0,
-          transition: "all var(--transition-fast)",
-        }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
       </button>
 
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div className="flex-1 overflow-y-auto flex flex-col">
         {rhizomes.length === 0 ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--color-text-tertiary)",
-              fontSize: "var(--font-size-sm)",
-            }}
-          >
+          <div className="flex-1 flex items-center justify-center text-text-tertiary text-sm">
             暂无话题
           </div>
         ) : (
@@ -122,27 +65,14 @@ export function RhizoneList() {
                 aria-current={isSelected ? "true" : undefined}
               >
                 <div
-                  style={{
-                    fontSize: "var(--font-size-sm)",
-                    color: "var(--color-text-primary)",
-                    fontWeight: isSelected ? 600 : 500,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    width: "100%",
-                  }}
+                  className={clsx(
+                    "text-sm text-text-primary whitespace-nowrap overflow-hidden text-ellipsis w-full",
+                    isSelected ? "font-semibold" : "font-medium",
+                  )}
                 >
                   {plainText || "Unknown Topic"}
                 </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--color-text-secondary)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    width: "100%",
-                  }}
-                >
+                <div className="text-[11px] text-text-secondary flex justify-between w-full">
                   <span>{new Date(node.created_at).toLocaleDateString()}</span>
                   <span>{node.author_id ?? "Anonymous"}</span>
                 </div>
@@ -152,20 +82,13 @@ export function RhizoneList() {
         )}
       </div>
 
-      {/* 发布观点入口 */}
-      <div
-        style={{
-          padding: "var(--space-3) var(--space-4)",
-          borderTop: "1px solid var(--color-border-subtle)",
-        }}
-      >
+      <div className="px-4 py-3 border-t border-border-subtle">
         <button
-          className="btn-primary"
+          className="btn-primary w-full rounded-md"
           onClick={() => {
             selectNode(null);
             openPostPanel();
           }}
-          style={{ width: "100%", borderRadius: "var(--radius-md)" }}
         >
           + 发起新话题
         </button>

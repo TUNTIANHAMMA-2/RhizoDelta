@@ -5,6 +5,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { useNavigate } from "react-router-dom";
+import clsx from "clsx";
 import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
 import { NotificationCenter } from "./NotificationCenter";
@@ -20,6 +21,10 @@ const SSE_ANIM_CLASS = {
   connected: "",
   disconnected: "sse-indicator--disconnected",
 } as const;
+
+// Shared capsule surface classes (liquid-glass pill)
+const CAPSULE_SURFACE =
+  "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150 border border-border-default shadow-sm";
 
 export function Header() {
   const navigate = useNavigate();
@@ -38,7 +43,6 @@ export function Header() {
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifContainerRef = useRef<HTMLDivElement>(null);
 
-  // Click-outside to close notification panel
   useEffect(() => {
     if (!notifOpen) return;
     const onMouseDown = (e: MouseEvent) => {
@@ -62,64 +66,21 @@ export function Header() {
   }, [clearToken, navigate]);
 
   return (
-    <header
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 100,
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        width: "100%",
-        padding: "var(--space-4)",
-        pointerEvents: "none",
-        fontFamily: "var(--font-ui)",
-        fontSize: "var(--font-size-sm)",
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", position: "relative", width: "100%", height: 40 }}>
+    <header className="fixed top-0 left-0 z-[100] flex items-start justify-between w-full p-4 pointer-events-none font-ui text-sm box-border">
+      <div className="flex items-center relative w-full h-10">
         {/* Logo 胶囊 */}
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            height: 40,
-            background: "rgba(253, 252, 249, 0.88)",
-            backdropFilter: "blur(16px) saturate(1.3)",
-            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-lg)",
-            padding: "0 var(--space-4)",
-            boxShadow: "var(--shadow-md)",
-            pointerEvents: "auto",
-            width: "max-content",
-            boxSizing: "border-box",
-            zIndex: 2,
-          }}
+          className={clsx(
+            CAPSULE_SURFACE,
+            "flex items-center h-10 rounded-lg px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
+          )}
         >
-          <div
-            style={{
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              fontFamily: "var(--font-content)",
-              fontWeight: 400,
-              color: "var(--color-text-primary)",
-              fontSize: "var(--font-size-md)",
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <div className="shrink-0 flex items-center font-content font-normal text-text-primary text-md tracking-[-0.02em]">
             RhizoDelt
             <span
-              className={SSE_ANIM_CLASS[sseStatus]}
+              className={`${SSE_ANIM_CLASS[sseStatus]} text-lg ml-[2px]`}
               aria-live="polite"
-              style={{
-                color: SSE_STATUS_COLOR[sseStatus],
-                fontSize: "var(--font-size-lg)",
-                marginLeft: 2,
-              }}
+              style={{ color: SSE_STATUS_COLOR[sseStatus] }}
             >
               △
             </span>
@@ -128,28 +89,15 @@ export function Header() {
 
         {/* 面包屑胶囊 */}
         <div
+          className={clsx(
+            "absolute top-0 flex items-center h-10 rounded-lg overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
+            "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150",
+            selectedNodeId
+              ? "border border-border-default px-4 shadow-md pointer-events-auto opacity-100 max-w-[400px]"
+              : "border border-transparent p-0 shadow-none pointer-events-none opacity-0 max-w-0",
+          )}
           style={{
-            position: "absolute",
-            top: 0,
-            left: selectedNodeId
-              ? (leftSidebarOpen ? 260 : 156)
-              : 80,
-            display: "flex",
-            alignItems: "center",
-            height: 40,
-            background: "rgba(253, 252, 249, 0.88)",
-            backdropFilter: "blur(16px) saturate(1.3)",
-            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-            border: selectedNodeId ? "1px solid var(--color-border-default)" : "1px solid transparent",
-            borderRadius: "var(--radius-lg)",
-            padding: selectedNodeId ? "0 var(--space-4)" : "0",
-            boxShadow: selectedNodeId ? "var(--shadow-md)" : "none",
-            pointerEvents: selectedNodeId ? "auto" : "none",
-            opacity: selectedNodeId ? 1 : 0,
-            maxWidth: selectedNodeId ? 400 : 0,
-            overflow: "hidden",
-            transition: "all 300ms var(--ease-out)",
-            zIndex: 1,
+            left: selectedNodeId ? (leftSidebarOpen ? 260 : 156) : 80,
           }}
         >
           {selectedNodeId && <Breadcrumb />}
@@ -158,39 +106,22 @@ export function Header() {
 
       {/* 右侧控件组 */}
       <div
+        className="pointer-events-auto flex items-center gap-2 transition-transform duration-300 ease-[var(--ease-out)]"
         style={{
-          pointerEvents: "auto",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-2)",
-          transition: "transform 300ms var(--ease-out)",
-          transform: rightPanelMode !== "hidden" ? "translateX(calc(-1 * max(45vw, 460px)))" : "translateX(0)",
+          transform:
+            rightPanelMode !== "hidden"
+              ? "translateX(calc(-1 * max(45vw, 460px)))"
+              : "translateX(0)",
         }}
       >
-        {/* ADMIN 复核按钮 */}
         {topRole === "ADMIN" && (
           <button
             type="button"
             onClick={openReviewPanel}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              height: 36,
-              border: "1px solid var(--color-border-default)",
-              borderRadius: "var(--radius-full)",
-              padding: "0 14px",
-              background: "rgba(253, 252, 249, 0.88)",
-              backdropFilter: "blur(16px) saturate(1.3)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-              boxShadow: "var(--shadow-sm)",
-              cursor: "pointer",
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--font-size-xs)",
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-              transition: "all var(--transition-fast)",
-              letterSpacing: "0.01em",
-            }}
+            className={clsx(
+              CAPSULE_SURFACE,
+              "flex items-center h-9 rounded-full px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
+            )}
           >
             复核
           </button>
@@ -210,33 +141,12 @@ export function Header() {
             setUserHovered(false);
           }}
           onClick={userHovered ? handleLogout : undefined}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-2)",
-            height: 36,
-            border: userHovered
-              ? "1px solid var(--color-danger)"
-              : "1px solid var(--color-border-default)",
-            borderRadius: "var(--radius-full)",
-            padding: "0 14px",
-            background: userHovered
-              ? "rgba(196, 69, 58, 0.06)"
-              : "rgba(253, 252, 249, 0.88)",
-            backdropFilter: "blur(16px) saturate(1.3)",
-            WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-            boxShadow: "var(--shadow-sm)",
-            cursor: userHovered ? "pointer" : "default",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            fontWeight: 500,
-            color: userHovered
-              ? "var(--color-danger)"
-              : "var(--color-text-secondary)",
-            transition: "all var(--transition-fast)",
-            minWidth: 0,
-            whiteSpace: "nowrap",
-          }}
+          className={clsx(
+            "flex items-center gap-2 h-9 rounded-full px-[14px] backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
+            userHovered
+              ? "border border-danger bg-[rgba(196,69,58,0.06)] text-danger cursor-pointer"
+              : "border border-border-default bg-[rgba(253,252,249,0.88)] text-text-secondary cursor-default",
+          )}
         >
           {userHovered ? (
             <>
@@ -256,28 +166,15 @@ export function Header() {
         </button>
 
         {/* 通知铃铛 */}
-        <div ref={notifContainerRef} style={{ position: "relative" }}>
+        <div ref={notifContainerRef} className="relative">
           <button
             type="button"
             onClick={() => setNotifOpen(!notifOpen)}
             aria-label="通知"
-            style={{
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 36,
-              height: 36,
-              border: "1px solid var(--color-border-default)",
-              borderRadius: "50%",
-              background: "rgba(253, 252, 249, 0.88)",
-              backdropFilter: "blur(16px) saturate(1.3)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-              boxShadow: "var(--shadow-sm)",
-              cursor: "pointer",
-              padding: 0,
-              transition: "all var(--transition-fast)",
-            }}
+            className={clsx(
+              CAPSULE_SURFACE,
+              "relative flex items-center justify-center w-9 h-9 rounded-full cursor-pointer p-0 transition-[all] duration-[var(--transition-fast)]",
+            )}
           >
             <svg
               width="16"
@@ -293,25 +190,7 @@ export function Header() {
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             {unreadCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -2,
-                  right: -2,
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "var(--color-danger)",
-                  color: "#fff",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 4px",
-                  lineHeight: 1,
-                }}
-              >
+              <span className="absolute -top-[2px] -right-[2px] min-w-4 h-4 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}

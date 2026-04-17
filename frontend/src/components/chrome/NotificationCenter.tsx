@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -46,70 +47,20 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
   };
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: "100%",
-        right: 0,
-        marginTop: 8,
-        width: 320,
-        maxHeight: 400,
-        overflowY: "auto",
-        background: "var(--color-bg-primary)",
-        border: "1px solid var(--color-border-default)",
-        borderRadius: "var(--radius-lg)",
-        boxShadow: "var(--shadow-lg)",
-        zIndex: 200,
-        fontFamily: "var(--font-ui)",
-        fontSize: "var(--font-size-sm)",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "var(--space-3) var(--space-4)",
-          borderBottom: "1px solid var(--color-border-default)",
-        }}
-      >
-        <span
-          style={{
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-          }}
-        >
-          通知
-        </span>
+    <div className="absolute top-full right-0 mt-2 w-[320px] max-h-[400px] overflow-y-auto bg-bg-primary border border-border-default rounded-lg shadow-lg z-[200] font-ui text-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
+        <span className="font-semibold text-text-primary">通知</span>
         <button
           type="button"
           onClick={markAllRead}
-          style={{
-            border: "none",
-            background: "none",
-            color: "var(--color-text-tertiary)",
-            cursor: "pointer",
-            fontFamily: "var(--font-ui)",
-            fontSize: "var(--font-size-xs)",
-            padding: "2px 4px",
-          }}
+          className="border-none bg-transparent text-text-tertiary cursor-pointer font-ui text-xs px-1 py-[2px]"
         >
           全部已读
         </button>
       </div>
 
-      {/* List */}
       {items.length === 0 ? (
-        <div
-          style={{
-            padding: "var(--space-8) var(--space-4)",
-            textAlign: "center",
-            color: "var(--color-text-tertiary)",
-          }}
-        >
-          暂无通知
-        </div>
+        <div className="px-4 py-8 text-center text-text-tertiary">暂无通知</div>
       ) : (
         <div>
           {items.map((item) => (
@@ -124,71 +75,27 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
                   handleItemClick(item);
                 }
               }}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "var(--space-3)",
-                padding: "var(--space-3) var(--space-4)",
-                cursor: "pointer",
-                borderBottom: "1px solid var(--color-border-default)",
-                background: item.read ? "transparent" : "var(--color-bg-secondary)",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "var(--color-bg-tertiary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = item.read
-                  ? "transparent"
-                  : "var(--color-bg-secondary)";
-              }}
+              className={clsx(
+                "flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-border-default transition-[background] duration-150 hover:bg-bg-hover",
+                item.read ? "bg-transparent" : "bg-bg-secondary",
+              )}
             >
-              {/* Color dot */}
               <span
-                style={{
-                  flexShrink: 0,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  marginTop: 5,
-                  background: TYPE_COLOR[item.type] ?? "var(--color-text-tertiary)",
-                }}
+                className="shrink-0 w-2 h-2 rounded-full mt-[5px]"
+                style={{ background: TYPE_COLOR[item.type] ?? "var(--color-text-tertiary)" }}
               />
 
-              {/* Content */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    color: "var(--color-text-primary)",
-                    lineHeight: 1.4,
-                    wordBreak: "break-word",
-                  }}
-                >
+              <div className="flex-1 min-w-0">
+                <div className="text-text-primary leading-[1.4] break-words">
                   {item.message}
                 </div>
-                <div
-                  style={{
-                    color: "var(--color-text-tertiary)",
-                    fontSize: "var(--font-size-xs)",
-                    marginTop: 2,
-                  }}
-                >
+                <div className="text-text-tertiary text-xs mt-[2px]">
                   {relativeTime(item.timestamp)}
                 </div>
               </div>
 
-              {/* Unread indicator */}
               {!item.read && (
-                <span
-                  style={{
-                    flexShrink: 0,
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    marginTop: 6,
-                    background: "var(--color-accent)",
-                  }}
-                />
+                <span className="shrink-0 w-[6px] h-[6px] rounded-full mt-[6px] bg-accent" />
               )}
             </div>
           ))}
