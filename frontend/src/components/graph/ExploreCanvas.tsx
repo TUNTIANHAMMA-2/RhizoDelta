@@ -13,7 +13,6 @@ import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { createExploreSimulation } from "../../lib/exploreSimulation";
 import { nodeTypes, edgeTypes, MINIMAP_NODE_COLOR } from "./graphConstants";
-import { AssociationToggle } from "./AssociationToggle";
 
 function ExploreViewportListener() {
   const { setCenter, getViewport } = useReactFlow();
@@ -77,8 +76,6 @@ export function ExploreCanvas() {
   const setExplorePositions = useGraphStore((s) => s.setExplorePositions);
   const selectNode = useGraphStore((s) => s.selectNode);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
-  const showAssociations = useGraphStore((s) => s.showAssociations);
-  const associationRfEdges = useGraphStore((s) => s.associationRfEdges);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
   const savedViewport = useUiStore((s) => s.viewports.explore);
   const showMiniMap = exploreRfNodes.length > 20;
@@ -106,13 +103,7 @@ export function ExploreCanvas() {
     [exploreRfNodes, selectedNodeId],
   );
 
-  const mergedEdges = useMemo(
-    () =>
-      showAssociations
-        ? [...exploreRfEdges, ...associationRfEdges]
-        : exploreRfEdges,
-    [exploreRfEdges, associationRfEdges, showAssociations],
-  );
+  const mergedEdges = exploreRfEdges;
 
   useEffect(() => {
     if (!anchorNodeId || exploreRfNodes.length === 0) {
@@ -219,7 +210,6 @@ export function ExploreCanvas() {
       }}
     >
       <ExploreViewportListener />
-      <AssociationToggle />
       <Background
         variant={"dots" as never}
         gap={20}

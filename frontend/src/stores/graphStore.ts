@@ -7,7 +7,7 @@ import type {
 } from "../api/types";
 import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
 import { toRfNode } from "../lib/mapping";
-import { buildGraphViews, associationToRfEdge } from "../lib/graphView";
+import { buildGraphViews } from "../lib/graphView";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
 
@@ -25,8 +25,6 @@ export interface GraphState {
   exploreRfEdges: Edge[];
   rfNodes: Node[];
   rfEdges: Edge[];
-  showAssociations: boolean;
-  associationRfEdges: Edge[];
   expandingNodeIds: Set<string>;
   pendingFocusNodeId: string | null;
 
@@ -41,7 +39,6 @@ export interface GraphState {
   loadAssociations: (nodeId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setSemanticZoom: (zoom: SemanticZoom) => void;
-  toggleAssociations: () => void;
   expandChildren: (nodeId: string) => Promise<void>;
   getBoundaryNodeIds: () => string[];
   requestFocusNode: (nodeId: string) => void;
@@ -75,8 +72,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   exploreRfEdges: [],
   rfNodes: [],
   rfEdges: [],
-  showAssociations: false,
-  associationRfEdges: [],
   expandingNodeIds: new Set<string>(),
   pendingFocusNodeId: null,
   selectedNodeId: null,
@@ -169,11 +164,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }
   },
 
-  toggleAssociations: () => {
-    set((s) => ({ showAssociations: !s.showAssociations }));
-    get().flushLayout();
-  },
-
   expandChildren: async (nodeId) => {
     const expanding = new Set(get().expandingNodeIds);
     if (expanding.has(nodeId)) return; // already expanding
@@ -254,16 +244,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       priorExplorePositions,
     );
 
-    // Build association RF edges when toggled on
-    let associationRfEdges: Edge[] = [];
-    if (get().showAssociations && get().rootNodeId) {
-      const anchorId = get().rootNodeId!;
-      const nodeIds = new Set(nodesMap.keys());
-      associationRfEdges = get()
-        .associations.map((assoc) => associationToRfEdge(assoc, anchorId))
-        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
-    }
-
     set({
       lineageRfNodes: views.lineage.nodes,
       lineageRfEdges: views.lineage.edges,
@@ -271,7 +251,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       exploreRfEdges: views.explore.edges,
       rfNodes: views.lineage.nodes,
       rfEdges: views.lineage.edges,
-      associationRfEdges,
     });
   },
 
