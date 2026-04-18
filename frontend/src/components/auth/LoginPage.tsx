@@ -16,11 +16,130 @@ interface AuthSessionPayload {
   };
 }
 
-const INPUT_CLASS =
-  "border border-border-default rounded-md px-[14px] py-3 text-base bg-white/70 text-text-primary outline-none font-ui transition-[border-color,box-shadow] duration-150";
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  autoComplete?: string;
+  required?: boolean;
+};
 
-const FIELD_LABEL_CLASS =
-  "text-xs font-medium text-text-secondary";
+function Field({ label, value, onChange, ...rest }: FieldProps) {
+  return (
+    <label className="block group">
+      <span className="block font-mono text-[10px] uppercase tracking-[0.28em] text-text-tertiary mb-2 transition-colors group-focus-within:text-accent">
+        {label}
+      </span>
+      <input
+        {...rest}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="block w-full border-0 border-b border-border-default bg-transparent px-0 py-[10px] text-base text-text-primary outline-none placeholder:text-text-tertiary/50 focus-visible:outline-none focus:border-b-[1.5px] focus:border-accent transition-all"
+      />
+    </label>
+  );
+}
+
+function RhizomeBackdrop() {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox="0 0 900 1200"
+      preserveAspectRatio="xMidYMid slice"
+      fill="none"
+      aria-hidden
+    >
+      {/* Primary trunk — bottom-left to upper-right, like a root climbing */}
+      <path
+        d="M 0 1150 Q 180 1010 360 920 Q 500 840 600 720 Q 700 600 770 440 Q 820 300 880 110"
+        stroke="#4A7C59"
+        strokeWidth="2.4"
+        opacity="0.55"
+      />
+      {/* Secondary branches */}
+      <path
+        d="M 360 920 Q 310 840 250 730 Q 210 610 240 480"
+        stroke="#4A7C59"
+        strokeWidth="1.5"
+        opacity="0.42"
+      />
+      <path
+        d="M 600 720 Q 700 680 790 640 Q 860 590 900 540"
+        stroke="#2D8F6F"
+        strokeWidth="1.5"
+        opacity="0.42"
+      />
+      <path
+        d="M 600 720 Q 540 640 460 570 Q 380 490 340 380"
+        stroke="#3B7DD8"
+        strokeWidth="1.2"
+        opacity="0.4"
+      />
+      <path
+        d="M 770 440 Q 820 370 880 320"
+        stroke="#7C5CBF"
+        strokeWidth="1.2"
+        opacity="0.4"
+      />
+      <path
+        d="M 240 480 Q 170 440 90 420 Q 30 410 0 420"
+        stroke="#4A7C59"
+        strokeWidth="1"
+        opacity="0.35"
+      />
+      {/* Tertiary hair-lines */}
+      <path
+        d="M 250 730 Q 310 770 400 770"
+        stroke="#4A7C59"
+        strokeWidth="0.8"
+        opacity="0.25"
+      />
+      <path
+        d="M 460 570 Q 540 550 600 510"
+        stroke="#4A7C59"
+        strokeWidth="0.8"
+        opacity="0.25"
+      />
+      <path
+        d="M 770 440 Q 700 380 620 360"
+        stroke="#C4713B"
+        strokeWidth="0.8"
+        opacity="0.3"
+      />
+
+      {/* Major nodes */}
+      <circle cx="360" cy="920" r="8" fill="#4A7C59" opacity="0.72" />
+      <circle cx="600" cy="720" r="10" fill="#3B7DD8" opacity="0.72" />
+      <circle cx="770" cy="440" r="9" fill="#7C5CBF" opacity="0.72" />
+      <circle cx="240" cy="480" r="7" fill="#2D8F6F" opacity="0.65" />
+      <circle cx="880" cy="110" r="6" fill="#4A7C59" opacity="0.7" />
+
+      {/* Mid-size nodes */}
+      <circle cx="900" cy="540" r="5" fill="#2D8F6F" opacity="0.6" />
+      <circle cx="340" cy="380" r="5" fill="#3B7DD8" opacity="0.55" />
+      <circle cx="880" cy="320" r="5" fill="#7C5CBF" opacity="0.55" />
+
+      {/* Minor nodes */}
+      <circle cx="500" cy="840" r="3" fill="#4A7C59" opacity="0.5" />
+      <circle cx="700" cy="600" r="3" fill="#2D8F6F" opacity="0.5" />
+      <circle cx="400" cy="770" r="2.5" fill="#4A7C59" opacity="0.4" />
+      <circle cx="600" cy="510" r="2.5" fill="#4A7C59" opacity="0.4" />
+      <circle cx="620" cy="360" r="3" fill="#C4713B" opacity="0.55" />
+      <circle cx="90" cy="420" r="3" fill="#4A7C59" opacity="0.5" />
+      <circle cx="250" cy="730" r="4" fill="#4A7C59" opacity="0.5" />
+
+      {/* Satellite drift */}
+      <circle cx="150" cy="300" r="2" fill="#4A7C59" opacity="0.3" />
+      <circle cx="700" cy="280" r="2" fill="#7C5CBF" opacity="0.3" />
+      <circle cx="560" cy="950" r="2" fill="#3B7DD8" opacity="0.3" />
+      <circle cx="830" cy="780" r="2" fill="#2D8F6F" opacity="0.3" />
+      <circle cx="50" cy="600" r="2" fill="#C4713B" opacity="0.3" />
+      <circle cx="440" cy="1050" r="2.5" fill="#4A7C59" opacity="0.3" />
+    </svg>
+  );
+}
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -62,180 +181,273 @@ export function LoginPage() {
     }
   };
 
+  const now = new Date();
+  const issueId = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   return (
-    <main
-      className="min-h-screen grid place-items-center p-6 font-ui relative overflow-hidden"
-      style={{ background: "#F0EDE4" }}
-    >
-      {/* Layered background gradients */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 60% at 20% 10%, rgba(74, 124, 89, 0.08), transparent 50%), " +
-            "radial-gradient(ellipse 60% 80% at 80% 90%, rgba(59, 125, 216, 0.06), transparent 50%), " +
-            "radial-gradient(ellipse 50% 50% at 50% 50%, rgba(196, 113, 59, 0.04), transparent 60%)",
-        }}
-      />
-
-      {/* Decorative botanical illustration — top-left */}
-      <svg
-        className="absolute -top-[2%] -left-[2%] opacity-[0.35] pointer-events-none"
-        width="560"
-        height="560"
-        viewBox="0 0 480 480"
-        fill="none"
+    <main className="min-h-screen flex flex-col md:flex-row font-ui">
+      {/* ═══ LEFT — editorial panel ═══ */}
+      <aside
+        className="hidden md:flex md:flex-[1.15] lg:flex-[1.25] relative overflow-hidden flex-col justify-between p-12 lg:p-16 xl:p-20 animate-fade-in"
+        style={{ background: "#F0EDE4" }}
       >
-        <path d="M60 420 Q120 360 180 340 Q240 320 300 280 Q340 260 380 200" stroke="#4A7C59" strokeWidth="2" fill="none" />
-        <path d="M60 420 Q100 380 140 370 Q200 350 240 300 Q260 270 300 220 Q320 190 360 140" stroke="#4A7C59" strokeWidth="1.5" fill="none" opacity="0.7" />
-        <path d="M180 340 Q200 310 220 290 Q250 260 260 220" stroke="#4A7C59" strokeWidth="1.2" fill="none" opacity="0.6" />
-        <path d="M300 280 Q320 300 350 320 Q380 340 420 350" stroke="#4A7C59" strokeWidth="1.2" fill="none" opacity="0.6" />
-        <path d="M240 300 Q220 280 200 240 Q180 200 170 160" stroke="#4A7C59" strokeWidth="1" fill="none" opacity="0.5" />
-        <path d="M140 370 Q120 340 100 300 Q85 260 90 220" stroke="#4A7C59" strokeWidth="0.8" fill="none" opacity="0.4" />
-        <path d="M380 200 Q400 180 430 170 Q450 165 470 170" stroke="#2D8F6F" strokeWidth="1" fill="none" opacity="0.5" />
-        <circle cx="60" cy="420" r="6" fill="#4A7C59" opacity="0.6" />
-        <circle cx="180" cy="340" r="7" fill="#4A7C59" opacity="0.7" />
-        <circle cx="300" cy="280" r="8" fill="#3B7DD8" opacity="0.6" />
-        <circle cx="240" cy="300" r="6" fill="#7C5CBF" opacity="0.6" />
-        <circle cx="360" cy="140" r="5" fill="#2D8F6F" opacity="0.6" />
-        <circle cx="260" cy="220" r="5" fill="#4A7C59" opacity="0.5" />
-        <circle cx="420" cy="350" r="5" fill="#3B7DD8" opacity="0.5" />
-        <circle cx="170" cy="160" r="4" fill="#7C5CBF" opacity="0.5" />
-        <circle cx="90" cy="220" r="4" fill="#2D8F6F" opacity="0.4" />
-        <circle cx="470" cy="170" r="4" fill="#2D8F6F" opacity="0.5" />
-        <circle cx="200" cy="350" r="2.5" fill="#3B7DD8" opacity="0.4" />
-        <circle cx="320" cy="260" r="2.5" fill="#7C5CBF" opacity="0.4" />
-        <circle cx="280" cy="240" r="2" fill="#4A7C59" opacity="0.3" />
-      </svg>
+        <RhizomeBackdrop />
 
-      {/* Decorative botanical illustration — bottom-right */}
-      <svg
-        className="absolute -bottom-[5%] -right-[3%] opacity-30 pointer-events-none"
-        width="600"
-        height="600"
-        viewBox="0 0 520 520"
-        fill="none"
-      >
-        <circle cx="260" cy="260" r="220" stroke="#4A7C59" strokeWidth="1" strokeDasharray="6 10" />
-        <circle cx="260" cy="260" r="170" stroke="#4A7C59" strokeWidth="1.2" strokeDasharray="4 8" />
-        <circle cx="260" cy="260" r="120" stroke="#4A7C59" strokeWidth="1.5" />
-        <circle cx="260" cy="260" r="70" stroke="#4A7C59" strokeWidth="1.8" />
-        <circle cx="260" cy="260" r="25" stroke="#4A7C59" strokeWidth="2" />
-        <line x1="260" y1="30" x2="260" y2="490" stroke="#4A7C59" strokeWidth="0.8" opacity="0.5" />
-        <line x1="30" y1="260" x2="490" y2="260" stroke="#4A7C59" strokeWidth="0.8" opacity="0.5" />
-        <line x1="100" y1="100" x2="420" y2="420" stroke="#4A7C59" strokeWidth="0.6" opacity="0.35" />
-        <line x1="420" y1="100" x2="100" y2="420" stroke="#4A7C59" strokeWidth="0.6" opacity="0.35" />
-        <path d="M260 260 Q310 190 350 165 Q375 150 400 155" stroke="#2D8F6F" strokeWidth="1.8" fill="none" opacity="0.6" />
-        <path d="M260 260 Q210 190 185 145 Q170 120 175 95" stroke="#3B7DD8" strokeWidth="1.8" fill="none" opacity="0.5" />
-        <path d="M260 260 Q330 310 375 355 Q395 380 415 385" stroke="#7C5CBF" strokeWidth="1.5" fill="none" opacity="0.5" />
-        <path d="M260 260 Q200 320 160 370 Q140 395 120 405" stroke="#C4713B" strokeWidth="1.2" fill="none" opacity="0.4" />
-        <circle cx="400" cy="155" r="6" fill="#2D8F6F" opacity="0.7" />
-        <circle cx="175" cy="95" r="5" fill="#3B7DD8" opacity="0.6" />
-        <circle cx="415" cy="385" r="5" fill="#7C5CBF" opacity="0.6" />
-        <circle cx="120" cy="405" r="4" fill="#C4713B" opacity="0.5" />
-        <circle cx="260" cy="260" r="6" fill="#4A7C59" opacity="0.8" />
-        <circle cx="260" cy="40" r="3" fill="#4A7C59" opacity="0.4" />
-        <circle cx="480" cy="260" r="3" fill="#4A7C59" opacity="0.4" />
-        <circle cx="260" cy="480" r="3" fill="#4A7C59" opacity="0.4" />
-        <circle cx="40" cy="260" r="3" fill="#4A7C59" opacity="0.4" />
-      </svg>
-
-      <section className="relative w-[min(440px,100%)] pt-9 px-8 pb-8 rounded-xl bg-[rgba(253,252,249,0.88)] border border-[rgba(74,124,89,0.12)] shadow-xl backdrop-blur-[20px] backdrop-saturate-[1.3] animate-scale-in">
-        <div className="grid gap-[10px] mb-7">
-          <span className="w-fit px-3 py-[5px] rounded-full bg-[rgba(74,124,89,0.08)] text-accent text-[11px] font-semibold tracking-[0.1em] font-mono">
-            RHIZODELTA
+        {/* Masthead */}
+        <header className="relative z-10 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.32em] text-text-secondary">
+          <span className="flex items-center gap-2.5">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+              <path
+                d="M 6 1 L 11 10.5 L 1 10.5 Z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+              />
+            </svg>
+            <span>RhizoDelta</span>
+            <span className="text-text-tertiary">·</span>
+            <span className="text-text-tertiary">Rhizomatic Field Notes</span>
           </span>
-          <h1 className="m-0 text-2xl leading-[1.1] text-text-primary font-content font-normal tracking-[-0.02em]">
-            登录你的谱系工作台
+          <span className="tabular-nums">№ {issueId}</span>
+        </header>
+
+        {/* Manifesto — big editorial title */}
+        <div className="relative z-10 max-w-xl space-y-7 animate-slide-up" style={{ animationDelay: "120ms", animationFillMode: "both" }}>
+          <div className="flex items-baseline gap-4 font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
+            <span className="font-bold">04</span>
+            <span className="w-10 h-px bg-accent/60" />
+            <span>Observatory / 观察台</span>
+          </div>
+
+          <h1 className="font-content text-[64px] lg:text-[84px] xl:text-[96px] leading-[0.9] tracking-[-0.035em] text-text-primary">
+            谱系
+            <br />
+            <em
+              className="italic font-light text-accent"
+              style={{ fontFeatureSettings: "'ss01'" }}
+            >
+              工作台
+            </em>
+            <span className="font-mono text-[11px] align-super text-text-tertiary not-italic ml-2 tracking-[0.1em]">
+              v0.1
+            </span>
           </h1>
-          <p className="m-0 text-text-secondary leading-[1.6] text-sm">
-            使用已有账号进入图谱；如果你是第一次使用，可以直接注册一个 USER 身份。
+
+          <p className="font-content text-lg lg:text-xl leading-[1.55] text-text-secondary max-w-lg font-light">
+            <em className="italic text-text-primary">A living thicket of thought.</em>
+            <span className="block mt-2">
+              一处可并、可分、可反思的知识网络 —— 每一条观点都带出它的来路与去向。
+            </span>
           </p>
         </div>
 
-        {/* Mode toggle */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-[rgba(26,29,27,0.05)] mb-6">
-          {([
-            ["login", "登录"],
-            ["register", "注册"],
-          ] as const).map(([value, label]) => {
-            const active = mode === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setMode(value);
-                  setError(null);
-                }}
-                className={clsx(
-                  "border-none rounded-full py-[10px] cursor-pointer text-sm font-semibold font-ui transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
-                  active
-                    ? "bg-text-primary text-bg-primary"
-                    : "bg-transparent text-text-secondary",
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
+        {/* Specimen card — three-column dl like a field notebook */}
+        <div className="relative z-10 space-y-6 animate-slide-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
+          <dl className="grid grid-cols-3 gap-6 max-w-2xl border-t border-accent/25 pt-6">
+            {([
+              ["01", "Merge", "并入共识"],
+              ["02", "Branch", "分出支线"],
+              ["03", "Reflect", "反思修正"],
+            ] as const).map(([n, en, zh]) => (
+              <div key={n} className="space-y-1.5">
+                <dt className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent flex items-baseline gap-2">
+                  <span className="font-bold tabular-nums">{n}</span>
+                  <span>{en}</span>
+                </dt>
+                <dd className="font-content italic text-[17px] text-text-secondary">
+                  {zh}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.32em] text-text-tertiary">
+            <span>Specimen № {issueId}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              est. 2026 / alpha
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ═══ RIGHT — form panel ═══ */}
+      <section className="flex-1 bg-bg-elevated relative flex items-center justify-center p-8 sm:p-12 lg:p-16 xl:p-20">
+        {/* Floating page number — top right */}
+        <div className="absolute top-6 right-8 md:top-10 md:right-10 font-mono text-[10px] uppercase tracking-[0.32em] text-text-tertiary tabular-nums">
+          pg. 01 / 01
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <label className="grid gap-[6px] text-text-primary">
-            <span className={FIELD_LABEL_CLASS}>用户名</span>
-            <input
+        <div
+          className="w-full max-w-[420px] space-y-10 animate-slide-up"
+          style={{ animationDelay: "60ms", animationFillMode: "both" }}
+        >
+          {/* Mobile-only brand */}
+          <div className="md:hidden flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.32em] text-accent">
+            <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden>
+              <path
+                d="M 6 1 L 11 10.5 L 1 10.5 Z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+              />
+            </svg>
+            <span>RhizoDelta · Rhizomatic Field Notes</span>
+          </div>
+
+          {/* Heading */}
+          <header className="space-y-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-accent">
+              {mode === "login" ? "Authenticate / 认证" : "Enrol / 加入"}
+            </div>
+            <h2 className="font-content text-[40px] lg:text-[48px] leading-[1.0] tracking-[-0.025em] text-text-primary">
+              {mode === "login" ? (
+                <>
+                  Welcome <em className="italic text-accent">back</em>.
+                </>
+              ) : (
+                <>
+                  Begin a <em className="italic text-accent">thread</em>.
+                </>
+              )}
+            </h2>
+            <p className="font-content italic text-text-secondary text-base leading-[1.5]">
+              {mode === "login"
+                ? "使用已有账号进入图谱。"
+                : "第一次使用？注册一个 USER 身份即可。"}
+            </p>
+          </header>
+
+          {/* Mode tabs — two-line labels, underline for active */}
+          <div role="tablist" className="flex gap-10 border-b border-border-default">
+            {(
+              [
+                ["login", "登录", "Sign in"],
+                ["register", "注册", "Register"],
+              ] as const
+            ).map(([v, zh, en]) => {
+              const active = mode === v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setMode(v);
+                    setError(null);
+                  }}
+                  className={clsx(
+                    "relative pb-3 text-left transition-colors",
+                    active
+                      ? "text-text-primary"
+                      : "text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <span className="block font-mono text-[10px] uppercase tracking-[0.3em]">
+                    {en}
+                  </span>
+                  <span
+                    className={clsx(
+                      "block font-content text-base mt-0.5",
+                      active ? "italic" : "",
+                    )}
+                  >
+                    {zh}
+                  </span>
+                  {active && (
+                    <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-accent" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-7">
+            <Field
+              label="Username · 用户名"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={setUsername}
               placeholder="alice"
               autoComplete="username"
               required
-              className={INPUT_CLASS}
             />
-          </label>
 
-          {mode === "register" && (
-            <label className="grid gap-[6px] text-text-primary">
-              <span className={FIELD_LABEL_CLASS}>显示名称</span>
-              <input
+            {mode === "register" && (
+              <Field
+                label="Display name · 显示名称"
                 value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
+                onChange={setDisplayName}
                 placeholder="Alice"
-                className={INPUT_CLASS}
               />
-            </label>
-          )}
+            )}
 
-          <label className="grid gap-[6px] text-text-primary">
-            <span className={FIELD_LABEL_CLASS}>密码</span>
-            <input
+            <Field
+              label="Password · 密码"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
               placeholder="至少 8 位"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               required
-              className={INPUT_CLASS}
             />
-          </label>
 
-          {error && (
-            <div className="px-[14px] py-3 rounded-md bg-[rgba(196,69,58,0.06)] border border-[rgba(196,69,58,0.12)] text-danger text-sm leading-[1.5]">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className={clsx(
-              "border-none rounded-md px-[18px] py-[13px] bg-text-primary text-bg-primary text-base font-semibold font-ui mt-1 transition-[all] duration-[var(--transition-fast)] shadow-sm tracking-[0.01em]",
-              submitting ? "cursor-wait" : "cursor-pointer",
+            {error && (
+              <div className="relative border-l-2 border-danger pl-4 py-2 bg-danger/5">
+                <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-danger mb-1">
+                  Error / 错误
+                </div>
+                <div className="font-content text-sm text-text-primary leading-[1.5]">
+                  {error}
+                </div>
+              </div>
             )}
-          >
-            {submitting ? "提交中..." : mode === "login" ? "进入工作台" : "创建账号并登录"}
-          </button>
-        </form>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className={clsx(
+                "group relative w-full flex items-center justify-between border border-text-primary bg-text-primary text-bg-primary py-[14px] px-5 transition-all",
+                submitting
+                  ? "cursor-wait opacity-70"
+                  : "cursor-pointer hover:bg-accent hover:border-accent",
+              )}
+            >
+              <span className="font-mono text-[11px] uppercase tracking-[0.3em]">
+                {submitting
+                  ? "Authenticating…"
+                  : mode === "login"
+                    ? "Enter workbench"
+                    : "Create account"}
+              </span>
+              <span className="flex items-center gap-3">
+                <span className="font-content italic text-sm">
+                  {submitting
+                    ? "稍候"
+                    : mode === "login"
+                      ? "进入工作台"
+                      : "创建并登录"}
+                </span>
+                <span
+                  className="inline-block transition-transform duration-300 group-hover:translate-x-1"
+                  aria-hidden
+                >
+                  ↗
+                </span>
+              </span>
+            </button>
+          </form>
+
+          {/* Footer meta — like a journal colophon */}
+          <footer className="border-t border-border-default pt-6 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-text-tertiary">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1 h-1 rounded-full bg-success" />
+              Secure · JWT / ES256
+            </span>
+            <span>{mode === "login" ? "Returning member" : "New specimen"}</span>
+          </footer>
+        </div>
       </section>
     </main>
   );
