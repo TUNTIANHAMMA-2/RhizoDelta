@@ -4,7 +4,7 @@ import { useAuthStore } from "../../stores/authStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import { useNotificationStore } from "../../stores/notificationStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import clsx from "clsx";
 import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
@@ -26,8 +26,9 @@ const SSE_ANIM_CLASS = {
 const CAPSULE_SURFACE =
   "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150 border border-border-default shadow-sm";
 
-export function Header() {
+export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const sseStatus = useSseStore((s) => s.status);
   const roles = useAuthStore((s) => s.roles);
   const userId = useAuthStore((s) => s.userId);
@@ -42,6 +43,8 @@ export function Header() {
   const [userHovered, setUserHovered] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifContainerRef = useRef<HTMLDivElement>(null);
+
+  const onWorkspace = location.pathname.startsWith("/workspace");
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -69,23 +72,37 @@ export function Header() {
     <header className="fixed top-0 left-0 z-[100] flex items-start justify-between w-full p-4 pointer-events-none font-ui text-sm box-border">
       <div className="flex items-center relative w-full h-10">
         {/* Logo 胶囊 */}
-        <div
-          className={clsx(
-            CAPSULE_SURFACE,
-            "flex items-center h-10 rounded-lg px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
-          )}
-        >
-          <div className="shrink-0 flex items-center font-content font-normal text-text-primary text-md tracking-[-0.02em]">
-            RhizoDelt
-            <span
-              className={`${SSE_ANIM_CLASS[sseStatus]} text-lg ml-[2px]`}
-              aria-live="polite"
-              style={{ color: SSE_STATUS_COLOR[sseStatus] }}
-            >
-              △
-            </span>
+        {!hideLogo && (
+          <div
+            className={clsx(
+              CAPSULE_SURFACE,
+              "flex items-center h-10 rounded-lg px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
+              onWorkspace && "cursor-pointer group",
+            )}
+            onClick={onWorkspace ? () => navigate("/") : undefined}
+            role={onWorkspace ? "link" : undefined}
+            aria-label={onWorkspace ? "Back to home" : undefined}
+          >
+            {onWorkspace && (
+              <span
+                className="mr-2 text-text-tertiary group-hover:text-accent transition-colors"
+                aria-hidden
+              >
+                ←
+              </span>
+            )}
+            <div className="shrink-0 flex items-center font-content font-normal text-text-primary text-md tracking-[-0.02em]">
+              RhizoDelt
+              <span
+                className={`${SSE_ANIM_CLASS[sseStatus]} text-lg ml-[2px]`}
+                aria-live="polite"
+                style={{ color: SSE_STATUS_COLOR[sseStatus] }}
+              >
+                △
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 面包屑胶囊 */}
         <div

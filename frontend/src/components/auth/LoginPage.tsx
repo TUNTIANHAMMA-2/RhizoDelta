@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { request } from "../../api/client";
 import { useAuthStore } from "../../stores/authStore";
+import { metaLabel } from "../../lib/typography";
+import { WordMark } from "../brand/WordMark";
 
 type Mode = "login" | "register";
 
@@ -29,7 +31,13 @@ type FieldProps = {
 function Field({ label, value, onChange, ...rest }: FieldProps) {
   return (
     <label className="block group">
-      <span className="block font-mono text-[10px] uppercase tracking-[0.28em] text-text-tertiary mb-2 transition-colors group-focus-within:text-accent">
+      <span
+        className={clsx(
+          "block",
+          metaLabel,
+          "text-text-tertiary mb-2 transition-colors group-focus-within:text-accent",
+        )}
+      >
         {label}
       </span>
       <input
@@ -181,44 +189,25 @@ export function LoginPage() {
     }
   };
 
-  const now = new Date();
-  const issueId = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
   return (
     <main className="min-h-screen flex flex-col md:flex-row font-ui">
       {/* ═══ LEFT — editorial panel ═══ */}
       <aside
-        className="hidden md:flex md:flex-[1.15] lg:flex-[1.25] relative overflow-hidden flex-col justify-between p-12 lg:p-16 xl:p-20 animate-fade-in"
-        style={{ background: "#F0EDE4" }}
+        className="hidden md:flex md:flex-1 lg:flex-[7] bg-bg-parchment relative overflow-hidden flex-col justify-between p-12 lg:p-16 xl:p-20 animate-fade-in"
       >
         <RhizomeBackdrop />
 
         {/* Masthead */}
-        <header className="relative z-10 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.32em] text-text-secondary">
-          <span className="flex items-center gap-2.5">
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-              <path
-                d="M 6 1 L 11 10.5 L 1 10.5 Z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-            </svg>
-            <span>RhizoDelta</span>
-            <span className="text-text-tertiary">·</span>
-            <span className="text-text-tertiary">Rhizomatic Field Notes</span>
-          </span>
-          <span className="tabular-nums">№ {issueId}</span>
+        <header className="relative z-10 inline-block">
+          <WordMark className="block text-[26px] leading-none" />
+          <div className="mt-2.5 h-px w-32 bg-accent/40" />
+          <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-text-tertiary">
+            A thinking thicket · in threads
+          </div>
         </header>
 
         {/* Manifesto — big editorial title */}
         <div className="relative z-10 max-w-xl space-y-7 animate-slide-up" style={{ animationDelay: "120ms", animationFillMode: "both" }}>
-          <div className="flex items-baseline gap-4 font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
-            <span className="font-bold">04</span>
-            <span className="w-10 h-px bg-accent/60" />
-            <span>Observatory / 观察台</span>
-          </div>
-
           <h1 className="font-content text-[64px] lg:text-[84px] xl:text-[96px] leading-[0.9] tracking-[-0.035em] text-text-primary">
             谱系
             <br />
@@ -226,11 +215,8 @@ export function LoginPage() {
               className="italic font-light text-accent"
               style={{ fontFeatureSettings: "'ss01'" }}
             >
-              工作台
+              丛林
             </em>
-            <span className="font-mono text-[11px] align-super text-text-tertiary not-italic ml-2 tracking-[0.1em]">
-              v0.1
-            </span>
           </h1>
 
           <p className="font-content text-lg lg:text-xl leading-[1.55] text-text-secondary max-w-lg font-light">
@@ -241,65 +227,44 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Specimen card — three-column dl like a field notebook */}
-        <div className="relative z-10 space-y-6 animate-slide-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
-          <dl className="grid grid-cols-3 gap-6 max-w-2xl border-t border-accent/25 pt-6">
-            {([
-              ["01", "Merge", "并入共识"],
-              ["02", "Branch", "分出支线"],
-              ["03", "Reflect", "反思修正"],
-            ] as const).map(([n, en, zh]) => (
-              <div key={n} className="space-y-1.5">
-                <dt className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent flex items-baseline gap-2">
-                  <span className="font-bold tabular-nums">{n}</span>
-                  <span>{en}</span>
-                </dt>
-                <dd className="font-content italic text-[17px] text-text-secondary">
-                  {zh}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.32em] text-text-tertiary">
-            <span>Specimen № {issueId}</span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              est. 2026 / alpha
-            </span>
-          </div>
-        </div>
+        {/* Footer index — three movements */}
+        <dl className="relative z-10 grid grid-cols-3 gap-10 max-w-2xl animate-slide-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
+          {([
+            ["01", "Merge", "并入共识"],
+            ["02", "Branch", "分出支线"],
+            ["03", "Reflect", "反思修正"],
+          ] as const).map(([n, en, zh]) => (
+            <div key={n} className="space-y-2 border-l border-accent/25 pl-4">
+              <dt className={clsx(metaLabel, "text-accent flex items-baseline gap-2")}>
+                <span className="font-bold tabular-nums">{n}</span>
+                <span>{en}</span>
+              </dt>
+              <dd className="font-content italic text-[17px] text-text-secondary">
+                {zh}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </aside>
 
       {/* ═══ RIGHT — form panel ═══ */}
-      <section className="flex-1 bg-bg-elevated relative flex items-center justify-center p-8 sm:p-12 lg:p-16 xl:p-20">
-        {/* Floating page number — top right */}
-        <div className="absolute top-6 right-8 md:top-10 md:right-10 font-mono text-[10px] uppercase tracking-[0.32em] text-text-tertiary tabular-nums">
-          pg. 01 / 01
-        </div>
-
+      <section className="flex-1 lg:flex-[3] bg-bg-elevated relative flex items-center justify-center p-8 sm:p-12 lg:p-16 xl:p-20">
         <div
           className="w-full max-w-[420px] space-y-10 animate-slide-up"
           style={{ animationDelay: "60ms", animationFillMode: "both" }}
         >
           {/* Mobile-only brand */}
-          <div className="md:hidden flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.32em] text-accent">
-            <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden>
-              <path
-                d="M 6 1 L 11 10.5 L 1 10.5 Z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-            </svg>
-            <span>RhizoDelta · Rhizomatic Field Notes</span>
+          <div className="md:hidden space-y-1.5">
+            <h1>
+              <WordMark className="block text-[22px] leading-none" />
+            </h1>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
+              A thinking thicket · in threads
+            </div>
           </div>
 
           {/* Heading */}
           <header className="space-y-3">
-            <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-accent">
-              {mode === "login" ? "Authenticate / 认证" : "Enrol / 加入"}
-            </div>
             <h2 className="font-content text-[40px] lg:text-[48px] leading-[1.0] tracking-[-0.025em] text-text-primary">
               {mode === "login" ? (
                 <>
@@ -314,7 +279,7 @@ export function LoginPage() {
             <p className="font-content italic text-text-secondary text-base leading-[1.5]">
               {mode === "login"
                 ? "使用已有账号进入图谱。"
-                : "第一次使用？注册一个 USER 身份即可。"}
+                : "第一次使用？注册一个账号即可。"}
             </p>
           </header>
 
@@ -344,7 +309,7 @@ export function LoginPage() {
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
-                  <span className="block font-mono text-[10px] uppercase tracking-[0.3em]">
+                  <span className={clsx("block", metaLabel)}>
                     {en}
                   </span>
                   <span
@@ -395,7 +360,7 @@ export function LoginPage() {
 
             {error && (
               <div className="relative border-l-2 border-danger pl-4 py-2 bg-danger/5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-danger mb-1">
+                <div className={clsx(metaLabel, "text-danger mb-1")}>
                   Error / 错误
                 </div>
                 <div className="font-content text-sm text-text-primary leading-[1.5]">
@@ -414,11 +379,11 @@ export function LoginPage() {
                   : "cursor-pointer hover:bg-accent hover:border-accent",
               )}
             >
-              <span className="font-mono text-[11px] uppercase tracking-[0.3em]">
+              <span className="font-mono text-[12px] tracking-[0.06em]">
                 {submitting
                   ? "Authenticating…"
                   : mode === "login"
-                    ? "Enter workbench"
+                    ? "Enter the thicket"
                     : "Create account"}
               </span>
               <span className="flex items-center gap-3">
@@ -426,7 +391,7 @@ export function LoginPage() {
                   {submitting
                     ? "稍候"
                     : mode === "login"
-                      ? "进入工作台"
+                      ? "进入丛林"
                       : "创建并登录"}
                 </span>
                 <span
@@ -440,12 +405,17 @@ export function LoginPage() {
           </form>
 
           {/* Footer meta — like a journal colophon */}
-          <footer className="border-t border-border-default pt-6 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.3em] text-text-tertiary">
+          <footer
+            className={clsx(
+              "border-t border-border-default pt-6 flex items-center justify-between text-text-tertiary",
+              metaLabel,
+            )}
+          >
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-1 h-1 rounded-full bg-success" />
               Secure · JWT / ES256
             </span>
-            <span>{mode === "login" ? "Returning member" : "New specimen"}</span>
+            <span>{mode === "login" ? "Returning member" : "New thread"}</span>
           </footer>
         </div>
       </section>

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { useUiStore } from "../stores/uiStore";
 import { useGraphStore } from "../stores/graphStore";
 import { useSse } from "../hooks/useSse";
@@ -47,6 +48,7 @@ function CanvasModeSwitch() {
 }
 
 export function GraphWorkspace() {
+  const { rhizomeId } = useParams<{ rhizomeId?: string }>();
   const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
   const rightPanelMode = useUiStore((s) => s.rightPanelMode);
   const isMobileMenuOpen = useUiStore((s) => s.isMobileMenuOpen);
@@ -61,6 +63,18 @@ export function GraphWorkspace() {
   const loadChildren = useGraphStore((s) => s.loadChildren);
 
   useEffect(() => {
+    // Priority: route param → first available rhizome
+    if (rhizomeId) {
+      loadGraphForRoot(rhizomeId, {
+        loadLineage,
+        loadChildren,
+        onChildrenError: console.error,
+      }).catch(console.error);
+      // Also load the rhizome list in the background for the sidebar
+      loadRhizomes().catch(console.error);
+      return;
+    }
+
     loadRhizomes()
       .then(async () => {
         const rootNodeId = useGraphStore.getState().rhizomes[0]?.node_id;
@@ -74,7 +88,7 @@ export function GraphWorkspace() {
         });
       })
       .catch(console.error);
-  }, [loadRhizomes, loadLineage, loadChildren]);
+  }, [rhizomeId, loadRhizomes, loadLineage, loadChildren]);
 
   useSse();
 
