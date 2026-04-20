@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,18 @@ import java.util.Map;
 public class DatabaseInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseInitializer.class);
     private static final String VECTOR_INDEX_NAME = "rhizodelta_graph_node_embedding_idx";
+    private static final int USER_ID_INTEGRITY_LIMIT = 20;
+    private static final String NULL_OR_BLANK_USER_ID_QUERY = """
+            MATCH (u:UserAccount)
+            WHERE u.user_id IS NULL OR trim(u.user_id) = ''
+            RETURN u.username AS username LIMIT %d
+            """.formatted(USER_ID_INTEGRITY_LIMIT).trim();
+    private static final String DUPLICATE_USER_ID_QUERY = """
+            MATCH (u:UserAccount)
+            WITH u.user_id AS uid, collect(u.username) AS names, count(*) AS n
+            WHERE n > 1
+            RETURN uid, names LIMIT %d
+            """.formatted(USER_ID_INTEGRITY_LIMIT).trim();
 
     private static final List<String> SCHEMA_QUERIES = List.of(
             "CREATE CONSTRAINT rhizodelta_graph_node_node_id_unique IF NOT EXISTS FOR (n:GraphNode) REQUIRE n.node_id IS UNIQUE",
@@ -61,11 +74,21 @@ public class DatabaseInitializer {
      */
     @PostConstruct
     void initializeSchema() {
+        verifyUserIdIntegrity();
         for (String query : SCHEMA_QUERIES) {
             executeSchemaQuery(query);
         }
         executeSchemaQuery(buildVectorIndexQuery());
         logConstraintStatus();
+    }
+
+    private void verifyUserIdIntegrity() {
+        List<Map<String, Object>> blankViolations = runReadOnlyIntegrityQuery(NULL_OR_BLANK_USER_ID_QUERY);
+        List<Map<String, Object>> duplicateViolations = runReadOnlyIntegrityQuery(DUPLICATE_USER_ID_QUERY);
+        if (blankViolations.isEmpty() && duplicateViolations.isEmpty()) {
+            return;
+        }
+        throw new IllegalStateException(buildIntegrityViolationMessage(blankViolations, duplicateViolations));
     }
 
     /**
@@ -81,6 +104,66 @@ public class DatabaseInitializer {
             LOGGER.error("Failed to apply schema query: {}", query, exception);
             throw new IllegalStateException("Neo4j schema initialization failed", exception);
         }
+    }
+
+    private List<Map<String, Object>> runReadOnlyIntegrityQuery(String query) {
+        try {
+            return List.copyOf(neo4jClient.query(query).fetch().all());
+        } catch (Exception exception) {
+            throw new IllegalStateException("Neo4j user_id integrity pre-check failed", exception);
+        }
+    }
+
+    private String buildIntegrityViolationMessage(
+            List<Map<String, Object>> blankViolations,
+            List<Map<String, Object>> duplicateViolations
+    ) {
+        List<String> sections = new ArrayList<>();
+        if (!blankViolations.isEmpty()) {
+            sections.add("blank user_id usernames=" + formatBlankViolations(blankViolations));
+        }
+        if (!duplicateViolations.isEmpty()) {
+            sections.add("duplicate user_id entries=" + formatDuplicateViolations(duplicateViolations));
+        }
+        return "UserAccount user_id integrity violation: " + String.join("; ", sections);
+    }
+
+    private String formatBlankViolations(List<Map<String, Object>> blankViolations) {
+        return blankViolations.stream()
+                .map(violation -> readText(violation.get("username"), "<missing username>"))
+                .toList()
+                .toString();
+    }
+
+    private String formatDuplicateViolations(List<Map<String, Object>> duplicateViolations) {
+        return duplicateViolations.stream()
+                .map(this::formatDuplicateViolation)
+                .toList()
+                .toString();
+    }
+
+    private String formatDuplicateViolation(Map<String, Object> violation) {
+        String userId = readText(violation.get("uid"), "<null user_id>");
+        String usernames = formatUsernames(violation.get("names"));
+        return userId + " -> " + usernames;
+    }
+
+    private String formatUsernames(Object value) {
+        if (!(value instanceof Collection<?> usernames)) {
+            return "[]";
+        }
+        return usernames.stream()
+                .map(username -> readText(username, "<missing username>"))
+                .toList()
+                .toString();
+    }
+
+    private String readText(Object value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String text = value.toString();
+        return text.isBlank() ? fallback : text;
     }
 
     /**
