@@ -39,6 +39,20 @@ public class DatabaseInitializer {
             WHERE n > 1
             RETURN uid, names LIMIT %d
             """.formatted(USER_ID_INTEGRITY_LIMIT).trim();
+    private static final String SHOW_RHIZODELTA_CONSTRAINTS_QUERY = """
+            SHOW CONSTRAINTS
+            YIELD name
+            WHERE name STARTS WITH 'rhizodelta_'
+            RETURN name
+            ORDER BY name
+            """.trim();
+    private static final String SHOW_RHIZODELTA_INDEXES_QUERY = """
+            SHOW INDEXES
+            YIELD name
+            WHERE name STARTS WITH 'rhizodelta_'
+            RETURN name
+            ORDER BY name
+            """.trim();
 
     private static final List<String> SCHEMA_QUERIES = List.of(
             "CREATE CONSTRAINT rhizodelta_graph_node_node_id_unique IF NOT EXISTS FOR (n:GraphNode) REQUIRE n.node_id IS UNIQUE",
@@ -53,7 +67,10 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_human_post_operation_id_idx IF NOT EXISTS FOR (n:Human_Post) ON (n.operation_id)",
             "CREATE INDEX rhizodelta_conceptual_overlap_association_id_idx IF NOT EXISTS FOR ()-[r:CONCEPTUAL_OVERLAP]-() ON (r.association_id)",
             "CREATE INDEX rhizodelta_relates_to_association_id_idx IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.association_id)",
-            "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE"
+            "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE",
+            "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE",
+            "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)",
+            "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)"
     );
 
     private final Neo4jClient neo4jClient;
@@ -170,14 +187,14 @@ public class DatabaseInitializer {
      * 输出当前 RhizoDelta 相关约束和索引状态。
      */
     private void logConstraintStatus() {
-        Collection<Map<String, Object>> constraints = neo4jClient.query("""
-                SHOW CONSTRAINTS
-                YIELD name
-                WHERE name STARTS WITH 'rhizodelta_'
-                RETURN name
-                ORDER BY name
-                """).fetch().all();
-        LOGGER.info("Neo4j constraints/indexes verified: {}", constraints);
+        List<Map<String, Object>> schemaEntries = new ArrayList<>();
+        schemaEntries.addAll(fetchSchemaEntries(SHOW_RHIZODELTA_CONSTRAINTS_QUERY));
+        schemaEntries.addAll(fetchSchemaEntries(SHOW_RHIZODELTA_INDEXES_QUERY));
+        LOGGER.info("Neo4j constraints/indexes verified: {}", schemaEntries);
+    }
+
+    private Collection<Map<String, Object>> fetchSchemaEntries(String query) {
+        return neo4jClient.query(query).fetch().all();
     }
 
     /**

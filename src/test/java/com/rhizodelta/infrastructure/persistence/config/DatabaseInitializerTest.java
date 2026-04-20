@@ -21,6 +21,12 @@ class DatabaseInitializerTest {
     private static final int EMBEDDING_DIMENSION = 1024;
     private static final String FIRST_SCHEMA_QUERY =
             "CREATE CONSTRAINT rhizodelta_graph_node_node_id_unique IF NOT EXISTS FOR (n:GraphNode) REQUIRE n.node_id IS UNIQUE";
+    private static final String USER_ACCOUNT_USER_ID_UNIQUE_QUERY =
+            "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE";
+    private static final String USER_ACCOUNT_USER_ID_INDEX_QUERY =
+            "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)";
+    private static final String USER_ACCOUNT_STATUS_INDEX_QUERY =
+            "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)";
 
     @Test
     void initializeSchemaShouldCreateAssociationRelationshipIndexes() {
@@ -59,6 +65,19 @@ class DatabaseInitializerTest {
     }
 
     @Test
+    void initializeSchemaShouldCreateUserAccountConstraintAndIndexes() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(USER_ACCOUNT_USER_ID_UNIQUE_QUERY);
+        verify(neo4jClient).query(USER_ACCOUNT_USER_ID_INDEX_QUERY);
+        verify(neo4jClient).query(USER_ACCOUNT_STATUS_INDEX_QUERY);
+    }
+
+    @Test
     void initializeSchemaShouldVerifyUserIdIntegrityBeforeSchemaQueries() {
         Neo4jClient neo4jClient = mockNeo4jClient(List.of(), List.of());
 
@@ -92,6 +111,26 @@ class DatabaseInitializerTest {
                 .contains("RETURN uid, names LIMIT 20");
         assertReadOnly(queries.get(blankQueryIndex));
         assertReadOnly(queries.get(duplicateQueryIndex));
+    }
+
+    @Test
+    void initializeSchemaShouldInspectIndexesDuringVerificationLogging() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(argThat((String query) ->
+                query != null
+                        && query.contains("SHOW CONSTRAINTS")
+                        && query.contains("WHERE name STARTS WITH 'rhizodelta_'")
+        ));
+        verify(neo4jClient).query(argThat((String query) ->
+                query != null
+                        && query.contains("SHOW INDEXES")
+                        && query.contains("WHERE name STARTS WITH 'rhizodelta_'")
+        ));
     }
 
     @Test
