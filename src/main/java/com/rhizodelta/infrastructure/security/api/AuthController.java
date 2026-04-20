@@ -68,6 +68,7 @@ public class AuthController {
               user.display_name = $displayName,
               user.password_hash = $passwordHash,
               user.roles = $roles,
+              user.status = 'ACTIVE',
               user.created_at = datetime()
             RETURN user.user_id AS userId,
                    user.username AS username,
