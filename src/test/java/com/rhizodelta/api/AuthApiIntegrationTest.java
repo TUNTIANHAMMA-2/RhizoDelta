@@ -1,6 +1,7 @@
 package com.rhizodelta.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,7 +79,7 @@ class AuthApiIntegrationTest {
         assertThat(user.get("display_name")).isEqualTo("Alice");
         assertThat(user.get("roles")).isEqualTo(List.of("USER"));
         assertThat(user.get("user_id")).isEqualTo(storedUser.get("userId"));
-        assertThat(storedUser.get("status")).isEqualTo("ACTIVE");
+        assertThat(storedUser.get("status")).isEqualTo(UserStatus.ACTIVE.name());
         assertThat(storedUser.get("passwordHash").toString())
                 .startsWith("$2")
                 .isNotEqualTo("password123");

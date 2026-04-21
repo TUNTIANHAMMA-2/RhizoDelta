@@ -1,6 +1,7 @@
 package com.rhizodelta.api;
 
 import com.rhizodelta.RhizoDeltaApplication;
+import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
@@ -74,7 +75,7 @@ class UserIdentitySchemaIntegrationTest {
                     Map.class
             );
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-            assertThat(fetchUserStatus(app.driver(), "alice")).isEqualTo("ACTIVE");
+            assertThat(fetchUserStatus(app.driver(), "alice")).isEqualTo(UserStatus.ACTIVE.name());
         });
     }
 
@@ -201,11 +202,15 @@ class UserIdentitySchemaIntegrationTest {
                   display_name: $username,
                   password_hash: 'hash',
                   roles: ['USER'],
-                  status: 'ACTIVE',
+                  status: $statusValue,
                   created_at: datetime()
                 })
                 """)
-                .bindAll(Map.of("username", username, "userId", userId))
+                .bindAll(Map.of(
+                        "username", username,
+                        "userId", userId,
+                        "statusValue", UserStatus.ACTIVE.name()
+                ))
                 .run();
     }
 

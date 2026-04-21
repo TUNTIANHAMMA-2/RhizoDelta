@@ -2,6 +2,7 @@ package com.rhizodelta.infrastructure.security.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.infrastructure.web.ApiResponse;
+import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -68,7 +69,7 @@ public class AuthController {
               user.display_name = $displayName,
               user.password_hash = $passwordHash,
               user.roles = $roles,
-              user.status = 'ACTIVE',
+              user.status = $statusValue,
               user.created_at = datetime()
             RETURN user.user_id AS userId,
                    user.username AS username,
@@ -141,7 +142,8 @@ public class AuthController {
                         "username", request.username().trim(),
                         "displayName", displayName,
                         "passwordHash", passwordHash,
-                        "roles", DEFAULT_ROLES
+                        "roles", DEFAULT_ROLES,
+                        "statusValue", UserStatus.ACTIVE.name()
                 ))
                 .fetch()
                 .one()
