@@ -88,6 +88,17 @@ class UserIdentitySchemaIntegrationTest {
     }
 
     @Test
+    void startupShouldFailWhenSeededUserHasWhitespaceUserId() {
+        Throwable failure = startApplicationFailure(
+                driver -> createUserWithWhitespaceUserId(driver, "whitespace-user"));
+
+        assertThat(failure).isNotNull();
+        String message = rootCause(failure).getMessage();
+        assertThat(message).contains("whitespace-user");
+        assertThat(message).contains("blank user_id");
+    }
+
+    @Test
     void startupShouldFailWhenSeededUsersShareDuplicateUserId() {
         Throwable failure = startApplicationFailure(driver -> {
             createUser(driver, "dup-a", "dup-1");
@@ -192,6 +203,19 @@ class UserIdentitySchemaIntegrationTest {
                   created_at: datetime()
                 })
                 """, Map.of("username", username));
+    }
+
+    private static void createUserWithWhitespaceUserId(Driver driver, String username) {
+        runWrite(driver, """
+                CREATE (:UserAccount {
+                  username: $username,
+                  user_id: $userId,
+                  display_name: $username,
+                  password_hash: 'hash',
+                  roles: ['USER'],
+                  created_at: datetime()
+                })
+                """, Map.of("username", username, "userId", "   "));
     }
 
     private static void createUserWithNeo4jClient(Neo4jClient neo4jClient, String username, String userId) {
