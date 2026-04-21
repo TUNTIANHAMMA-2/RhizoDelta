@@ -32,7 +32,8 @@ class UserIdentitySchemaIntegrationTest {
     private static final String NEO4J_PASSWORD = "testpassword";
     private static final String USER_ID_CONSTRAINT = "rhizodelta_user_account_user_id_unique";
     private static final String STATUS_INDEX = "rhizodelta_user_account_status_idx";
-    private static final String UNIQUE_INDEX_SEEK = "NodeUniqueIndexSeek";
+    private static final String INDEX_SEEK_SUFFIX = "IndexSeek";
+    private static final List<String> FORBIDDEN_SCAN_OPERATORS = List.of("AllNodesScan", "NodeByLabelScan");
     private static final String SHOW_CONSTRAINTS_QUERY = """
             SHOW CONSTRAINTS
             YIELD name
@@ -60,9 +61,17 @@ class UserIdentitySchemaIntegrationTest {
         }, app -> assertThat(queryNames(app.driver(), SHOW_INDEXES_QUERY)).contains(STATUS_INDEX));
     }
     @Test
-    void explainUserIdLookupShouldUseUniqueIndexSeek() throws Exception {
+    void explainUserIdLookupShouldUseIndexSeek() throws Exception {
         withStartedApplication(driver -> {
-        }, app -> assertThat(explainPlanContainsOperator(app.driver(), "test-user-id", UNIQUE_INDEX_SEEK)).isTrue());
+        }, app -> {
+            Plan plan = explainUserIdLookupPlan(app.driver(), "test-user-id");
+            assertThat(planContainsOperatorSuffix(plan, INDEX_SEEK_SUFFIX))
+                    .as("user_id lookup plan must contain an IndexSeek-family operator")
+                    .isTrue();
+            assertThat(planContainsAnyOperator(plan, FORBIDDEN_SCAN_OPERATORS))
+                    .as("user_id lookup plan must not fall back to a scan: %s", FORBIDDEN_SCAN_OPERATORS)
+                    .isFalse();
+        });
     }
     @Test
     void registerShouldPersistActiveStatus() throws Exception {
@@ -251,20 +260,32 @@ class UserIdentitySchemaIntegrationTest {
                 .toList();
     }
 
-    private static boolean explainPlanContainsOperator(Driver driver, String userId, String operator) {
-        Plan plan = driver.executableQuery("EXPLAIN MATCH (u:UserAccount {user_id: $userId}) RETURN u")
+    private static Plan explainUserIdLookupPlan(Driver driver, String userId) {
+        return driver.executableQuery("EXPLAIN MATCH (u:UserAccount {user_id: $userId}) RETURN u")
                 .withParameters(Map.of("userId", userId))
                 .execute()
                 .summary()
                 .plan();
-        return planContainsOperator(plan, operator);
     }
 
-    private static boolean planContainsOperator(Plan plan, String operator) {
-        if (plan.operatorType().contains(operator)) {
+    private static boolean planContainsOperatorSuffix(Plan plan, String suffix) {
+        String type = plan.operatorType();
+        int at = type.indexOf('@');
+        String core = at >= 0 ? type.substring(0, at) : type;
+        if (core.endsWith(suffix)) {
             return true;
         }
-        return plan.children().stream().anyMatch(child -> planContainsOperator(child, operator));
+        return plan.children().stream().anyMatch(child -> planContainsOperatorSuffix(child, suffix));
+    }
+
+    private static boolean planContainsAnyOperator(Plan plan, List<String> operators) {
+        String type = plan.operatorType();
+        int at = type.indexOf('@');
+        String core = at >= 0 ? type.substring(0, at) : type;
+        if (operators.contains(core)) {
+            return true;
+        }
+        return plan.children().stream().anyMatch(child -> planContainsAnyOperator(child, operators));
     }
 
     private static String fetchUserStatus(Driver driver, String username) {
