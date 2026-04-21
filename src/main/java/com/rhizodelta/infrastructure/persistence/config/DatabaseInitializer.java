@@ -35,10 +35,10 @@ public class DatabaseInitializer {
             """.formatted(USER_ID_INTEGRITY_LIMIT).trim();
     private static final String DUPLICATE_USER_ID_QUERY = """
             MATCH (u:UserAccount)
-            WITH u.user_id AS uid, collect(u.username) AS names, count(*) AS n
+            WITH u.user_id AS uid, collect(u.username)[0..%d] AS names, count(*) AS n
             WHERE n > 1
-            RETURN uid, names LIMIT %d
-            """.formatted(USER_ID_INTEGRITY_LIMIT).trim();
+            RETURN uid, names, n LIMIT %d
+            """.formatted(USER_ID_INTEGRITY_LIMIT, USER_ID_INTEGRITY_LIMIT).trim();
     private static final String SHOW_RHIZODELTA_CONSTRAINTS_QUERY = """
             SHOW CONSTRAINTS
             YIELD name
@@ -161,7 +161,17 @@ public class DatabaseInitializer {
     private String formatDuplicateViolation(Map<String, Object> violation) {
         String userId = readText(violation.get("uid"), "<null user_id>");
         String usernames = formatUsernames(violation.get("names"));
-        return userId + " -> " + usernames;
+        long total = readLong(violation.get("n"));
+        return total > 0
+                ? userId + " -> " + usernames + " (total=" + total + ")"
+                : userId + " -> " + usernames;
+    }
+
+    private long readLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return 0L;
     }
 
     private String formatUsernames(Object value) {

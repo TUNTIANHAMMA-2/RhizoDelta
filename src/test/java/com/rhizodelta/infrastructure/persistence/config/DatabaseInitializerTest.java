@@ -95,7 +95,7 @@ class DatabaseInitializerTest {
         int blankQueryIndex = findQueryIndex(queries, "WHERE u.user_id IS NULL OR trim(u.user_id) = ''");
         int duplicateQueryIndex = findQueryIndex(
                 queries,
-                "WITH u.user_id AS uid, collect(u.username) AS names, count(*) AS n"
+                "WITH u.user_id AS uid, collect(u.username)[0..20] AS names, count(*) AS n"
         );
         int schemaQueryIndex = queries.indexOf(FIRST_SCHEMA_QUERY);
 
@@ -108,7 +108,7 @@ class DatabaseInitializerTest {
         assertThat(queries.get(duplicateQueryIndex))
                 .contains("MATCH (u:UserAccount)")
                 .contains("WHERE n > 1")
-                .contains("RETURN uid, names LIMIT 20");
+                .contains("RETURN uid, names, n LIMIT 20");
         assertReadOnly(queries.get(blankQueryIndex));
         assertReadOnly(queries.get(duplicateQueryIndex));
     }
@@ -152,7 +152,7 @@ class DatabaseInitializerTest {
     void initializeSchemaShouldFailWhenUserIdIsDuplicated() {
         Neo4jClient neo4jClient = mockNeo4jClient(
                 List.of(),
-                List.of(Map.of("uid", "dup-1", "names", List.of("alice", "bob")))
+                List.of(Map.of("uid", "dup-1", "names", List.of("alice", "bob"), "n", 2L))
         );
         DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
 
@@ -161,7 +161,8 @@ class DatabaseInitializerTest {
                 .hasMessageContaining("duplicate user_id entries")
                 .hasMessageContaining("dup-1")
                 .hasMessageContaining("alice")
-                .hasMessageContaining("bob");
+                .hasMessageContaining("bob")
+                .hasMessageContaining("total=2");
         verify(neo4jClient, never()).query(FIRST_SCHEMA_QUERY);
     }
 
@@ -207,7 +208,7 @@ class DatabaseInitializerTest {
                 query != null && query.contains("WHERE u.user_id IS NULL OR trim(u.user_id) = ''")
         )).fetch().all()).thenReturn(blankViolations);
         when(neo4jClient.query(argThat((String query) ->
-                query != null && query.contains("WITH u.user_id AS uid, collect(u.username) AS names, count(*) AS n")
+                query != null && query.contains("WITH u.user_id AS uid, collect(u.username)[0..20] AS names, count(*) AS n")
         )).fetch().all()).thenReturn(duplicateViolations);
         return neo4jClient;
     }
