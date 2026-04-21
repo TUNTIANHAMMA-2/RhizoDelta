@@ -23,8 +23,6 @@ class DatabaseInitializerTest {
             "CREATE CONSTRAINT rhizodelta_graph_node_node_id_unique IF NOT EXISTS FOR (n:GraphNode) REQUIRE n.node_id IS UNIQUE";
     private static final String USER_ACCOUNT_USER_ID_UNIQUE_QUERY =
             "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE";
-    private static final String USER_ACCOUNT_USER_ID_INDEX_QUERY =
-            "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)";
     private static final String USER_ACCOUNT_STATUS_INDEX_QUERY =
             "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)";
 
@@ -65,7 +63,7 @@ class DatabaseInitializerTest {
     }
 
     @Test
-    void initializeSchemaShouldCreateUserAccountConstraintAndIndexes() {
+    void initializeSchemaShouldCreateUserAccountConstraintAndStatusIndex() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
         DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
@@ -73,8 +71,10 @@ class DatabaseInitializerTest {
         initializer.initializeSchema();
 
         verify(neo4jClient).query(USER_ACCOUNT_USER_ID_UNIQUE_QUERY);
-        verify(neo4jClient).query(USER_ACCOUNT_USER_ID_INDEX_QUERY);
         verify(neo4jClient).query(USER_ACCOUNT_STATUS_INDEX_QUERY);
+        verify(neo4jClient, never()).query(
+                "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)"
+        );
     }
 
     @Test
