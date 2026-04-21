@@ -1,5 +1,6 @@
 package com.rhizodelta.infrastructure.security.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.domain.UserStatus;
@@ -242,7 +243,13 @@ public class AuthController {
 
     /**
      * 表示注册请求。
+     *
+     * <p>显式忽略未知字段，避免依赖全局 {@code ObjectMapper} 配置；
+     * 这样即使未来某处启用了 {@code FAIL_ON_UNKNOWN_PROPERTIES}，
+     * 注册端点仍然会安全地丢弃客户端提交的 {@code user_id} 等字段，
+     * 而不会升级为 400。详见 {@code user-identity-hardening} D2。
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record RegisterRequest(
             @JsonProperty("username") String username,
             @JsonProperty("password") String password,

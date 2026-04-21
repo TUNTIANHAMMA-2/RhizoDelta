@@ -1,6 +1,7 @@
 package com.rhizodelta.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rhizodelta.infrastructure.security.api.AuthController;
 import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,6 +103,15 @@ class AuthApiIntegrationTest {
         UUID.fromString(actualUserId);
         assertThat(actualUserId).isNotEqualTo(clientUserId);
         assertThat(findUserRecord("ignored-id").get("userId")).isEqualTo(actualUserId);
+
+        com.fasterxml.jackson.annotation.JsonIgnoreProperties annotation =
+                AuthController.RegisterRequest.class.getAnnotation(
+                        com.fasterxml.jackson.annotation.JsonIgnoreProperties.class);
+        assertThat(annotation)
+                .as("RegisterRequest must declare @JsonIgnoreProperties(ignoreUnknown = true) "
+                        + "so the ignore-unknown contract is local to the DTO (user-identity-hardening D2)")
+                .isNotNull();
+        assertThat(annotation.ignoreUnknown()).isTrue();
     }
 
     @Test
