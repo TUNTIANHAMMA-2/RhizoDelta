@@ -175,30 +175,63 @@ CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique
   IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE;
 ```
 
-**代码变更**：
-1. `AuthController.CREATE_USER_QUERY` 拆为两段事务：
-   - MERGE `UserAccount`（去掉 `display_name` 字段）
-   - CREATE `UserProfile`，MERGE `(account)-[:HAS_PROFILE]->(profile)`
-2. `/api/auth/me` 改为从 `UserProfile` 读 `display_name`（LEFT JOIN）。
-3. JWT claim `display_name` **保留**（避免强制所有客户端重新解析）。
+> **备注**：`HAS_PROFILE` 1:1 语义由 `UserProfile.user_id` UNIQUE 约束 + 写时 `MERGE` 在同一事务内保障。Neo4j 没有原生"最多一条 HAS_PROFILE 边"约束。
 
-**回填脚本**（一次性，通过 flyway 或启动期 migration）：
+**代码变更**：
+1. `AuthController.CREATE_USER_QUERY` 单事务内同时写 `UserAccount` + `UserProfile` + `HAS_PROFILE`，且 `profile` 的 MERGE 与 edge 的 MERGE 被 `FOREACH (_ IN CASE WHEN created THEN [1] ELSE [] END | ...)` 守护，保证**仅在真的创建账户时才写入 profile**——避免重复 username 请求被用来覆盖既有账户的 profile。`UserAccount.display_name` **不再写入**。
+2. `AuthController.FIND_USER_BY_USERNAME_QUERY` / `FIND_USER_BY_ID_QUERY` 追加 `OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile)` 并从 profile 读 `display_name`。
+3. 应用层读 fallback：`AuthController.resolveDisplayName(profileValue, username)` —— profile 非空非空白返回 profile 值；否则回退 username。`/api/auth/me`、register 响应、login 响应都走此 helper。
+4. JWT claim `display_name` **保留**（避免强制所有客户端重新解析）。
+
+**启动期回填**（由 `DatabaseInitializer.migrateLegacyUserProfile()` 执行，在 schema DDL 之后、`logConstraintStatus` 之前）：
 
 ```cypher
-MATCH (u:UserAccount) WHERE u.display_name IS NOT NULL
+MATCH (u:UserAccount)
+WHERE u.display_name IS NOT NULL
+  AND NOT (u)-[:HAS_PROFILE]->(:UserProfile)
+WITH u LIMIT 500
+OPTIONAL MATCH (existing:UserProfile {user_id: u.user_id})
+WITH u, existing
 MERGE (p:UserProfile {user_id: u.user_id})
-  ON CREATE SET p.display_name = u.display_name, p.created_at = datetime()
+  ON CREATE SET p.display_name = u.display_name,
+                p.updated_at   = datetime()
 MERGE (u)-[:HAS_PROFILE]->(p)
-REMOVE u.display_name;
+REMOVE u.display_name
+RETURN
+  sum(CASE WHEN existing IS NULL THEN 1 ELSE 0 END) AS migrated,
+  sum(CASE WHEN existing IS NOT NULL THEN 1 ELSE 0 END) AS skipped
 ```
 
+特性：
+- **幂等**：已迁移过的行不会被重复处理（`WHERE u.display_name IS NOT NULL AND NOT (u)-[:HAS_PROFILE]->...` 过滤掉）。
+- **批量**：每事务 `LIMIT 500` 行，避免单事务持锁时间过长；外层 Java 循环直到 `pending = 0` 为止。
+- **fail-close**：任何批次异常抛 `IllegalStateException`，Spring Boot 启动中断，不会吞错继续。
+- **atomic per row**：每行 `REMOVE u.display_name` 与 `MERGE HAS_PROFILE` 在同一 Cypher 事务，崩溃后不会留下"有 profile 边但 account 仍携带 display_name"的半成品状态。
+
 **新增接口**（纯内部迁移期接口，不对外扩能）：
-- `GET /api/users/me/profile` → 完整个人 profile
-- `PUT /api/users/me/profile` → 更新 display_name / avatar / language / theme
+- `GET /api/users/me/profile` → 完整个人 profile（`user_id, display_name, avatar_url, language, timezone, theme, notification_prefs, updated_at`）；profile 缺失时 `display_name` 回退 username，其余字段 null。
+- `PUT /api/users/me/profile` → 更新任意 mutable 子集（`display_name / avatar_url / language / timezone / theme / notification_prefs`）。
+  - 字段缺失：不改变存储值
+  - 字段显式为 null：清空
+  - 每次成功写入 `updated_at = datetime()`
+  - 空 body（无任何 mutable field）→ HTTP 400 "empty profile update"
+  - 未知字段（如 `user_id`）静默丢弃
+  - 无 JWT → HTTP 401（由 SecurityConfig `anyRequest().authenticated()` 保证）
+- 公开 `GET /api/users/{user_id}/profile` **未在本阶段落地**，推迟到 Phase 2 有真实调用方（AUTHORED 边 + 作者展示）时再开。
 
 **回滚**：
-- 将 `p.display_name` 回写 `u.display_name`。
-- 删除 `HAS_PROFILE` 边和 `UserProfile` 节点。
+
+```cypher
+MATCH (u:UserAccount)-[:HAS_PROFILE]->(p:UserProfile)
+WHERE u.display_name IS NULL AND p.display_name IS NOT NULL
+SET u.display_name = p.display_name;
+
+MATCH ()-[r:HAS_PROFILE]->() DELETE r;
+MATCH (p:UserProfile) DETACH DELETE p;
+DROP CONSTRAINT rhizodelta_user_profile_user_id_unique IF EXISTS;
+```
+
+无数据丢失；旧构建只读 `UserAccount.display_name`，回写后即可正常读出。详细步骤见 `docs/runbooks/user-profile-backfill.md`。
 
 **验证**：
 - 登录响应保持兼容（`display_name` 仍在 payload 中）。
