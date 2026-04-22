@@ -8,8 +8,10 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Neo4jContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -22,6 +24,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@ActiveProfiles("test")
+@TestPropertySource(properties = {
+        "spring.rabbitmq.listener.simple.auto-startup=false",
+        "spring.rabbitmq.listener.direct.auto-startup=false",
+        "langchain4j.open-ai.chat-model.api-key=test-chat-key",
+        "langchain4j.open-ai.embedding-model.api-key=test-embedding-key"
+})
 class AsyncPostPipelineIntegrationTest {
     private static final String RABBITMQ_USERNAME = "testuser";
     private static final String RABBITMQ_PASSWORD = "testpass";
@@ -59,6 +68,7 @@ class AsyncPostPipelineIntegrationTest {
     @BeforeEach
     void cleanDatabase() {
         neo4jClient.query("MATCH (n) DETACH DELETE n").run();
+        createUserAccount("test-operator");
     }
 
     @Test
@@ -73,6 +83,7 @@ class AsyncPostPipelineIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         awaitHumanPost("req-async-001");
+        assertThat(countAuthoredRelationships("req-async-001", "test-operator")).isEqualTo(1L);
     }
 
     @Test
@@ -88,6 +99,7 @@ class AsyncPostPipelineIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         awaitHumanPost("req-async-authenticated-author");
         assertThat(findAuthorId("req-async-authenticated-author")).isEqualTo("test-operator");
+        assertThat(countAuthoredRelationships("req-async-authenticated-author", "test-operator")).isEqualTo(1L);
     }
 
     @Test
@@ -103,6 +115,19 @@ class AsyncPostPipelineIntegrationTest {
 
         awaitHumanPost("req-async-dup");
         assertThat(countHumanPosts("req-async-dup")).isEqualTo(1L);
+        assertThat(countAuthoredRelationships("req-async-dup", "test-operator")).isEqualTo(1L);
+    }
+
+    private long countAuthoredRelationships(String requestId, String authorId) {
+        return neo4jClient.query("""
+                MATCH (:UserAccount {user_id: $authorId})-[rel:AUTHORED]->(:Human_Post {request_id: $requestId})
+                RETURN count(rel) AS count
+                """)
+                .bind(authorId).to("authorId")
+                .bind(requestId).to("requestId")
+                .fetchAs(Long.class)
+                .one()
+                .orElse(0L);
     }
 
     private void awaitHumanPost(String requestId) {
@@ -136,6 +161,22 @@ class AsyncPostPipelineIntegrationTest {
                 .fetchAs(String.class)
                 .one()
                 .orElseThrow(() -> new AssertionError("Missing Human_Post for request_id=" + requestId));
+    }
+
+    private void createUserAccount(String userId) {
+        neo4jClient.query("""
+                CREATE (:UserAccount {
+                  username: $username,
+                  user_id: $userId,
+                  password_hash: 'hash',
+                  roles: ['USER'],
+                  status: 'ACTIVE',
+                  created_at: datetime()
+                })
+                """)
+                .bind(userId).to("userId")
+                .bind("user-" + userId).to("username")
+                .run();
     }
 
     private void sleep(Duration duration) {

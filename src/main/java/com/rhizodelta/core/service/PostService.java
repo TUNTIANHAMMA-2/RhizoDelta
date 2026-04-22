@@ -12,25 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * 负责将用户帖子持久化为核心图谱节点。
- *
- * <p>该服务位于 {@code com.rhizodelta.core.service}，承担“把一条人类输入稳定落到图谱里”的职责，
- * 并维护帖子与目标节点之间的 {@code CONTINUES_FROM} 关系。
- *
- * <p><b>关键副作用</b>：
- * <ul>
- *   <li>会在 Neo4j 中创建或复用 {@link HumanPost} 节点。</li>
- *   <li>当存在 {@code targetNodeId} 时，会补写一条回复关系边。</li>
- *   <li>该服务本身不发 MQ、不推 SSE，只负责核心持久化语义。</li>
- * </ul>
- *
- * <p><b>隐藏约束</b>：
- * <ul>
- *   <li>幂等键是 {@code requestId}，重复请求不会重复创建帖子。</li>
- *   <li>目标节点不存在时会直接失败，避免异步链路后置暴露脏引用。</li>
- * </ul>
- */
 @Service
 public class PostService {
     private static final String HUMAN_OPERATOR_TYPE = "HUMAN";
@@ -58,11 +39,22 @@ public class PostService {
             MATCH (post:Human_Post {request_id: $requestId})
             RETURN toString(post.node_id) AS nodeId
             """;
+    private static final String AUTHOR_EXISTS_QUERY = """
+            MATCH (user:UserAccount {user_id: $authorId})
+            RETURN count(user) > 0 AS exists
+            """;
 
     private static final String TARGET_NODE_EXISTS_QUERY = """
             MATCH (node:GraphNode {node_id: $targetNodeId})
             WHERE NOT coalesce(node._deleted, false)
             RETURN count(node) > 0 AS exists
+            """;
+    private static final String CREATE_AUTHORED_RELATIONSHIP_QUERY = """
+            MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
+            MATCH (author:UserAccount {user_id: $authorId})
+            MERGE (author)-[rel:AUTHORED]->(post)
+            ON CREATE SET rel.created_at = $createdAt
+            RETURN type(rel) AS relType
             """;
     private static final String CREATE_REPLY_RELATIONSHIP_QUERY = """
             MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
@@ -119,6 +111,7 @@ public class PostService {
             return new CreateHumanPostResult(existing, false);
         }
 
+        validateAuthorExists(command.authorId());
         if (command.targetNodeId() != null) {
             validateTargetNodeExists(command.targetNodeId());
         }
@@ -126,6 +119,7 @@ public class PostService {
         UUID generatedNodeId = UUID.randomUUID();
         OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC);
         String nodeIdString = upsertByRequestId(command, generatedNodeId, createdAt);
+        createAuthoredRelationship(nodeIdString, command.authorId(), createdAt);
         createReplyRelationshipIfNeeded(nodeIdString, command, createdAt);
         UUID persistedNodeId = UUID.fromString(nodeIdString);
 
@@ -169,6 +163,16 @@ public class PostService {
                 .fetchAs(String.class)
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to resolve node_id from upsert query"));
+    }
+
+    private void createAuthoredRelationship(String postNodeId, String authorId, OffsetDateTime createdAt) {
+        neo4jClient.query(CREATE_AUTHORED_RELATIONSHIP_QUERY)
+                .bind(postNodeId).to("postNodeId")
+                .bind(authorId).to("authorId")
+                .bind(createdAt).to("createdAt")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to create AUTHORED relationship"));
     }
 
     /**
@@ -230,6 +234,17 @@ public class PostService {
                 .orElseThrow(() -> new IllegalStateException("Failed to validate target_node_id"));
         if (!Boolean.TRUE.equals(result.get("exists"))) {
             throw new IllegalArgumentException("target_node_id not found");
+        }
+    }
+
+    private void validateAuthorExists(String authorId) {
+        Map<String, Object> result = neo4jClient.query(AUTHOR_EXISTS_QUERY)
+                .bind(authorId).to("authorId")
+                .fetch()
+                .one()
+                .orElseThrow(() -> new IllegalStateException("Failed to validate author_id"));
+        if (!Boolean.TRUE.equals(result.get("exists"))) {
+            throw new IllegalArgumentException("author_id not found");
         }
     }
 
