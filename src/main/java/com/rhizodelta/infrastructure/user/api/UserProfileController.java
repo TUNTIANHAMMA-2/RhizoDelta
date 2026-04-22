@@ -1,10 +1,12 @@
 package com.rhizodelta.infrastructure.user.api;
 
 import com.rhizodelta.infrastructure.web.ApiResponse;
+import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,7 +33,7 @@ import java.util.Set;
  * <p>两个接口都不接受 {@code user_id} 参数，只能操作调用方自己的画像。
  */
 @RestController
-@RequestMapping("/api/users/me")
+@RequestMapping("/api/users")
 public class UserProfileController {
     private static final String FIND_PROFILE_QUERY = """
             MATCH (user:UserAccount {user_id: $userId})
@@ -45,6 +47,15 @@ public class UserProfileController {
                    profile.notification_prefs   AS notificationPrefs,
                    toString(profile.updated_at) AS updatedAt
             """;
+    private static final String FIND_PUBLIC_PROFILE_QUERY = """
+            MATCH (user:UserAccount {user_id: $userId})
+            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
+            RETURN user.user_id         AS userId,
+                   user.username        AS username,
+                   user.status          AS status,
+                   profile.display_name AS displayName,
+                   profile.avatar_url   AS avatarUrl
+            """;
 
     private final Neo4jClient neo4jClient;
 
@@ -52,7 +63,7 @@ public class UserProfileController {
         this.neo4jClient = neo4jClient;
     }
 
-    @GetMapping("/profile")
+    @GetMapping("/me/profile")
     public ApiResponse<UserProfilePayload> getMyProfile(Authentication authentication) {
         AuthenticatedUser user = requireAuthenticatedUser(authentication);
         Map<String, Object> record = fetchProfile(user.sub())
@@ -60,7 +71,18 @@ public class UserProfileController {
         return ApiResponse.ok(toPayload(user.sub(), record));
     }
 
-    @PutMapping("/profile")
+    @GetMapping("/{userId}/profile")
+    public ApiResponse<Map<String, Object>> getPublicProfile(
+            @PathVariable String userId,
+            Authentication authentication
+    ) {
+        requireAuthenticatedUser(authentication);
+        Map<String, Object> record = fetchPublicProfile(userId)
+                .orElseThrow(() -> new NoSuchElementException("user not found"));
+        return ApiResponse.ok(toPublicPayload(record));
+    }
+
+    @PutMapping("/me/profile")
     public ApiResponse<UserProfilePayload> updateMyProfile(
             @RequestBody(required = false) UpdateUserProfileRequest request,
             Authentication authentication
@@ -77,6 +99,14 @@ public class UserProfileController {
 
     private java.util.Optional<Map<String, Object>> fetchProfile(String userId) {
         return neo4jClient.query(FIND_PROFILE_QUERY)
+                .bind(userId)
+                .to("userId")
+                .fetch()
+                .one();
+    }
+
+    private java.util.Optional<Map<String, Object>> fetchPublicProfile(String userId) {
+        return neo4jClient.query(FIND_PUBLIC_PROFILE_QUERY)
                 .bind(userId)
                 .to("userId")
                 .fetch()
@@ -137,6 +167,30 @@ public class UserProfileController {
                 stringOrNull(record.get("notificationPrefs")),
                 stringOrNull(record.get("updatedAt"))
         );
+    }
+
+    private Map<String, Object> toPublicPayload(Map<String, Object> record) {
+        String userId = record.get("userId").toString();
+        String status = stringOrNull(record.get("status"));
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+        payload.put("user_id", userId);
+        if (UserStatus.SUSPENDED.name().equals(status) || UserStatus.DELETED.name().equals(status)) {
+            payload.put("status", "UNAVAILABLE");
+            return payload;
+        }
+        String username = record.get("username").toString();
+        payload.put("username", username);
+        payload.put("display_name", resolveDisplayName(record.get("displayName"), username));
+        payload.put("avatar_url", stringOrNull(record.get("avatarUrl")));
+        return payload;
+    }
+
+    private String resolveDisplayName(Object displayNameRaw, String username) {
+        if (displayNameRaw == null) {
+            return username;
+        }
+        String text = displayNameRaw.toString();
+        return text.isBlank() ? username : text;
     }
 
     private static String stringOrNull(Object value) {

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -49,6 +50,9 @@ class UserProfileApiIntegrationTest {
 
     @Autowired
     private Neo4jClient neo4jClient;
+
+    @LocalServerPort
+    private int port;
 
     @BeforeEach
     void cleanDatabase() {
@@ -153,10 +157,67 @@ class UserProfileApiIntegrationTest {
                 .isNotEqualTo("attacker-supplied-id");
     }
 
-    // 401 on missing JWT is verified via MockMvc in UserProfileSecurityWebTest;
-    // under TestRestTemplate + full Tomcat, Spring Boot's ErrorPageFilter rewrites
-    // the 401 response into a 404 dispatch to /error, which is a project-wide
-    // infrastructure behavior unrelated to user-profile-split.
+    @Test
+    void shouldReturnPublicProfileForAuthenticatedCaller() {
+        registerUser("grace", "password123", "Grace");
+        String viewerToken = registerUser("harry", "password123", "Harry");
+
+        ResponseEntity<Map> response = authorizedGet(viewerToken, "/api/users/" + findUserId("grace") + "/profile");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> payload = responseData(response);
+        assertThat(payload).containsEntry("user_id", findUserId("grace"));
+        assertThat(payload).containsEntry("username", "grace");
+        assertThat(payload).containsEntry("display_name", "Grace");
+        assertThat(payload.get("avatar_url")).isNull();
+        assertThat(payload).doesNotContainKeys("roles", "language", "timezone", "theme", "notification_prefs");
+    }
+
+    @Test
+    void shouldReturnPublicProfileWithUsernameFallbackWhenProfileMissing() {
+        registerUser("ivy", "password123", "Ivy");
+        String viewerToken = registerUser("jane", "password123", "Jane");
+        neo4jClient.query("""
+                MATCH (:UserAccount {username: 'ivy'})-[edge:HAS_PROFILE]->(profile:UserProfile)
+                DELETE edge
+                DETACH DELETE profile
+                """).run();
+
+        ResponseEntity<Map> response = authorizedGet(viewerToken, "/api/users/" + findUserId("ivy") + "/profile");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> payload = responseData(response);
+        assertThat(payload.get("display_name")).isEqualTo("ivy");
+        assertThat(payload.get("avatar_url")).isNull();
+    }
+
+    @Test
+    void shouldMaskSuspendedOrDeletedPublicProfile() {
+        registerUser("kate", "password123", "Kate");
+        String viewerToken = registerUser("liam", "password123", "Liam");
+        neo4jClient.query("""
+                MATCH (user:UserAccount {username: 'kate'})
+                SET user.status = 'SUSPENDED'
+                """).run();
+
+        ResponseEntity<Map> response = authorizedGet(viewerToken, "/api/users/" + findUserId("kate") + "/profile");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> payload = responseData(response);
+        assertThat(payload).containsEntry("user_id", findUserId("kate"));
+        assertThat(payload).containsEntry("status", "UNAVAILABLE");
+        assertThat(payload).doesNotContainKeys("username", "display_name", "avatar_url");
+    }
+
+    @Test
+    void shouldReject401ForPublicProfileWithoutJwt() {
+        String targetUserId = registerAndGetUserId("mona", "password123", "Mona");
+
+        ResponseEntity<Map> response = new TestRestTemplate()
+                .getForEntity(baseUrl("/api/users/" + targetUserId + "/profile"), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 
     private String registerUser(String username, String password, String displayName) {
         ResponseEntity<Map> response = restTemplate.postForEntity(
@@ -189,5 +250,14 @@ class UserProfileApiIntegrationTest {
                 .fetchAs(String.class)
                 .one()
                 .orElseThrow();
+    }
+
+    private String registerAndGetUserId(String username, String password, String displayName) {
+        registerUser(username, password, displayName);
+        return findUserId(username);
+    }
+
+    private String baseUrl(String path) {
+        return "http://localhost:" + port + path;
     }
 }
