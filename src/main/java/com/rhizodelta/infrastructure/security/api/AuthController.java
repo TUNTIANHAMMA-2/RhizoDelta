@@ -49,17 +49,19 @@ public class AuthController {
     private static final List<String> DEFAULT_ROLES = List.of("USER");
     private static final String FIND_USER_BY_USERNAME_QUERY = """
             MATCH (user:UserAccount {username: $username})
+            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN user.user_id AS userId,
                    user.username AS username,
-                   user.display_name AS displayName,
+                   profile.display_name AS displayName,
                    user.password_hash AS passwordHash,
                    user.roles AS roles
             """;
     private static final String FIND_USER_BY_ID_QUERY = """
             MATCH (user:UserAccount {user_id: $userId})
+            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN user.user_id AS userId,
                    user.username AS username,
-                   user.display_name AS displayName,
+                   profile.display_name AS displayName,
                    user.password_hash AS passwordHash,
                    user.roles AS roles
             """;
@@ -67,17 +69,26 @@ public class AuthController {
             MERGE (user:UserAccount {username: $username})
             ON CREATE SET
               user.user_id = $userId,
-              user.display_name = $displayName,
               user.password_hash = $passwordHash,
               user.roles = $roles,
               user.status = $statusValue,
               user.created_at = datetime()
+            WITH user, user.user_id = $userId AS created
+            FOREACH (_ IN CASE WHEN created THEN [1] ELSE [] END |
+              MERGE (profile:UserProfile {user_id: user.user_id})
+              ON CREATE SET
+                profile.display_name = $displayName,
+                profile.updated_at = datetime()
+              MERGE (user)-[:HAS_PROFILE]->(profile)
+            )
+            WITH user, created
+            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN user.user_id AS userId,
                    user.username AS username,
-                   user.display_name AS displayName,
+                   profile.display_name AS displayName,
                    user.password_hash AS passwordHash,
                    user.roles AS roles,
-                   user.user_id = $userId AS created
+                   created
             """;
 
     private final Neo4jClient neo4jClient;
@@ -194,13 +205,29 @@ public class AuthController {
     }
 
     private static StoredUser toStoredUser(Map<String, Object> record) {
+        String username = record.get("username").toString();
+        Object displayNameRaw = record.get("displayName");
         return new StoredUser(
                 record.get("userId").toString(),
-                record.get("username").toString(),
-                record.get("displayName").toString(),
+                username,
+                resolveDisplayName(displayNameRaw, username),
                 record.get("passwordHash").toString(),
                 toStringList(record.get("roles"))
         );
+    }
+
+    /**
+     * 返回最终向调用方暴露的 display_name。
+     *
+     * <p>按优先级：UserProfile.display_name（非空非空白）→ username。
+     * 该策略是 user-profile-split D4 定义的应用层契约；任何读到账户展示名的路径都要走这个 helper。
+     */
+    static String resolveDisplayName(Object profileDisplayName, String username) {
+        if (profileDisplayName == null) {
+            return username;
+        }
+        String text = profileDisplayName.toString();
+        return text.isBlank() ? username : text;
     }
 
     private static List<String> toStringList(Object value) {

@@ -81,6 +81,13 @@ class AuthApiIntegrationTest {
         assertThat(user.get("roles")).isEqualTo(List.of("USER"));
         assertThat(user.get("user_id")).isEqualTo(storedUser.get("userId"));
         assertThat(storedUser.get("status")).isEqualTo(UserStatus.ACTIVE.name());
+        assertThat(storedUser.get("accountDisplayName"))
+                .as("display_name must be stored on UserProfile, not UserAccount (user-profile-split D1)")
+                .isNull();
+        assertThat(storedUser.get("profileDisplayName")).isEqualTo("Alice");
+        assertThat(storedUser.get("profileUpdatedAt"))
+                .as("UserProfile.updated_at must be set on creation")
+                .isNotNull();
         assertThat(storedUser.get("passwordHash").toString())
                 .startsWith("$2")
                 .isNotEqualTo("password123");
@@ -207,6 +214,37 @@ class AuthApiIntegrationTest {
         assertThat(user.get("roles")).isEqualTo(List.of("USER"));
     }
 
+    @Test
+    void shouldFallBackToUsernameWhenProfileEdgeMissing() {
+        String token = registerUser("frank", "password123", "Franklin");
+        neo4jClient.query("""
+                MATCH (user:UserAccount {username: $username})-[edge:HAS_PROFILE]->(profile:UserProfile)
+                DELETE edge
+                DETACH DELETE profile
+                """)
+                .bind("frank")
+                .to("username")
+                .run();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "/api/auth/me",
+                org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode())
+                .as("missing HAS_PROFILE edge must not surface as 500; fallback to username")
+                .isEqualTo(HttpStatus.OK);
+        Map<String, Object> user = (Map<String, Object>) response.getBody().get("data");
+        assertThat(user.get("username")).isEqualTo("frank");
+        assertThat(user.get("display_name"))
+                .as("display_name must fall back to username when profile is missing (user-profile-split D4)")
+                .isEqualTo("frank");
+    }
+
     private String registerUser(String username, String password, String displayName) {
         ResponseEntity<Map> response = restTemplate.postForEntity(
                 "/api/auth/register",
@@ -231,9 +269,13 @@ class AuthApiIntegrationTest {
     private Map<String, Object> findUserRecord(String username) {
         return neo4jClient.query("""
                 MATCH (user:UserAccount {username: $username})
+                OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
                 RETURN user.user_id AS userId,
                        user.password_hash AS passwordHash,
-                       user.status AS status
+                       user.status AS status,
+                       user.display_name AS accountDisplayName,
+                       profile.display_name AS profileDisplayName,
+                       profile.updated_at AS profileUpdatedAt
                 """)
                 .bind(username)
                 .to("username")
