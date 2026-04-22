@@ -12,17 +12,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 在启动阶段初始化 Neo4j 约束、索引与向量索引。
- *
- * <p>该组件会在应用启动时主动执行 schema 语句，确保核心节点、关系和向量检索所需的数据库结构已经就绪。
- *
- * <p><b>关键副作用</b>：
- * <ul>
- *   <li>会执行多条 Neo4j DDL 语句。</li>
- *   <li>一旦 schema 初始化失败，应用启动会直接中止。</li>
- * </ul>
- */
 @Component
 public class DatabaseInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseInitializer.class);
@@ -62,6 +51,23 @@ public class DatabaseInitializer {
               sum(CASE WHEN existing IS NULL THEN 1 ELSE 0 END) AS migrated,
               sum(CASE WHEN existing IS NOT NULL THEN 1 ELSE 0 END) AS skipped
             """.formatted(PROFILE_BACKFILL_BATCH_SIZE).trim();
+    private static final String AUTHORED_BACKFILL_QUERY = """
+            MATCH (p:Human_Post)
+            WHERE p.author_id IS NOT NULL
+            MATCH (u:UserAccount {user_id: p.author_id})
+            MERGE (u)-[r:AUTHORED]->(p)
+            ON CREATE SET r.created_at = p.created_at
+            RETURN count(r) AS touched
+            """.trim();
+    private static final String AUTHORED_AUDIT_QUERY = """
+            MATCH (p:Human_Post)
+            WHERE p.author_id IS NOT NULL
+            OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)
+            WITH p, u
+            WHERE u IS NULL
+            RETURN p.node_id AS nodeId, p.author_id AS authorId
+            LIMIT 100
+            """.trim();
     private static final String SHOW_RHIZODELTA_CONSTRAINTS_QUERY = """
             SHOW CONSTRAINTS
             YIELD name
@@ -88,6 +94,7 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_ai_consensus_created_at_idx IF NOT EXISTS FOR (n:AI_Consensus) ON (n.created_at)",
             "CREATE INDEX rhizodelta_result_created_at_idx IF NOT EXISTS FOR (n:Result) ON (n.created_at)",
             "CREATE INDEX rhizodelta_human_post_operation_id_idx IF NOT EXISTS FOR (n:Human_Post) ON (n.operation_id)",
+            "CREATE INDEX rhizodelta_authored_created_at_idx IF NOT EXISTS FOR ()-[r:AUTHORED]-() ON (r.created_at)",
             "CREATE INDEX rhizodelta_conceptual_overlap_association_id_idx IF NOT EXISTS FOR ()-[r:CONCEPTUAL_OVERLAP]-() ON (r.association_id)",
             "CREATE INDEX rhizodelta_relates_to_association_id_idx IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.association_id)",
             "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE",
@@ -107,11 +114,6 @@ public class DatabaseInitializer {
         this.embeddingDimension = embeddingDimension;
     }
 
-    /**
-     * 在 Bean 初始化后执行 schema 初始化。
-     *
-     * <p>该流程会先创建常规约束与索引，再创建向量索引，最后输出校验日志。
-     */
     @PostConstruct
     void initializeSchema() {
         verifyUserIdIntegrity();
@@ -184,11 +186,14 @@ public class DatabaseInitializer {
                 .orElse(Map.of("migrated", 0L, "skipped", 0L));
     }
 
-    /**
-     * 执行单条 schema 语句。
-     *
-     * <p>执行失败会被视为启动级错误，而不是可忽略的告警。
-     */
+    static String authoredBackfillQuery() {
+        return AUTHORED_BACKFILL_QUERY;
+    }
+
+    static String authoredAuditQuery() {
+        return AUTHORED_AUDIT_QUERY;
+    }
+
     private void executeSchemaQuery(String query) {
         try {
             neo4jClient.query(query).run();
@@ -269,9 +274,6 @@ public class DatabaseInitializer {
         return text.isBlank() ? fallback : text;
     }
 
-    /**
-     * 输出当前 RhizoDelta 相关约束和索引状态。
-     */
     private void logConstraintStatus() {
         List<Map<String, Object>> schemaEntries = new ArrayList<>();
         schemaEntries.addAll(fetchSchemaEntries(SHOW_RHIZODELTA_CONSTRAINTS_QUERY));
@@ -283,11 +285,6 @@ public class DatabaseInitializer {
         return neo4jClient.query(query).fetch().all();
     }
 
-    /**
-     * 构造向量索引创建语句。
-     *
-     * <p>向量维度直接绑定当前系统配置，避免索引维度与模型维度不一致。
-     */
     private String buildVectorIndexQuery() {
         return """
                 CREATE VECTOR INDEX %s IF NOT EXISTS

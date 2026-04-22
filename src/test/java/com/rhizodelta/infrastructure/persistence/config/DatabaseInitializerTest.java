@@ -25,6 +25,8 @@ class DatabaseInitializerTest {
             "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE";
     private static final String USER_ACCOUNT_STATUS_INDEX_QUERY =
             "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)";
+    private static final String AUTHORED_CREATED_AT_INDEX_QUERY =
+            "CREATE INDEX rhizodelta_authored_created_at_idx IF NOT EXISTS FOR ()-[r:AUTHORED]-() ON (r.created_at)";
     private static final String USER_PROFILE_USER_ID_UNIQUE_QUERY =
             "CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE";
 
@@ -78,6 +80,18 @@ class DatabaseInitializerTest {
         verify(neo4jClient, never()).query(
                 "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)"
         );
+    }
+
+    @Test
+    void initializeSchemaShouldCreateAuthoredCreatedAtIndex() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(AUTHORED_CREATED_AT_INDEX_QUERY);
     }
 
     @Test
@@ -207,6 +221,22 @@ class DatabaseInitializerTest {
                         && query.contains("WITH u LIMIT 500")
                         && query.contains("REMOVE u.display_name")
         ));
+    }
+
+    @Test
+    void authoredBackfillAndAuditQueriesShouldMatchPhaseTwoContract() {
+        assertThat(DatabaseInitializer.authoredBackfillQuery())
+                .contains("MATCH (p:Human_Post)")
+                .contains("WHERE p.author_id IS NOT NULL")
+                .contains("MATCH (u:UserAccount {user_id: p.author_id})")
+                .contains("MERGE (u)-[r:AUTHORED]->(p)")
+                .contains("ON CREATE SET r.created_at = p.created_at");
+
+        assertThat(DatabaseInitializer.authoredAuditQuery())
+                .contains("OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)")
+                .contains("WHERE u IS NULL")
+                .contains("RETURN p.node_id AS nodeId, p.author_id AS authorId")
+                .contains("LIMIT 100");
     }
 
     private static void assertReadOnly(String query) {
