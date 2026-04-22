@@ -28,6 +28,7 @@ public class DatabaseInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseInitializer.class);
     private static final String VECTOR_INDEX_NAME = "rhizodelta_graph_node_embedding_idx";
     private static final int USER_ID_INTEGRITY_LIMIT = 20;
+    private static final int PROFILE_BACKFILL_BATCH_SIZE = 500;
     private static final String NULL_OR_BLANK_USER_ID_QUERY = """
             MATCH (u:UserAccount)
             WHERE u.user_id IS NULL OR trim(u.user_id) = ''
@@ -39,6 +40,28 @@ public class DatabaseInitializer {
             WHERE n > 1
             RETURN uid, names, n LIMIT %d
             """.formatted(USER_ID_INTEGRITY_LIMIT, USER_ID_INTEGRITY_LIMIT).trim();
+    private static final String PROFILE_BACKFILL_PENDING_QUERY = """
+            MATCH (u:UserAccount)
+            WHERE u.display_name IS NOT NULL
+              AND NOT (u)-[:HAS_PROFILE]->(:UserProfile)
+            RETURN count(u) AS pending
+            """.trim();
+    private static final String PROFILE_BACKFILL_BATCH_QUERY = """
+            MATCH (u:UserAccount)
+            WHERE u.display_name IS NOT NULL
+              AND NOT (u)-[:HAS_PROFILE]->(:UserProfile)
+            WITH u LIMIT %d
+            OPTIONAL MATCH (existing:UserProfile {user_id: u.user_id})
+            WITH u, existing
+            MERGE (p:UserProfile {user_id: u.user_id})
+              ON CREATE SET p.display_name = u.display_name,
+                            p.updated_at = datetime()
+            MERGE (u)-[:HAS_PROFILE]->(p)
+            REMOVE u.display_name
+            RETURN
+              sum(CASE WHEN existing IS NULL THEN 1 ELSE 0 END) AS migrated,
+              sum(CASE WHEN existing IS NOT NULL THEN 1 ELSE 0 END) AS skipped
+            """.formatted(PROFILE_BACKFILL_BATCH_SIZE).trim();
     private static final String SHOW_RHIZODELTA_CONSTRAINTS_QUERY = """
             SHOW CONSTRAINTS
             YIELD name
@@ -69,7 +92,8 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_relates_to_association_id_idx IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.association_id)",
             "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE",
             "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE",
-            "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)"
+            "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)",
+            "CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE"
     );
 
     private final Neo4jClient neo4jClient;
@@ -95,6 +119,7 @@ public class DatabaseInitializer {
             executeSchemaQuery(query);
         }
         executeSchemaQuery(buildVectorIndexQuery());
+        migrateLegacyUserProfile();
         logConstraintStatus();
     }
 
@@ -105,6 +130,58 @@ public class DatabaseInitializer {
             return;
         }
         throw new IllegalStateException(buildIntegrityViolationMessage(blankViolations, duplicateViolations));
+    }
+
+    /**
+     * 把还把 display_name 留在 UserAccount 且没有 HAS_PROFILE 边的账户
+     * 逐批迁移到 UserProfile 节点上。本方法幂等：已经迁移完的数据库，该方法是一次 count 查询后即返回。
+     */
+    private void migrateLegacyUserProfile() {
+        long totalMigrated = 0L;
+        long totalSkipped = 0L;
+        try {
+            while (true) {
+                long pending = runPendingCountQuery();
+                if (pending <= 0L) {
+                    break;
+                }
+                Map<String, Object> batchCounts = runBackfillBatch();
+                long migrated = readLong(batchCounts.get("migrated"));
+                long skipped = readLong(batchCounts.get("skipped"));
+                totalMigrated += migrated;
+                totalSkipped += skipped;
+                LOGGER.info("UserProfile backfill: migrated={}, skipped={}", migrated, skipped);
+                if (migrated + skipped <= 0L) {
+                    break;
+                }
+            }
+        } catch (IllegalStateException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException("UserProfile backfill failed", exception);
+        }
+        if (totalMigrated == 0L && totalSkipped == 0L) {
+            LOGGER.info("UserProfile backfill: migrated=0, skipped=0");
+        }
+    }
+
+    private long runPendingCountQuery() {
+        try {
+            return neo4jClient.query(PROFILE_BACKFILL_PENDING_QUERY)
+                    .fetch()
+                    .one()
+                    .map(record -> readLong(record.get("pending")))
+                    .orElse(0L);
+        } catch (Exception exception) {
+            throw new IllegalStateException("UserProfile backfill pending-count query failed", exception);
+        }
+    }
+
+    private Map<String, Object> runBackfillBatch() {
+        return neo4jClient.query(PROFILE_BACKFILL_BATCH_QUERY)
+                .fetch()
+                .one()
+                .orElse(Map.of("migrated", 0L, "skipped", 0L));
     }
 
     /**

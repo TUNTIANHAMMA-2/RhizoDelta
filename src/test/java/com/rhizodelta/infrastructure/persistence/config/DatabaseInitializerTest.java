@@ -25,6 +25,8 @@ class DatabaseInitializerTest {
             "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE";
     private static final String USER_ACCOUNT_STATUS_INDEX_QUERY =
             "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)";
+    private static final String USER_PROFILE_USER_ID_UNIQUE_QUERY =
+            "CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE";
 
     @Test
     void initializeSchemaShouldCreateAssociationRelationshipIndexes() {
@@ -72,6 +74,7 @@ class DatabaseInitializerTest {
 
         verify(neo4jClient).query(USER_ACCOUNT_USER_ID_UNIQUE_QUERY);
         verify(neo4jClient).query(USER_ACCOUNT_STATUS_INDEX_QUERY);
+        verify(neo4jClient).query(USER_PROFILE_USER_ID_UNIQUE_QUERY);
         verify(neo4jClient, never()).query(
                 "CREATE INDEX rhizodelta_user_account_user_id_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.user_id)"
         );
@@ -179,6 +182,31 @@ class DatabaseInitializerTest {
                 .hasMessageContaining("Neo4j user_id integrity pre-check failed")
                 .hasRootCauseMessage("boom");
         verify(neo4jClient, never()).query(FIRST_SCHEMA_QUERY);
+    }
+
+    @Test
+    void initializeSchemaShouldRunUserProfileBackfillUntilPendingReachesZero() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+        when(neo4jClient.query(argThat((String query) ->
+                query != null && query.contains("RETURN count(u) AS pending")
+        )).fetch().one())
+                .thenReturn(java.util.Optional.of(Map.<String, Object>of("pending", 5L)))
+                .thenReturn(java.util.Optional.of(Map.<String, Object>of("pending", 0L)));
+        when(neo4jClient.query(argThat((String query) ->
+                query != null && query.contains("MERGE (p:UserProfile {user_id: u.user_id})")
+                        && query.contains("REMOVE u.display_name")
+        )).fetch().one())
+                .thenReturn(java.util.Optional.of(Map.<String, Object>of("migrated", 3L, "skipped", 2L)));
+
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(argThat((String query) ->
+                query != null && query.contains("MERGE (p:UserProfile {user_id: u.user_id})")
+                        && query.contains("WITH u LIMIT 500")
+                        && query.contains("REMOVE u.display_name")
+        ));
     }
 
     private static void assertReadOnly(String query) {

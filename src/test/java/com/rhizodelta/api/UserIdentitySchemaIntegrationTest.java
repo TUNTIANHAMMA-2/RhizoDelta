@@ -133,9 +133,35 @@ class UserIdentitySchemaIntegrationTest {
     @Test
     void cleanPreCheckShouldLeaveUserPropertiesUnchanged() throws Exception {
         withStartedApplication(driver -> createUser(driver, "snapshot-user", "snapshot-1"), app -> {
-            List<Map<String, Object>> snapshotAfterBoot = snapshotUserAccounts(app.driver());
-            assertThat(snapshotAfterBoot).containsExactlyElementsOf(app.seedSnapshot());
+            List<Map<String, Object>> snapshotAfterBoot = strippedAccountSnapshot(app.driver());
+            List<Map<String, Object>> seedStripped = stripDisplayName(app.seedSnapshot());
+            assertThat(snapshotAfterBoot)
+                    .as("initializeSchema must not mutate identity-bearing UserAccount fields; display_name may be removed by the Phase 1 backfill")
+                    .containsExactlyElementsOf(seedStripped);
         });
+    }
+
+    @Test
+    void startupBackfillShouldMigrateLegacyUserProfile() throws Exception {
+        withStartedApplication(
+                driver -> {
+                    createLegacyUser(driver, "legacy-a", "legacy-a-id", "Alice Legacy");
+                    createLegacyUser(driver, "legacy-b", "legacy-b-id", "Bob Legacy");
+                    createLegacyUser(driver, "legacy-c", "legacy-c-id", "Carol Legacy");
+                },
+                app -> {
+                    Driver driver = app.driver();
+                    List<Map<String, Object>> accounts = fetchUserAccountDisplayNames(driver);
+                    assertThat(accounts)
+                            .as("every legacy account must have display_name removed by the backfill")
+                            .allSatisfy(row -> assertThat(row.get("accountDisplayName")).isNull());
+                    Map<String, String> profileDisplayNames = fetchProfileDisplayNames(driver);
+                    assertThat(profileDisplayNames)
+                            .containsEntry("legacy-a-id", "Alice Legacy")
+                            .containsEntry("legacy-b-id", "Bob Legacy")
+                            .containsEntry("legacy-c-id", "Carol Legacy");
+                }
+        );
     }
 
     private void withStartedApplication(DriverConsumer seeder, StartedApplicationConsumer assertions) throws Exception {
@@ -227,6 +253,54 @@ class UserIdentitySchemaIntegrationTest {
                 """, Map.of("username", username, "userId", "   "));
     }
 
+    private static void createLegacyUser(Driver driver, String username, String userId, String displayName) {
+        runWrite(driver, """
+                CREATE (:UserAccount {
+                  username: $username,
+                  user_id: $userId,
+                  display_name: $displayName,
+                  password_hash: 'hash',
+                  roles: ['USER'],
+                  status: 'ACTIVE',
+                  created_at: datetime()
+                })
+                """, Map.of("username", username, "userId", userId, "displayName", displayName));
+    }
+
+    private static List<Map<String, Object>> fetchUserAccountDisplayNames(Driver driver) {
+        return driver.executableQuery("""
+                MATCH (u:UserAccount)
+                RETURN u.username AS username,
+                       u.display_name AS accountDisplayName
+                ORDER BY u.username
+                """)
+                .execute()
+                .records()
+                .stream()
+                .map(record -> {
+                    java.util.HashMap<String, Object> row = new java.util.HashMap<>();
+                    row.put("username", record.get("username").asString());
+                    row.put("accountDisplayName",
+                            record.get("accountDisplayName").isNull() ? null : record.get("accountDisplayName").asString());
+                    return (Map<String, Object>) row;
+                })
+                .toList();
+    }
+
+    private static Map<String, String> fetchProfileDisplayNames(Driver driver) {
+        return driver.executableQuery("""
+                MATCH (u:UserAccount)-[:HAS_PROFILE]->(p:UserProfile)
+                RETURN u.user_id AS userId, p.display_name AS displayName
+                """)
+                .execute()
+                .records()
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        r -> r.get("userId").asString(),
+                        r -> r.get("displayName").asString()
+                ));
+    }
+
     private static void createUserWithNeo4jClient(Neo4jClient neo4jClient, String username, String userId) {
         neo4jClient.query("""
                 CREATE (:UserAccount {
@@ -314,6 +388,26 @@ class UserIdentitySchemaIntegrationTest {
                         "username", record.get("username").asString(),
                         "props", record.get("props").asMap()
                 ))
+                .toList();
+    }
+
+    private static List<Map<String, Object>> strippedAccountSnapshot(Driver driver) {
+        return stripDisplayName(snapshotUserAccounts(driver));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> stripDisplayName(List<Map<String, Object>> rows) {
+        return rows.stream()
+                .map(row -> {
+                    java.util.LinkedHashMap<String, Object> copy = new java.util.LinkedHashMap<>(row);
+                    Object propsRaw = copy.get("props");
+                    if (propsRaw instanceof Map<?, ?> props) {
+                        java.util.LinkedHashMap<String, Object> propsCopy = new java.util.LinkedHashMap<>((Map<String, Object>) props);
+                        propsCopy.remove("display_name");
+                        copy.put("props", propsCopy);
+                    }
+                    return (Map<String, Object>) copy;
+                })
                 .toList();
     }
 
