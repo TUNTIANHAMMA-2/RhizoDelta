@@ -35,6 +35,8 @@ export interface GraphNodeDTO {
   content?: string;
   summary_content?: string;
   author_id?: string;
+  author_username?: string;
+  author_display_name?: string;
   agent_version?: string;
   created_at: string;
   has_embedding: boolean;

@@ -54,6 +54,11 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
     ? stripMarkdown(node.summary_content)
     : body;
   const quality = node.quality_overall;
+  const authorLabel =
+    node.author_display_name ??
+    node.author_username ??
+    node.author_id ??
+    "anon";
 
   const openGraph = () => navigate(`/workspace/${node.node_id}`);
 
@@ -114,7 +119,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
         >
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-1 h-1 rounded-full bg-text-tertiary/60" />
-            {node.author_id ?? "anon"}
+            {authorLabel}
           </span>
           <span className="text-text-tertiary/50">·</span>
           <time

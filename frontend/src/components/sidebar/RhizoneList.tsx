@@ -57,6 +57,11 @@ export function RhizoneList() {
           rhizomes.map((node) => {
             const isSelected = node.node_id === rootNodeId;
             const plainText = stripMarkdown(node.content ?? node.summary_content);
+            const authorLabel =
+              node.author_display_name ??
+              node.author_username ??
+              node.author_id ??
+              "Anonymous";
             return (
               <button
                 key={node.node_id}
@@ -74,7 +79,7 @@ export function RhizoneList() {
                 </div>
                 <div className="text-[11px] text-text-secondary flex justify-between w-full">
                   <span>{new Date(node.created_at).toLocaleDateString()}</span>
-                  <span>{node.author_id ?? "Anonymous"}</span>
+                  <span>{authorLabel}</span>
                 </div>
               </button>
             );
