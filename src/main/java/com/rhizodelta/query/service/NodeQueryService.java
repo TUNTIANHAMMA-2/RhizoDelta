@@ -227,6 +227,18 @@ public class NodeQueryService {
             ORDER BY createdAt DESC
             LIMIT $limit
             """;
+    private static final String AUTHOR_PROJECTION_QUERY = """
+            MATCH (user:UserAccount)
+            WHERE user.user_id IN $authorIds
+            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
+            WITH user, head(collect(profile.display_name)) AS profileDisplayName
+            RETURN user.user_id AS authorId,
+                   user.username AS authorUsername,
+                   CASE
+                     WHEN profileDisplayName IS NULL OR trim(profileDisplayName) = '' THEN user.username
+                     ELSE profileDisplayName
+                   END AS authorDisplayName
+            """;
 
     private final HumanPostRepository humanPostRepository;
     private final AIConsensusRepository aiConsensusRepository;
@@ -374,6 +386,7 @@ public class NodeQueryService {
                 .fetch()
                 .one()
                 .map(NodeQueryService::toLineageNode)
+                .map(this::enrichAuthorProjection)
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
@@ -398,12 +411,13 @@ public class NodeQueryService {
         if ("Human_Post".equals(nodeInfo.get("label"))) {
             return List.of();
         }
-        return neo4jClient.query(PROVENANCE_SUMMARY_QUERY)
+        List<LineageNode> nodes = neo4jClient.query(PROVENANCE_SUMMARY_QUERY)
                 .bind(nodeId.toString()).to("nodeId")
                 .fetch().all()
                 .stream()
                 .map(NodeQueryService::toLineageNode)
                 .toList();
+        return enrichAuthorProjections(nodes);
     }
 
     /**
@@ -419,12 +433,13 @@ public class NodeQueryService {
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getRoots(Integer limit) {
         int resolvedLimit = limit == null || limit <= 0 ? 50 : limit;
-        return neo4jClient.query(ROOTS_QUERY)
+        List<LineageNode> nodes = neo4jClient.query(ROOTS_QUERY)
                 .bind(resolvedLimit).to("limit")
                 .fetch().all()
                 .stream()
                 .map(NodeQueryService::toLineageNodeMap)
                 .toList();
+        return enrichAuthorProjections(nodes);
     }
 
     private int resolveMaxDepth(Integer maxDepth) {
@@ -487,7 +502,75 @@ public class NodeQueryService {
             return new GraphTopology(List.of(), List.of());
         }
 
-        return toGraphTopology(records.iterator().next());
+        return enrichGraphTopology(toGraphTopology(records.iterator().next()));
+    }
+
+    private GraphTopology enrichGraphTopology(GraphTopology topology) {
+        return new GraphTopology(enrichAuthorProjections(topology.nodes()), topology.edges());
+    }
+
+    private List<LineageNode> enrichAuthorProjections(List<LineageNode> nodes) {
+        Set<String> authorIds = nodes.stream()
+                .map(LineageNode::authorId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        if (authorIds.isEmpty()) {
+            return nodes;
+        }
+        Map<String, AuthorProjection> projections = fetchAuthorProjections(authorIds);
+        return nodes.stream()
+                .map(node -> enrichAuthorProjection(node, projections))
+                .toList();
+    }
+
+    private LineageNode enrichAuthorProjection(LineageNode node) {
+        if (node.authorId() == null) {
+            return node;
+        }
+        return enrichAuthorProjection(node, fetchAuthorProjections(Set.of(node.authorId())));
+    }
+
+    private LineageNode enrichAuthorProjection(LineageNode node, Map<String, AuthorProjection> projections) {
+        if (node.authorId() == null) {
+            return node;
+        }
+        AuthorProjection projection = projections.get(node.authorId());
+        if (projection == null) {
+            return node;
+        }
+        return new LineageNode(
+                node.nodeId(),
+                node.label(),
+                node.content(),
+                node.summaryContent(),
+                node.authorId(),
+                projection.authorUsername(),
+                projection.authorDisplayName(),
+                node.agentVersion(),
+                node.createdAt(),
+                node.hasEmbedding(),
+                node.qualityOverall()
+        );
+    }
+
+    private Map<String, AuthorProjection> fetchAuthorProjections(Set<String> authorIds) {
+        if (authorIds.isEmpty()) {
+            return Map.of();
+        }
+        return neo4jClient.query(AUTHOR_PROJECTION_QUERY)
+                .bind(List.copyOf(authorIds)).to("authorIds")
+                .fetch().all()
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        record -> record.get("authorId").toString(),
+                        record -> new AuthorProjection(
+                                record.get("authorId").toString(),
+                                record.get("authorUsername").toString(),
+                                record.get("authorDisplayName").toString()
+                        ),
+                        (left, right) -> left,
+                        java.util.LinkedHashMap::new
+                ));
     }
 
     private GraphTopology applyChildrenLimit(UUID nodeId, GraphTopology topology, Integer limit) {
@@ -742,6 +825,8 @@ public class NodeQueryService {
             String content,
             String summaryContent,
             String authorId,
+            String authorUsername,
+            String authorDisplayName,
             String agentVersion,
             Instant createdAt,
             boolean hasEmbedding,
@@ -756,7 +841,21 @@ public class NodeQueryService {
                 String nodeId, String label, String content, String summaryContent,
                 String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding
         ) {
-            this(nodeId, label, content, summaryContent, authorId, agentVersion, createdAt, hasEmbedding, null);
+            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, null);
         }
+
+        public LineageNode(
+                String nodeId, String label, String content, String summaryContent,
+                String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding, Double qualityOverall
+        ) {
+            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, qualityOverall);
+        }
+    }
+
+    private record AuthorProjection(
+            String authorId,
+            String authorUsername,
+            String authorDisplayName
+    ) {
     }
 }
