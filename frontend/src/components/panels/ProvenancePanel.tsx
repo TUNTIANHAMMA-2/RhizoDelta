@@ -47,14 +47,21 @@ export function ProvenancePanel({ nodeId }: Props) {
   return (
     <div className="flex flex-col gap-2">
       {items.map((item) => (
-        <button
-          key={item.node_id}
-          onClick={() => {
-            selectNode(item.node_id);
-            openDetailPanel(item.node_id);
-          }}
-          className="flex items-center gap-3 p-3 bg-transparent hover:bg-bg-hover border border-border-default rounded-sm cursor-pointer text-left w-full transition-[background] duration-[var(--transition-fast)]"
-        >
+        (() => {
+          const authorLabel =
+            item.author_display_name ??
+            item.author_username ??
+            item.author_id ??
+            "Agent";
+          return (
+            <button
+              key={item.node_id}
+              onClick={() => {
+                selectNode(item.node_id);
+                openDetailPanel(item.node_id);
+              }}
+              className="flex items-center gap-3 p-3 bg-transparent hover:bg-bg-hover border border-border-default rounded-sm cursor-pointer text-left w-full transition-[background] duration-[var(--transition-fast)]"
+            >
           <span
             className="w-[6px] h-[6px] rounded-full shrink-0"
             style={{
@@ -66,11 +73,13 @@ export function ProvenancePanel({ nodeId }: Props) {
               {item.content?.slice(0, 60) ?? item.summary_content?.slice(0, 60) ?? "—"}
             </div>
             <div className="text-xs text-text-tertiary">
-              {item.author_id ?? "Agent"} &middot;{" "}
+              {authorLabel} &middot;{" "}
               {new Date(item.created_at).toLocaleDateString()}
             </div>
           </div>
-        </button>
+            </button>
+          );
+        })()
       ))}
     </div>
   );

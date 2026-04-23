@@ -57,6 +57,12 @@ export function NodeDetailPanel() {
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
   if (!node) return null;
+  const authorLabel =
+    node.author_display_name ??
+    node.author_username ??
+    node.author_id ??
+    node.agent_version ??
+    "System";
 
   const orchestrationStatus = orchestrationStatuses[node.node_id];
   const statusLabel = orchestrationStatus
@@ -101,7 +107,7 @@ export function NodeDetailPanel() {
           </button>
         </div>
         <div className="text-xs text-text-secondary">
-          {node.author_id ?? node.agent_version ?? "System"} &middot;{" "}
+          {authorLabel} &middot;{" "}
           {new Date(node.created_at).toLocaleString()}
         </div>
       </div>
