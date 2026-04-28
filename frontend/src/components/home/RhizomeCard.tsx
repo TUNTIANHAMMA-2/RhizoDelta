@@ -58,7 +58,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
     node.author_display_name ??
     node.author_username ??
     node.author_id ??
-    "anon";
+    "Anonymous";
 
   const openGraph = () => navigate(`/workspace/${node.node_id}`);
 

@@ -12,6 +12,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Persists human-authored posts into the graph with transactional dual-write
+ * semantics: {@code author_id} projection + canonical {@code AUTHORED} edge
+ * are written in the same transaction.
+ */
 @Service
 public class PostService {
     private static final String HUMAN_OPERATOR_TYPE = "HUMAN";

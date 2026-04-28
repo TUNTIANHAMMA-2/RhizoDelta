@@ -178,7 +178,8 @@ public class UserProfileController {
             payload.put("status", "UNAVAILABLE");
             return payload;
         }
-        String username = record.get("username").toString();
+        Object usernameRaw = record.get("username");
+        String username = usernameRaw != null ? usernameRaw.toString() : userId;
         payload.put("username", username);
         payload.put("display_name", resolveDisplayName(record.get("displayName"), username));
         payload.put("avatar_url", stringOrNull(record.get("avatarUrl")));

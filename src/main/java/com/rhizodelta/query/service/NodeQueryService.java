@@ -527,7 +527,7 @@ public class NodeQueryService {
         if (node.authorId() == null) {
             return node;
         }
-        return enrichAuthorProjection(node, fetchAuthorProjections(Set.of(node.authorId())));
+        return enrichAuthorProjections(List.of(node)).get(0);
     }
 
     private LineageNode enrichAuthorProjection(LineageNode node, Map<String, AuthorProjection> projections) {
