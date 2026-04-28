@@ -56,21 +56,67 @@ public class DecisionService {
             boolean appended
     ) {}
 
+    /**
+     * 原子化"合并或追加"查询。
+     *
+     * <p>该查询是累积合并（cumulative merge）的核心：当多条回复指向同一主题的根节点时，
+     * 它们应追加到同一个 AI_Consensus 下，而不是各自创建新的共识节点。
+     *
+     * <h3>共识查找策略（两级回退）</h3>
+     * <ol>
+     *   <li><b>直接匹配</b>：检查 source 节点上是否已有 MERGED_INTO 的共识。
+     *       这是最常见的情况——用户直接回复根帖子，AI 以根帖子为 source 触发合并。</li>
+     *   <li><b>根节点回退</b>：如果 source 上没有直接共识，则通过 source.root_id
+     *       查找根节点上的共识。这处理了"用户回复中间节点 B（其 root_id 指向 A），
+     *       而共识已存在于根节点 A 上"的场景。若不回退，会错误地创建第二个共识。</li>
+     * </ol>
+     *
+     * <p>优先级：直接匹配 > 根节点回退 > 新建共识。
+     *
+     * <h3>场景示例</h3>
+     * <pre>
+     *   1. 创建根帖子 A (node_id=aaa, root_id=aaa)
+     *   2. 回复 B → A (CONTINUES_FROM bbb→aaa, root_id=aaa)
+     *   3. AI 以 A 为 source 合并 B → 创建 Consensus_1 (MERGED_INTO→A) ✓
+     *   4. 用户选中 B，回复 C → B (CONTINUES_FROM ccc→bbb, root_id=aaa)
+     *   5. AI 以 B 为 source 尝试合并 C：
+     *      - 直接匹配：B 上没有共识 → 未命中
+     *      - 根节点回退：B.root_id=aaa，找到 Consensus_1 MERGED_INTO→A → 命中！
+     *      - 追加 C 到 Consensus_1 ✓（而非错误地创建 Consensus_2）
+     * </pre>
+     */
     private static final String ATOMIC_MERGE_OR_APPEND_QUERY = """
             MATCH (source:GraphNode {node_id: $sourceNodeId})
             WHERE NOT coalesce(source._deleted, false)
             SET source._merge_seq = coalesce(source._merge_seq, 0) + 1
 
-            WITH source
-            OPTIONAL MATCH (existing:AI_Consensus)-[:MERGED_INTO]->(source)
-              WHERE NOT coalesce(existing._deleted, false)
-            WITH source, existing
-            ORDER BY existing.created_at DESC
+            // Level 1 — direct consensus: is there already a consensus MERGED_INTO this exact source node?
+            OPTIONAL MATCH (direct:AI_Consensus)-[:MERGED_INTO]->(source)
+              WHERE NOT coalesce(direct._deleted, false)
+            WITH source, direct
+            ORDER BY direct.created_at DESC
             LIMIT 1
+
+            // Level 2 — root fallback: if no direct consensus, check whether the root node
+            // (identified by source.root_id) already has a consensus.  This handles the case
+            // where a user replies to an intermediate node B whose root is A, and a consensus
+            // already exists on A from a prior merge.
+            OPTIONAL MATCH (rootConsensus:AI_Consensus)-[:MERGED_INTO]->(:GraphNode {node_id: source.root_id})
+              WHERE NOT coalesce(rootConsensus._deleted, false) AND direct IS NULL
+            WITH source, direct, rootConsensus
+            ORDER BY rootConsensus.created_at DESC
+            LIMIT 1
+
+            // Prefer direct consensus; fall back to root ancestor consensus; else null
+            WITH source, direct, rootConsensus,
+                 CASE WHEN direct IS NOT NULL THEN direct
+                      WHEN rootConsensus IS NOT NULL THEN rootConsensus
+                      ELSE NULL END AS existing
 
             WITH source, existing,
                  CASE WHEN existing IS NOT NULL THEN true ELSE false END AS appended
 
+            // Only create a new consensus when no consensus exists anywhere in the ancestry chain
             FOREACH (_ IN CASE WHEN existing IS NULL THEN [1] ELSE [] END |
               CREATE (newAi:AI_Consensus:GraphNode {
                 node_id: $newNodeId,
@@ -90,14 +136,19 @@ public class DecisionService {
               }]->(source)
             )
 
-            WITH source, appended
-            MATCH (consensus:AI_Consensus)-[:MERGED_INTO]->(source)
-              WHERE NOT coalesce(consensus._deleted, false)
-            WITH consensus, appended
-            ORDER BY consensus.created_at ASC
+            // Resolve the active consensus node:
+            // - If we found an existing consensus (direct or root), use it directly.
+            // - If we just created a new one, find it via MERGED_INTO->source.
+            WITH source, existing, appended
+            OPTIONAL MATCH (freshConsensus:AI_Consensus)-[:MERGED_INTO]->(source)
+              WHERE NOT coalesce(freshConsensus._deleted, false) AND existing IS NULL
+            WITH existing, freshConsensus, appended
+            ORDER BY freshConsensus.created_at ASC
             LIMIT 1
+            WITH CASE WHEN existing IS NOT NULL THEN existing ELSE freshConsensus END AS consensus,
+                 appended
 
-            WITH consensus, appended
+            // Link all contributor Human_Post nodes to the consensus via SYNTHESIZED_FROM
             UNWIND $contributorNodeIds AS cid
             MATCH (contributor:Human_Post:GraphNode {node_id: cid})
               WHERE NOT coalesce(contributor._deleted, false)
