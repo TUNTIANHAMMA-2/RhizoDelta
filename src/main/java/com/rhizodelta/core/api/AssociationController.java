@@ -2,6 +2,7 @@ package com.rhizodelta.core.api;
 
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
 import com.rhizodelta.core.domain.association.AssociationResult;
 import com.rhizodelta.core.service.AssociationService;
 import com.rhizodelta.core.domain.association.CreateAssociationCommand;
@@ -115,9 +116,6 @@ public class AssociationController {
     }
 
     private static AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new IllegalStateException("authenticated user principal not available");
-        }
-        return user;
+        return AuthenticatedUsers.require(authentication);
     }
 }

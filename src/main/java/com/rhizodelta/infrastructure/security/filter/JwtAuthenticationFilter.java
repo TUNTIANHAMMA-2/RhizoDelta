@@ -1,8 +1,10 @@
 package com.rhizodelta.infrastructure.security.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
+import com.rhizodelta.infrastructure.web.ApiResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -29,18 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * 负责解析并验证请求中的 JWT。
- *
- * <p>该过滤器会从 {@code Authorization} 头中提取 Bearer Token，
- * 校验签名与有效期，并在成功后把 {@link AuthenticatedUser} 写入安全上下文。
- *
- * <p><b>关键副作用</b>：
- * <ul>
- *   <li>会修改 {@link SecurityContextHolder} 中的当前认证主体。</li>
- *   <li>JWT 失效或非法时会直接写回 {@code 401} JSON 响应并中断链路。</li>
- * </ul>
- */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
@@ -49,18 +39,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final SecretKey signingKey;
     private final ObjectMapper objectMapper;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final OnlineStatusService onlineStatusService;
 
-    public JwtAuthenticationFilter(@Value("${rhizodelta.jwt.secret}") String jwtSecret,
-                                   ObjectMapper objectMapper) {
+    public JwtAuthenticationFilter(
+            @Value("${rhizodelta.jwt.secret}") String jwtSecret,
+            ObjectMapper objectMapper,
+            TokenBlacklistService tokenBlacklistService,
+            OnlineStatusService onlineStatusService
+    ) {
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.objectMapper = objectMapper;
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.onlineStatusService = onlineStatusService;
     }
 
-    /**
-     * 对当前请求执行 JWT 鉴权。
-     *
-     * <p>没有 token 时会直接放行，由后续安全链决定是否需要认证。
-     */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -78,16 +71,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .parseSignedClaims(token)
                     .getPayload();
 
+            String jti = claims.getId();
+            if (jti != null && isJtiRevokedSafe(jti)) {
+                throw new BadCredentialsException("token revoked");
+            }
+
             String sub = claims.getSubject();
             if (sub == null || sub.isBlank()) {
                 throw new BadCredentialsException("invalid token");
             }
+
+            // 用户级吊销：账户被禁/删或检测到 refresh-token 盗用时，
+            // 在该时刻之前签发的 access token 必须立即失效。
+            java.time.Instant revokedBefore = revokedBeforeSafe(sub);
+            java.util.Date issuedAt = claims.getIssuedAt();
+            if (revokedBefore != null
+                    && issuedAt != null
+                    && issuedAt.toInstant().isBefore(revokedBefore)) {
+                throw new BadCredentialsException("token revoked");
+            }
+
             List<String> roles = extractRoles(claims);
             AuthenticatedUser user = new AuthenticatedUser(sub, roles);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(user, null, user.authorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            onlineStatusService.recordActivity(sub);
+
             filterChain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
             LOGGER.debug("Expired JWT token: {}", e.getMessage());
@@ -101,15 +113,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * 从请求头中提取 Bearer Token。
-     */
     private String extractToken(HttpServletRequest request) {
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (header != null && header.startsWith(BEARER_PREFIX)) {
             return header.substring(BEARER_PREFIX.length());
         }
         return null;
+    }
+
+    /**
+     * 黑名单查询失败时 fail-open：Redis 短暂故障不应该让所有已签发的 token 拒登。
+     * 签名仍然校验通过，撤销是 defense-in-depth；故障期间放行 + 告警是更可用的取舍。
+     */
+    private boolean isJtiRevokedSafe(String jti) {
+        try {
+            return tokenBlacklistService.isRevoked(jti);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("token blacklist check failed, fail-open: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    private java.time.Instant revokedBeforeSafe(String sub) {
+        try {
+            return tokenBlacklistService.revokedBefore(sub);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("user-level revoke check failed, fail-open: {}", ex.getMessage());
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -121,9 +152,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return Collections.emptyList();
     }
 
-    /**
-     * 写回统一的未认证响应。
-     */
     private void writeErrorResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

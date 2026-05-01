@@ -3,6 +3,7 @@ package com.rhizodelta.core.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
 import com.rhizodelta.infrastructure.messaging.config.RabbitMqConfig;
 import com.rhizodelta.infrastructure.messaging.message.PostEventMessage;
 import com.rhizodelta.infrastructure.sse.service.SseEventService;
@@ -227,10 +228,7 @@ public class PostController {
     }
 
     private AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new IllegalStateException("authenticated user principal not available");
-        }
-        return user;
+        return AuthenticatedUsers.require(authentication);
     }
 
     /**

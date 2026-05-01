@@ -1,9 +1,17 @@
 package com.rhizodelta.infrastructure.user.api;
 
+import com.rhizodelta.infrastructure.user.service.AvatarStorageService;
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,22 +27,10 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-/**
- * 当前用户自身画像的读取与更新接口。
- *
- * <p>读：{@code GET /api/users/me/profile} 返回当前认证用户的画像；
- * 画像不存在时 {@code display_name} 回退为 {@code username}，其余字段为 {@code null}。
- *
- * <p>写：{@code PUT /api/users/me/profile} 接受一个 JSON 对象，仅在
- * 请求体中出现的可变字段（display_name / avatar_url / language / timezone /
- * theme / notification_prefs）会被覆盖写入；显式 null 意味着清空该字段；
- * 未出现的字段保持不变。任何一次成功更新会把 {@code updated_at} 提至当前时刻。
- *
- * <p>两个接口都不接受 {@code user_id} 参数，只能操作调用方自己的画像。
- */
 @RestController
 @RequestMapping("/api/users")
 public class UserProfileController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserProfileController.class);
     private static final String FIND_PROFILE_QUERY = """
             MATCH (user:UserAccount {user_id: $userId})
             OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
@@ -58,9 +54,11 @@ public class UserProfileController {
             """;
 
     private final Neo4jClient neo4jClient;
+    private final AvatarStorageService avatarStorageService;
 
-    public UserProfileController(Neo4jClient neo4jClient) {
+    public UserProfileController(Neo4jClient neo4jClient, AvatarStorageService avatarStorageService) {
         this.neo4jClient = neo4jClient;
+        this.avatarStorageService = avatarStorageService;
     }
 
     @GetMapping("/me/profile")
@@ -80,6 +78,28 @@ public class UserProfileController {
         Map<String, Object> record = fetchPublicProfile(userId)
                 .orElseThrow(() -> new NoSuchElementException("user not found"));
         return ApiResponse.ok(toPublicPayload(record));
+    }
+
+    @GetMapping("/{userId}/avatar")
+    public ResponseEntity<?> getAvatar(@PathVariable String userId, Authentication authentication) {
+        requireAuthenticatedUser(authentication);
+        Map<String, Object> record = fetchPublicProfile(userId)
+                .orElseThrow(() -> new NoSuchElementException("user not found"));
+        String avatarUrl = stringOrNull(record.get("avatarUrl"));
+        if (avatarUrl == null) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            String presignedUrl = avatarStorageService.getPresignedUrl(avatarUrl);
+            if (presignedUrl != null) {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .header(HttpHeaders.LOCATION, presignedUrl)
+                        .build();
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Failed to generate presigned URL for user {}: {}", userId, e.getMessage());
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @PutMapping("/me/profile")
@@ -157,10 +177,18 @@ public class UserProfileController {
         String resolvedDisplayName = displayNameRaw != null && !displayNameRaw.toString().isBlank()
                 ? displayNameRaw.toString()
                 : record.get("username").toString();
+        String avatarUrl = stringOrNull(record.get("avatarUrl"));
+        if (avatarUrl != null) {
+            try {
+                avatarUrl = avatarStorageService.getPresignedUrl(avatarUrl);
+            } catch (Exception e) {
+                LOGGER.debug("Failed to resolve avatar URL: {}", e.getMessage());
+            }
+        }
         return new UserProfilePayload(
                 userId,
                 resolvedDisplayName,
-                stringOrNull(record.get("avatarUrl")),
+                avatarUrl,
                 stringOrNull(record.get("language")),
                 stringOrNull(record.get("timezone")),
                 stringOrNull(record.get("theme")),
@@ -182,7 +210,15 @@ public class UserProfileController {
         String username = usernameRaw != null ? usernameRaw.toString() : userId;
         payload.put("username", username);
         payload.put("display_name", resolveDisplayName(record.get("displayName"), username));
-        payload.put("avatar_url", stringOrNull(record.get("avatarUrl")));
+        String avatarUrl = stringOrNull(record.get("avatarUrl"));
+        if (avatarUrl != null) {
+            try {
+                avatarUrl = avatarStorageService.getPresignedUrl(avatarUrl);
+            } catch (Exception e) {
+                LOGGER.debug("Failed to resolve avatar URL: {}", e.getMessage());
+            }
+        }
+        payload.put("avatar_url", avatarUrl);
         return payload;
     }
 
@@ -199,9 +235,6 @@ public class UserProfileController {
     }
 
     private static AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new IllegalStateException("authenticated user principal not available");
-        }
-        return user;
+        return AuthenticatedUsers.require(authentication);
     }
 }

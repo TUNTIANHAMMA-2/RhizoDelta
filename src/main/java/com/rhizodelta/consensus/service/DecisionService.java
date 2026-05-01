@@ -14,6 +14,7 @@ import com.rhizodelta.consensus.repository.AIConsensusRepository;
 import com.rhizodelta.core.repository.HumanPostRepository;
 import com.rhizodelta.consensus.repository.ResultRepository;
 import com.rhizodelta.consensus.service.DagIntegrityService;
+import com.rhizodelta.infrastructure.user.service.TopicService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -377,13 +378,18 @@ public class DecisionService {
     private final ResultRepository resultRepository;
     private final DagIntegrityService dagIntegrityService;
     private final ApplicationEventPublisher eventPublisher;
-    public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, ResultRepository resultRepository, DagIntegrityService dagIntegrityService, ApplicationEventPublisher eventPublisher) {
+    private final TopicService topicService;
+    private final DecisionMetadataService decisionMetadataService;
+
+    public DecisionService(Neo4jClient neo4jClient, HumanPostRepository humanPostRepository, AIConsensusRepository aiConsensusRepository, ResultRepository resultRepository, DagIntegrityService dagIntegrityService, ApplicationEventPublisher eventPublisher, TopicService topicService, DecisionMetadataService decisionMetadataService) {
         this.neo4jClient = neo4jClient;
         this.humanPostRepository = humanPostRepository;
         this.aiConsensusRepository = aiConsensusRepository;
         this.resultRepository = resultRepository;
         this.dagIntegrityService = dagIntegrityService;
         this.eventPublisher = eventPublisher;
+        this.topicService = topicService;
+        this.decisionMetadataService = decisionMetadataService;
     }
 
     /**
@@ -403,6 +409,10 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createMergeRelationships(command, relationshipCreatedAt);
+        topicService.getOrCreateTopic(command.summary_content(), "DECISION");
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "MERGE", command.operator_type(), command.operator_id(),
+                upsertResult.nodeId(), command.reason(), relationshipCreatedAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.MergeCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
                 command.synthesized_from(), command.summary_content(), relationshipCreatedAt));
@@ -450,11 +460,18 @@ public class DecisionService {
                 consensusNodeId, appended, command.source_node_id(), command.synthesized_from().size());
 
         if (appended) {
+            decisionMetadataService.recordDecision(
+                    command.decision_id(), "MERGE", command.operator_type(), command.operator_id(),
+                    consensusNodeId, command.reason(), createdAt);
             eventPublisher.publishEvent(new DecisionCommittedEvent.MergeAppended(
                     command.decision_id(), consensusNodeId, command.source_node_id(),
                     command.synthesized_from(), createdAt));
         } else {
             dagIntegrityService.assertNoVersionEvolutionCycle(consensusNodeId, command.source_node_id());
+            topicService.getOrCreateTopic(command.summary_content(), "DECISION");
+            decisionMetadataService.recordDecision(
+                    command.decision_id(), "MERGE", command.operator_type(), command.operator_id(),
+                    consensusNodeId, command.reason(), createdAt);
             eventPublisher.publishEvent(new DecisionCommittedEvent.MergeCompleted(
                     command.decision_id(), consensusNodeId, command.source_node_id(),
                     command.synthesized_from(), command.summary_content(), createdAt));
@@ -478,6 +495,9 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createBranchRelationship(command, relationshipCreatedAt);
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "BRANCH", command.operator_type(), command.operator_id(),
+                upsertResult.nodeId(), command.reason(), relationshipCreatedAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
                 command.contributor_node_ids(), relationshipCreatedAt));
@@ -517,6 +537,9 @@ public class DecisionService {
                 .one()
                 .orElseThrow(() -> new IllegalStateException(
                         "Failed to link branch: existing node " + existingNodeId + " or source " + sourceNodeId + " not found"));
+        decisionMetadataService.recordDecision(
+                decisionId, "BRANCH", operatorType, operatorId,
+                existingNodeId, reason, createdAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.BranchCompleted(
                 decisionId, existingNodeId, sourceNodeId,
                 contributorNodeIds, createdAt));
@@ -537,6 +560,9 @@ public class DecisionService {
         dagIntegrityService.assertNoVersionEvolutionCycle(upsertResult.nodeId(), command.source_node_id());
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createInjectRelationship(command, relationshipCreatedAt);
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "INJECT", command.operator_type(), command.operator_id(),
+                upsertResult.nodeId(), command.reason(), relationshipCreatedAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.InjectCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
                 command.content(), relationshipCreatedAt));
@@ -556,6 +582,9 @@ public class DecisionService {
         }
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createMaterializeRelationship(command, relationshipCreatedAt);
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "MATERIALIZE", command.operator_type(), command.operator_id(),
+                upsertResult.nodeId(), command.reason(), relationshipCreatedAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.MaterializeCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_id(),
                 command.content(), relationshipCreatedAt));
@@ -596,6 +625,12 @@ public class DecisionService {
         List<UUID> nodeIds = branchParams.stream()
                 .map(b -> UUID.fromString((String) b.get("nodeId")))
                 .toList();
+        for (int i = 0; i < command.branches().size(); i++) {
+            ForkDecisionCommand.ForkBranchSpec branch = command.branches().get(i);
+            decisionMetadataService.recordDecision(
+                    branch.decision_id(), "FORK", command.operator_type(), command.operator_id(),
+                    nodeIds.get(i), command.reason(), createdAt);
+        }
         eventPublisher.publishEvent(new DecisionCommittedEvent.ForkCompleted(
                 command.operation_id(), nodeIds, command.source_node_id(), createdAt));
         return new ForkDecisionResult(command.operation_id(), nodeIds, QUEUED_STATUS,
@@ -635,6 +670,9 @@ public class DecisionService {
         for (UUID sourceResultId : command.source_result_ids()) {
             dagIntegrityService.assertNoResultLayerCycle(resolvedNodeId, sourceResultId);
         }
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "CROSS_SYNTH", command.operator_type(), command.operator_id(),
+                resolvedNodeId, command.reason(), createdAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.CrossSynthCompleted(
                 command.decision_id(), resolvedNodeId, command.source_result_ids(),
                 command.content(), createdAt));
@@ -657,6 +695,9 @@ public class DecisionService {
         }
         OffsetDateTime relationshipCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
         createJoinRelationships(command, relationshipCreatedAt);
+        decisionMetadataService.recordDecision(
+                command.decision_id(), "JOIN", command.operator_type(), command.operator_id(),
+                upsertResult.nodeId(), command.reason(), relationshipCreatedAt);
         eventPublisher.publishEvent(new DecisionCommittedEvent.JoinCompleted(
                 command.decision_id(), upsertResult.nodeId(), command.source_node_ids(),
                 command.summary_content(), relationshipCreatedAt));

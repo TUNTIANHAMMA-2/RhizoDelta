@@ -10,6 +10,10 @@ spring:
       max-connection-pool-size: 50
       connection-acquisition-timeout: 30s
       max-connection-lifetime: 1h
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 rhizodelta:
   embedding:
@@ -59,6 +63,13 @@ rhizodelta:
       cron: "0 */30 * * * *"
   jwt:
     secret: ${JWT_SECRET}
+    refresh-ttl: ${JWT_REFRESH_TTL:P30D}
+  minio:
+    enabled: ${MINIO_ENABLED:false}
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:rhizodelta-avatars}
 
 langchain4j:
   open-ai:

@@ -100,7 +100,12 @@ public class DatabaseInitializer {
             "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE",
             "CREATE CONSTRAINT rhizodelta_user_account_user_id_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.user_id IS UNIQUE",
             "CREATE INDEX rhizodelta_user_account_status_idx IF NOT EXISTS FOR (n:UserAccount) ON (n.status)",
-            "CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE"
+            "CREATE CONSTRAINT rhizodelta_user_profile_user_id_unique IF NOT EXISTS FOR (n:UserProfile) REQUIRE n.user_id IS UNIQUE",
+            "CREATE CONSTRAINT rhizodelta_topic_topic_id_unique IF NOT EXISTS FOR (n:Topic) REQUIRE n.topic_id IS UNIQUE",
+            "CREATE CONSTRAINT rhizodelta_decision_decision_id_unique IF NOT EXISTS FOR (n:Decision) REQUIRE n.decision_id IS UNIQUE",
+            "CREATE INDEX rhizodelta_decision_created_at_idx IF NOT EXISTS FOR (n:Decision) ON (n.created_at)",
+            "CREATE INDEX rhizodelta_follows_since_idx IF NOT EXISTS FOR ()-[r:FOLLOWS]-() ON (r.since)",
+            "CREATE INDEX rhizodelta_muted_since_idx IF NOT EXISTS FOR ()-[r:MUTED]-() ON (r.since)"
     );
 
     private final Neo4jClient neo4jClient;

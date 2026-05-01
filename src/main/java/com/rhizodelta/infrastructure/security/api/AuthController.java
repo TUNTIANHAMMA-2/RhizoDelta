@@ -2,14 +2,19 @@ package com.rhizodelta.infrastructure.security.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.domain.UserStatus;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
+import com.rhizodelta.infrastructure.security.service.RefreshTokenService;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.web.ApiResponse;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.security.authentication.BadCredentialsException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,19 +34,6 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * 提供注册、登录与当前用户信息接口。
- *
- * <p>该控制器负责管理用户账户的创建与认证会话签发，
- * 并通过 JWT 把认证结果返回给调用方。
- *
- * <p><b>关键副作用</b>：
- * <ul>
- *   <li>注册会写 Neo4j 中的 {@code UserAccount} 节点。</li>
- *   <li>登录和注册都会签发新的 JWT。</li>
- *   <li>密码会在写库前经由 {@link PasswordEncoder} 加密。</li>
- * </ul>
- */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -54,7 +46,8 @@ public class AuthController {
                    user.username AS username,
                    profile.display_name AS displayName,
                    user.password_hash AS passwordHash,
-                   user.roles AS roles
+                   user.roles AS roles,
+                   user.status AS status
             """;
     private static final String FIND_USER_BY_ID_QUERY = """
             MATCH (user:UserAccount {user_id: $userId})
@@ -63,7 +56,8 @@ public class AuthController {
                    user.username AS username,
                    profile.display_name AS displayName,
                    user.password_hash AS passwordHash,
-                   user.roles AS roles
+                   user.roles AS roles,
+                   user.status AS status
             """;
     private static final String CREATE_USER_QUERY = """
             MERGE (user:UserAccount {username: $username})
@@ -94,32 +88,32 @@ public class AuthController {
     private final Neo4jClient neo4jClient;
     private final PasswordEncoder passwordEncoder;
     private final SecretKey signingKey;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthController(
             Neo4jClient neo4jClient,
             PasswordEncoder passwordEncoder,
-            @Value("${rhizodelta.jwt.secret}") String jwtSecret
+            @Value("${rhizodelta.jwt.secret}") String jwtSecret,
+            TokenBlacklistService tokenBlacklistService,
+            RefreshTokenService refreshTokenService
     ) {
         this.neo4jClient = neo4jClient;
         this.passwordEncoder = passwordEncoder;
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.refreshTokenService = refreshTokenService;
     }
 
-    /**
-     * 注册一个新用户并返回登录态。
-     *
-     * <p>若用户名已存在，该接口会直接失败，不会悄悄覆盖原账户。
-     */
     @PostMapping("/register")
     public ApiResponse<AuthSessionPayload> register(@RequestBody RegisterRequest request) {
         validateCredentials(request.username(), request.password());
         StoredUser user = createUser(request);
-        return ApiResponse.ok(toSessionPayload(user, issueToken(user)));
+        String token = issueToken(user);
+        String refreshToken = refreshTokenService.issue(user.userId());
+        return ApiResponse.ok(toSessionPayload(user, token, refreshToken));
     }
 
-    /**
-     * 使用用户名和密码登录并返回登录态。
-     */
     @PostMapping("/login")
     public ApiResponse<AuthSessionPayload> login(@RequestBody LoginRequest request) {
         validateCredentials(request.username(), request.password());
@@ -128,12 +122,59 @@ public class AuthController {
         if (!passwordEncoder.matches(request.password(), user.passwordHash())) {
             throw new BadCredentialsException("invalid username or password");
         }
-        return ApiResponse.ok(toSessionPayload(user, issueToken(user)));
+        if (user.status() != null && !UserStatus.ACTIVE.name().equals(user.status())) {
+            throw new BadCredentialsException("account is " + user.status().toLowerCase() + ", login denied");
+        }
+        String token = issueToken(user);
+        String refreshToken = refreshTokenService.issue(user.userId());
+        return ApiResponse.ok(toSessionPayload(user, token, refreshToken));
     }
 
-    /**
-     * 返回当前认证用户信息。
-     */
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(Authentication authentication, HttpServletRequest request) {
+        AuthenticatedUser user = requireAuthenticatedUser(authentication);
+        revokeCurrentAccessToken(request);
+        refreshTokenService.revokeAllForUser(user.sub());
+        return ApiResponse.ok(null);
+    }
+
+    private void revokeCurrentAccessToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            return;
+        }
+        try {
+            String token = header.substring(7);
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            String jti = claims.getId();
+            if (jti != null && claims.getExpiration() != null) {
+                Duration remaining = Duration.between(Instant.now(), claims.getExpiration().toInstant());
+                if (!remaining.isNegative() && !remaining.isZero()) {
+                    tokenBlacklistService.revoke(jti, remaining);
+                }
+            }
+        } catch (Exception e) {
+            // Best-effort: if JWT parsing fails during logout, still proceed with refresh token revocation.
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthSessionPayload> refresh(@RequestBody RefreshRequest request) {
+        if (request.refreshToken() == null || request.refreshToken().isBlank()) {
+            throw new IllegalArgumentException("refresh_token must not be blank");
+        }
+        String userId = refreshTokenService.consume(request.refreshToken());
+        StoredUser user = findUserById(userId)
+                .orElseThrow(() -> new NoSuchElementException("user not found"));
+        String token = issueToken(user);
+        String newRefreshToken = refreshTokenService.issue(userId);
+        return ApiResponse.ok(toSessionPayload(user, token, newRefreshToken));
+    }
+
     @GetMapping("/me")
     public ApiResponse<UserPayload> me(Authentication authentication) {
         AuthenticatedUser user = requireAuthenticatedUser(authentication);
@@ -187,6 +228,7 @@ public class AuthController {
     private String issueToken(StoredUser user) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.userId())
                 .claim("roles", user.roles())
                 .claim("username", user.username())
@@ -198,30 +240,23 @@ public class AuthController {
     }
 
     private static AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new IllegalStateException("authenticated user principal not available");
-        }
-        return user;
+        return AuthenticatedUsers.require(authentication);
     }
 
     private static StoredUser toStoredUser(Map<String, Object> record) {
         String username = record.get("username").toString();
         Object displayNameRaw = record.get("displayName");
+        Object statusRaw = record.get("status");
         return new StoredUser(
                 record.get("userId").toString(),
                 username,
                 resolveDisplayName(displayNameRaw, username),
                 record.get("passwordHash").toString(),
-                toStringList(record.get("roles"))
+                toStringList(record.get("roles")),
+                statusRaw == null ? null : statusRaw.toString()
         );
     }
 
-    /**
-     * 返回最终向调用方暴露的 display_name。
-     *
-     * <p>按优先级：UserProfile.display_name（非空非空白）→ username。
-     * 该策略是 user-profile-split D4 定义的应用层契约；任何读到账户展示名的路径都要走这个 helper。
-     */
     static String resolveDisplayName(Object profileDisplayName, String username) {
         if (profileDisplayName == null) {
             return username;
@@ -237,8 +272,8 @@ public class AuthController {
         return values.stream().map(Object::toString).toList();
     }
 
-    private static AuthSessionPayload toSessionPayload(StoredUser user, String token) {
-        return new AuthSessionPayload(token, toUserPayload(user));
+    private static AuthSessionPayload toSessionPayload(StoredUser user, String token, String refreshToken) {
+        return new AuthSessionPayload(token, refreshToken, toUserPayload(user));
     }
 
     private static UserPayload toUserPayload(StoredUser user) {
@@ -264,52 +299,36 @@ public class AuthController {
             String username,
             String displayName,
             String passwordHash,
-            List<String> roles
-    ) {
-    }
+            List<String> roles,
+            String status
+    ) {}
 
-    /**
-     * 表示注册请求。
-     *
-     * <p>显式忽略未知字段，避免依赖全局 {@code ObjectMapper} 配置；
-     * 这样即使未来某处启用了 {@code FAIL_ON_UNKNOWN_PROPERTIES}，
-     * 注册端点仍然会安全地丢弃客户端提交的 {@code user_id} 等字段，
-     * 而不会升级为 400。详见 {@code user-identity-hardening} D2。
-     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record RegisterRequest(
             @JsonProperty("username") String username,
             @JsonProperty("password") String password,
             @JsonProperty("display_name") String displayName
-    ) {
-    }
+    ) {}
 
-    /**
-     * 表示登录请求。
-     */
     public record LoginRequest(
             @JsonProperty("username") String username,
             @JsonProperty("password") String password
-    ) {
-    }
+    ) {}
 
-    /**
-     * 表示认证会话响应。
-     */
+    public record RefreshRequest(
+            @JsonProperty("refresh_token") String refreshToken
+    ) {}
+
     public record AuthSessionPayload(
             @JsonProperty("token") String token,
+            @JsonProperty("refresh_token") String refreshToken,
             @JsonProperty("user") UserPayload user
-    ) {
-    }
+    ) {}
 
-    /**
-     * 表示当前用户的对外视图。
-     */
     public record UserPayload(
             @JsonProperty("user_id") String userId,
             @JsonProperty("username") String username,
             @JsonProperty("display_name") String displayName,
             @JsonProperty("roles") List<String> roles
-    ) {
-    }
+    ) {}
 }

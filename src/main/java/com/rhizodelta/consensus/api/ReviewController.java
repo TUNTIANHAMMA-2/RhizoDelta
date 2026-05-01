@@ -7,6 +7,7 @@ import com.rhizodelta.consensus.domain.decision.DecisionOperatorType;
 import com.rhizodelta.consensus.domain.decision.DecisionResult;
 import com.rhizodelta.consensus.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.consensus.domain.review.ReviewTask;
+import com.rhizodelta.consensus.service.AuditRelationService;
 import com.rhizodelta.consensus.service.DecisionService;
 import com.rhizodelta.consensus.service.ReviewTaskService;
 import org.slf4j.Logger;
@@ -47,10 +48,13 @@ public class ReviewController {
 
     private final ReviewTaskService reviewTaskService;
     private final DecisionService decisionService;
+    private final AuditRelationService auditRelationService;
 
-    public ReviewController(ReviewTaskService reviewTaskService, DecisionService decisionService) {
+    public ReviewController(ReviewTaskService reviewTaskService, DecisionService decisionService,
+                            AuditRelationService auditRelationService) {
         this.reviewTaskService = reviewTaskService;
         this.decisionService = decisionService;
+        this.auditRelationService = auditRelationService;
     }
 
     /**
@@ -99,6 +103,7 @@ public class ReviewController {
             throw ex;
         }
         reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        auditRelationService.recordReview(authentication.getName(), result.decision_id(), "APPROVED");
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
@@ -122,6 +127,7 @@ public class ReviewController {
             throw ex;
         }
         reviewTaskService.updateStatus(reviewId, ReviewTask.Status.APPROVED);
+        auditRelationService.recordReview(authentication.getName(), result.decision_id(), "APPROVED");
         return ResponseEntity.accepted().body(ApiResponse.ok(result));
     }
 
@@ -138,8 +144,12 @@ public class ReviewController {
      * <p>拒绝只更新任务状态，不执行底层决策命令。
      */
     @PostMapping("/{id}/reject")
-    public ApiResponse<ReviewTaskPayload> rejectReview(@PathVariable("id") String reviewId) {
+    public ApiResponse<ReviewTaskPayload> rejectReview(@PathVariable("id") String reviewId,
+                                                        Authentication authentication) {
         ReviewTask updated = reviewTaskService.updateStatus(reviewId, ReviewTask.Status.REJECTED);
+        Map<String, Object> draft = updated.draftPayload();
+        String decisionId = draft.containsKey("decision_id") ? draft.get("decision_id").toString() : reviewId;
+        auditRelationService.recordReview(authentication.getName(), decisionId, "REJECTED");
         return ApiResponse.ok(toPayload(updated));
     }
 

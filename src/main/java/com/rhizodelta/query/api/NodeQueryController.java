@@ -2,11 +2,14 @@ package com.rhizodelta.query.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.user.service.PreferenceEventService;
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.core.domain.association.AssociationInfo;
 import com.rhizodelta.core.domain.association.AssociationType;
 import com.rhizodelta.core.service.AssociationService;
 import com.rhizodelta.query.service.NodeQueryService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,10 +38,12 @@ import java.util.UUID;
 public class NodeQueryController {
     private final NodeQueryService nodeQueryService;
     private final AssociationService associationService;
+    private final PreferenceEventService preferenceEventService;
 
-    public NodeQueryController(NodeQueryService nodeQueryService, AssociationService associationService) {
+    public NodeQueryController(NodeQueryService nodeQueryService, AssociationService associationService, PreferenceEventService preferenceEventService) {
         this.nodeQueryService = nodeQueryService;
         this.associationService = associationService;
+        this.preferenceEventService = preferenceEventService;
     }
 
     /**
@@ -72,9 +77,10 @@ public class NodeQueryController {
      * @return 节点摘要。
      */
     @GetMapping("/{id}")
-    public ApiResponse<NodePayload> getNodeById(@PathVariable("id") String id) {
+    public ApiResponse<NodePayload> getNodeById(@PathVariable("id") String id, Authentication authentication) {
         UUID nodeId = parseUuid(id);
         NodeQueryService.LineageNode node = nodeQueryService.getNodeSummaryById(nodeId);
+        recordViewEvent(authentication, nodeId);
         return ApiResponse.ok(fromLineageNode(node));
     }
 
@@ -204,6 +210,13 @@ public class NodeQueryController {
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("id must be a valid UUID", exception);
         }
+    }
+
+    private void recordViewEvent(Authentication authentication, UUID nodeId) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser u)) {
+            return;
+        }
+        preferenceEventService.recordEvent(u.sub(), null, "VIEW", 0.5, nodeId.toString());
     }
 
     /**

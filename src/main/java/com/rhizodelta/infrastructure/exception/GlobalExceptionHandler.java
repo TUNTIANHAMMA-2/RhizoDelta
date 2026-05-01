@@ -3,6 +3,7 @@ package com.rhizodelta.infrastructure.exception;
 import com.rhizodelta.consensus.domain.exception.DagIntegrityViolationException;
 import com.rhizodelta.core.domain.association.AssociationType;
 import com.rhizodelta.consensus.domain.exception.RollbackBlockedException;
+import com.rhizodelta.infrastructure.exception.ConflictException;
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,15 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DagIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDagIntegrityViolation(DagIntegrityViolationException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.conflict(exception.getMessage()));
+    }
+
+    /**
+     * 处理资源已存在等业务级冲突。
+     */
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.conflict(exception.getMessage()));
     }

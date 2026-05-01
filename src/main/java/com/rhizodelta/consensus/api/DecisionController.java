@@ -2,6 +2,7 @@ package com.rhizodelta.consensus.api;
 
 import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUser;
+import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
 import com.rhizodelta.consensus.domain.decision.BranchDecisionCommand;
 import com.rhizodelta.consensus.domain.decision.CrossSynthDecisionCommand;
 import com.rhizodelta.consensus.domain.decision.DecisionResult;
@@ -10,6 +11,7 @@ import com.rhizodelta.consensus.domain.decision.ForkDecisionResult;
 import com.rhizodelta.consensus.domain.decision.InjectDecisionCommand;
 import com.rhizodelta.consensus.domain.decision.JoinDecisionCommand;
 import com.rhizodelta.consensus.domain.decision.MaterializeDecisionCommand;
+import com.rhizodelta.consensus.service.AuditRelationService;
 import com.rhizodelta.consensus.service.DecisionService;
 import com.rhizodelta.consensus.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.consensus.domain.decision.RollbackResult;
@@ -40,10 +42,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class DecisionController {
     private final DecisionService decisionService;
     private final RollbackService rollbackService;
+    private final AuditRelationService auditRelationService;
 
-    public DecisionController(DecisionService decisionService, RollbackService rollbackService) {
+    public DecisionController(DecisionService decisionService, RollbackService rollbackService,
+                              AuditRelationService auditRelationService) {
         this.decisionService = decisionService;
         this.rollbackService = rollbackService;
+        this.auditRelationService = auditRelationService;
     }
 
     /**
@@ -146,9 +151,13 @@ public class DecisionController {
      */
     @PostMapping("/{decision_id}/rollback")
     public ResponseEntity<ApiResponse<RollbackResult>> rollback(
-            @PathVariable("decision_id") String decisionId
+            @PathVariable("decision_id") String decisionId,
+            Authentication authentication
     ) {
+        AuthenticatedUser admin = AuthenticatedUsers.require(authentication);
         RollbackResult result = rollbackService.rollbackDecision(decisionId);
+        auditRelationService.recordOperation(
+                admin.sub(), result.rolled_back_node_id().toString(), decisionId);
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
@@ -157,17 +166,19 @@ public class DecisionController {
      */
     @PostMapping("/fork/{operation_id}/rollback")
     public ResponseEntity<ApiResponse<RollbackService.ForkRollbackResult>> rollbackFork(
-            @PathVariable("operation_id") String operationId
+            @PathVariable("operation_id") String operationId,
+            Authentication authentication
     ) {
+        AuthenticatedUser admin = AuthenticatedUsers.require(authentication);
         RollbackService.ForkRollbackResult result = rollbackService.rollbackForkByOperationId(operationId);
+        for (var nodeId : result.rolled_back_node_ids()) {
+            auditRelationService.recordOperation(admin.sub(), nodeId.toString(), operationId);
+        }
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
     private static AuthenticatedUser requireAuthenticatedUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new IllegalStateException("authenticated user principal not available");
-        }
-        return user;
+        return AuthenticatedUsers.require(authentication);
     }
 
     private static MergeDecisionCommand withOperatorId(MergeDecisionCommand command, String operatorId) {
