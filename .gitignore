@@ -24,3 +24,13 @@ frontend/README.md
 
 # Local environment config
 src/main/resources/application-local.yml
+
+# Vite cache
+.vite/
+
+# Root-level slash-command harness (ccg-workflow) — not project code
+/package.json
+/package-lock.json
+
+# Ad-hoc local demo scripts
+k6-demo.js
