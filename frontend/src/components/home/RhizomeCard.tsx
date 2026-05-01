@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useNavigate } from "react-router-dom";
 import type { GraphNodeDTO, NodeLabel } from "../../api/types";
 import { stripMarkdown } from "../../lib/markdown";
+import { AuthorLabel } from "../shared/AuthorLabel";
 import { metaLabel, relativeTime } from "../../lib/typography";
 
 interface RhizomeCardProps {
@@ -54,11 +55,6 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
     ? stripMarkdown(node.summary_content)
     : body;
   const quality = node.quality_overall;
-  const authorLabel =
-    node.author_display_name ??
-    node.author_username ??
-    node.author_id ??
-    "Anonymous";
 
   const openGraph = () => navigate(`/workspace/${node.node_id}`);
 
@@ -119,7 +115,11 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
         >
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-1 h-1 rounded-full bg-text-tertiary/60" />
-            {authorLabel}
+            <AuthorLabel
+              displayName={node.author_display_name}
+              username={node.author_username}
+              authorId={node.author_id}
+            />
           </span>
           <span className="text-text-tertiary/50">·</span>
           <time

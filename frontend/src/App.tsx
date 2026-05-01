@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import { GraphWorkspace } from "./components/GraphWorkspace";
 import { HomePage } from "./components/home/HomePage";
 import { LoginPage } from "./components/auth/LoginPage";
+import { SettingsPage } from "./components/settings/SettingsPage";
 import { useAuthStore } from "./stores/authStore";
 
 function RequireAuth() {
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/workspace" element={<GraphWorkspace />} />
           <Route path="/workspace/:rhizomeId" element={<GraphWorkspace />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

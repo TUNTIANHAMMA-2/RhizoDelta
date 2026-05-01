@@ -272,3 +272,85 @@ export interface ForkRollbackResult {
   soft_deleted: boolean;
   deleted_count: number;
 }
+
+// ────────────────────── 用户画像与个性化 ──────────────────────
+
+export interface UserProfile {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  language: string | null;
+  timezone: string | null;
+  theme: string | null;
+  notification_prefs: string | null;
+  updated_at: string | null;
+}
+
+export interface PublicUserProfile {
+  user_id: string;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string | null;
+  status?: string;
+}
+
+export interface FollowItem {
+  follow_id: string;
+  target_type: string;
+  target_id: string;
+  target_display_name?: string;
+  since: string;
+}
+
+export interface FollowListResponse {
+  items: FollowItem[];
+  page: number;
+  size: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+}
+
+export interface MuteItem {
+  mute_id: string;
+  target_type: string;
+  target_id: string;
+  target_display_name?: string;
+  reason?: string;
+  since: string;
+}
+
+export interface FeedResponse {
+  items: unknown[];
+  page: number;
+  size: number;
+  has_next: boolean;
+}
+
+export interface OnlineStatus {
+  user_id: string;
+  online: boolean;
+  last_active?: string;
+}
+
+export interface FollowRequest {
+  target_type: string;
+  target_id: string;
+}
+
+export interface MuteRequest {
+  target_type: string;
+  target_id: string;
+  reason?: string;
+}
+
+export interface AuthSessionPayload {
+  token: string;
+  refresh_token: string;
+  user: {
+    user_id: string;
+    username: string;
+    display_name: string;
+    roles: string[];
+  };
+}

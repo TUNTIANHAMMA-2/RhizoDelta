@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { type NodeProps } from "@xyflow/react";
 import type { GraphNodeDTO } from "../../api/types";
 import { useGraphStore } from "../../stores/graphStore";
-import { NodeActionToolbar } from "./NodeActionToolbar";
+import { AuthorLabel } from "../shared/AuthorLabel";
 import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
 import { QualityBadge } from "./QualityBadge";
@@ -23,11 +23,6 @@ export const HumanPostNode = memo(function HumanPostNode({ data, selected }: Nod
     () => stripMarkdown(node.content ?? node.summary_content),
     [node.content, node.summary_content],
   );
-  const authorLabel =
-    node.author_display_name ??
-    node.author_username ??
-    node.author_id ??
-    "Anonymous";
 
   return (
     <div
@@ -55,7 +50,11 @@ export const HumanPostNode = memo(function HumanPostNode({ data, selected }: Nod
         {zoom === "normal" && (
           <div className="node-content-normal">
             <div className="node-header">
-              <span>{authorLabel}</span>
+              <AuthorLabel
+                displayName={node.author_display_name}
+                username={node.author_username}
+                authorId={node.author_id}
+              />
               <span className="flex items-center gap-1">
                 {node.quality_overall != null && <QualityBadge qualityOverall={node.quality_overall} />}
                 {new Date(node.created_at).toLocaleDateString()}

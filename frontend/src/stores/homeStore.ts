@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import type { GraphNodeDTO } from "../api/types";
+import { getFeed } from "../api/feed";
+import { listFollows } from "../api/follows";
 
 export type QualityBand = "top" | "good" | "basic" | "unrated";
 
@@ -6,9 +9,10 @@ export type HomeNavKey =
   | "all"
   | "mine"
   | "recent"
+  | "following"
   | `quality:${QualityBand}`;
 
-export type HomeSortKey = "latest" | "quality" | "active";
+export type HomeSortKey = "latest" | "quality" | "active" | "for_you";
 
 export const QUALITY_TOP_THRESHOLD = 0.8;
 export const QUALITY_GOOD_THRESHOLD = 0.5;
@@ -23,15 +27,50 @@ export function qualityBandOf(q: number | null | undefined): QualityBand {
 export interface HomeState {
   activeNav: HomeNavKey;
   sortBy: HomeSortKey;
+  feedItems: GraphNodeDTO[];
+  feedLoading: boolean;
+  followingTargetIds: Set<string>;
+  followingLoading: boolean;
   setActiveNav: (key: HomeNavKey) => void;
   setSortBy: (key: HomeSortKey) => void;
+  loadFeed: () => Promise<void>;
+  loadFollowing: () => Promise<void>;
 }
 
 export const useHomeStore = create<HomeState>((set) => ({
   activeNav: "all",
   sortBy: "latest",
+  feedItems: [],
+  feedLoading: false,
+  followingTargetIds: new Set<string>(),
+  followingLoading: false,
   setActiveNav: (key) => set({ activeNav: key }),
   setSortBy: (key) => set({ sortBy: key }),
+  loadFeed: async () => {
+    set({ feedLoading: true });
+    try {
+      const response = await getFeed(0, 50);
+      const items = (response.items as GraphNodeDTO[]) ?? [];
+      set({ feedItems: items });
+    } finally {
+      set({ feedLoading: false });
+    }
+  },
+  loadFollowing: async () => {
+    set({ followingLoading: true });
+    try {
+      const response = await listFollows(0, 200);
+      const ids = new Set<string>();
+      for (const item of response.items) {
+        if (item.target_type === "node" || item.target_type === "user") {
+          ids.add(item.target_id);
+        }
+      }
+      set({ followingTargetIds: ids });
+    } finally {
+      set({ followingLoading: false });
+    }
+  },
 }));
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -48,6 +87,7 @@ export function filterRhizomes<T extends RhizomeLike>(
   list: T[],
   nav: HomeNavKey,
   currentUserId: string | null,
+  followingTargetIds: Set<string> = new Set(),
   now = Date.now(),
 ): T[] {
   if (nav === "all") return list;
@@ -60,6 +100,14 @@ export function filterRhizomes<T extends RhizomeLike>(
       (n) => now - Date.parse(n.created_at) < RECENT_WINDOW_MS,
     );
   }
+  if (nav === "following") {
+    if (followingTargetIds.size === 0) return [];
+    return list.filter(
+      (n) =>
+        followingTargetIds.has(n.node_id) ||
+        (n.author_id != null && followingTargetIds.has(n.author_id)),
+    );
+  }
   // quality:<band>
   const band = nav.slice("quality:".length) as QualityBand;
   return list.filter((n) => qualityBandOf(n.quality_overall) === band);
@@ -70,7 +118,8 @@ export function sortRhizomes<T extends RhizomeLike>(
   sortBy: HomeSortKey,
 ): T[] {
   const copy = [...list];
-  if (sortBy === "latest") {
+  if (sortBy === "latest" || sortBy === "for_you") {
+    // for_you 已由后端按推荐顺序返回，这里仅保底维持时间倒序
     copy.sort(
       (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
     );

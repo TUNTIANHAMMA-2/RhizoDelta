@@ -4,6 +4,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { Skeleton } from "../feedback/Skeleton";
 import { EmptyState } from "../feedback/EmptyState";
+import { AuthorLabel } from "../shared/AuthorLabel";
 import type { GraphNodeDTO } from "../../api/types";
 
 const TYPE_COLOR = {
@@ -17,11 +18,6 @@ interface Props {
 }
 
 function ProvenanceItem({ item, onSelect }: { item: GraphNodeDTO; onSelect: () => void }) {
-  const authorLabel =
-    item.author_display_name ??
-    item.author_username ??
-    item.author_id ??
-    "Agent";
   return (
     <button
       onClick={onSelect}
@@ -38,7 +34,11 @@ function ProvenanceItem({ item, onSelect }: { item: GraphNodeDTO; onSelect: () =
           {item.content?.slice(0, 60) ?? item.summary_content?.slice(0, 60) ?? "—"}
         </div>
         <div className="text-xs text-text-tertiary">
-          {authorLabel} &middot;{" "}
+          <AuthorLabel
+            displayName={item.author_display_name}
+            username={item.author_username}
+            authorId={item.author_id}
+          /> &middot;{" "}
           {new Date(item.created_at).toLocaleDateString()}
         </div>
       </div>

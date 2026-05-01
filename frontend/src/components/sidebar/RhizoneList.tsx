@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { useUiStore } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
-import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
+import { AuthorLabel } from "../shared/AuthorLabel";
 import { selectRhizome } from "../../lib/selectRhizome";
 import { stripMarkdown } from "../../lib/markdown";
 
@@ -57,11 +57,6 @@ export function RhizoneList() {
           rhizomes.map((node) => {
             const isSelected = node.node_id === rootNodeId;
             const plainText = stripMarkdown(node.content ?? node.summary_content);
-            const authorLabel =
-              node.author_display_name ??
-              node.author_username ??
-              node.author_id ??
-              "Anonymous";
             return (
               <button
                 key={node.node_id}
@@ -79,7 +74,11 @@ export function RhizoneList() {
                 </div>
                 <div className="text-[11px] text-text-secondary flex justify-between w-full">
                   <span>{new Date(node.created_at).toLocaleDateString()}</span>
-                  <span>{authorLabel}</span>
+                  <AuthorLabel
+                    displayName={node.author_display_name}
+                    username={node.author_username}
+                    authorId={node.author_id}
+                  />
                 </div>
               </button>
             );

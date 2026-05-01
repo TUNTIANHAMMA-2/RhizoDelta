@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { useUiStore, type NodeTab } from "../../stores/uiStore";
 import { useGraphStore } from "../../stores/graphStore";
@@ -9,6 +9,9 @@ import { AuditPanel } from "./AuditPanel";
 import { MarkdownViewer } from "../editor/MarkdownViewer";
 import { DecisionCard } from "./DecisionCard";
 import { summarizeNode, fetchNode } from "../../api/nodes";
+import { follow, unfollow, listFollows } from "../../api/follows";
+import { mute, unmute, listMutes } from "../../api/mutes";
+import { resolveAuthorName } from "../shared/AuthorLabel";
 import type { DecisionExplanation } from "../../api/types";
 
 const TABS: { id: NodeTab; label: string }[] = [
@@ -53,16 +56,58 @@ export function NodeDetailPanel() {
   const nodes = useGraphStore((s) => s.nodes);
   const orchestrationStatuses = useSseStore((s) => s.orchestrationStatuses);
   const [summarizing, setSummarizing] = useState(false);
+  const [followId, setFollowId] = useState<string | null>(null);
+  const [muteId, setMuteId] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
+  const [muting, setMuting] = useState(false);
+  const [pendingFollow, setPendingFollow] = useState(false);
+  const [pendingMute, setPendingMute] = useState(false);
 
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
   if (!node) return null;
-  const authorLabel =
-    node.author_display_name ??
-    node.author_username ??
-    node.author_id ??
-    node.agent_version ??
-    "System";
+  const authorName = resolveAuthorName(node.author_display_name, node.author_username, node.author_id)
+    || node.agent_version
+    || "System";
+
+  // Resolve current follow/mute state for this node when the panel opens. We
+  // page through follows/mutes once — for the typical user with O(10) follows
+  // this is one round-trip; large lists fall through to "not following" which
+  // simply turns the button into a no-op (user can click again).
+  useEffect(() => {
+    let cancelled = false;
+    setFollowId(null);
+    setMuteId(null);
+    setFollowing(false);
+    setMuting(false);
+    listFollows(0, 100)
+      .then((result) => {
+        if (cancelled) return;
+        const match = result.items.find(
+          (item) => item.target_type === "node" && item.target_id === node.node_id,
+        );
+        if (match) {
+          setFollowId(match.follow_id);
+          setFollowing(true);
+        }
+      })
+      .catch(() => {});
+    listMutes(0, 100)
+      .then((result) => {
+        if (cancelled) return;
+        const match = result.items.find(
+          (item) => item.target_type === "node" && item.target_id === node.node_id,
+        );
+        if (match) {
+          setMuteId(match.mute_id);
+          setMuting(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [node.node_id]);
 
   const orchestrationStatus = orchestrationStatuses[node.node_id];
   const statusLabel = orchestrationStatus
@@ -106,8 +151,72 @@ export function NodeDetailPanel() {
             &times;
           </button>
         </div>
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            disabled={pendingFollow}
+            onClick={async () => {
+              if (pendingFollow) return;
+              setPendingFollow(true);
+              try {
+                if (following && followId) {
+                  await unfollow(followId);
+                  setFollowing(false);
+                  setFollowId(null);
+                } else {
+                  const created = await follow({ target_type: "node", target_id: node.node_id });
+                  setFollowId(created.follow_id);
+                  setFollowing(true);
+                }
+              } catch {
+                // silently ignore
+              } finally {
+                setPendingFollow(false);
+              }
+            }}
+            className={clsx(
+              "px-2 py-0.5 text-xs border rounded-md cursor-pointer transition-colors",
+              following
+                ? "bg-accent text-white border-accent"
+                : "bg-transparent text-text-secondary border-border-default",
+              pendingFollow && "opacity-50 cursor-not-allowed",
+            )}
+          >
+            {following ? "关注中" : "关注"}
+          </button>
+          <button
+            disabled={pendingMute}
+            onClick={async () => {
+              if (pendingMute) return;
+              setPendingMute(true);
+              try {
+                if (muting && muteId) {
+                  await unmute(muteId);
+                  setMuting(false);
+                  setMuteId(null);
+                } else {
+                  const created = await mute({ target_type: "node", target_id: node.node_id });
+                  setMuteId(created.mute_id);
+                  setMuting(true);
+                }
+              } catch {
+                // silently ignore
+              } finally {
+                setPendingMute(false);
+              }
+            }}
+            className={clsx(
+              "px-2 py-0.5 text-xs border rounded-md cursor-pointer transition-colors",
+              muting
+                ? "bg-danger text-white border-danger"
+                : "bg-transparent text-text-secondary border-border-default",
+              pendingMute && "opacity-50 cursor-not-allowed",
+            )}
+          >
+            {muting ? "已屏蔽" : "屏蔽"}
+          </button>
+        </div>
         <div className="text-xs text-text-secondary">
-          {authorLabel} &middot;{" "}
+          {authorName} &middot;{" "}
           {new Date(node.created_at).toLocaleString()}
         </div>
       </div>

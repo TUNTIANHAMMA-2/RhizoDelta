@@ -8,10 +8,11 @@ export async function request<T>(
   options?: RequestInit,
 ): Promise<T> {
   const token = localStorage.getItem("jwt_token");
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },

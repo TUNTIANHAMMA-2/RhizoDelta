@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuthStore } from "../../stores/authStore";
 import { useGraphStore } from "../../stores/graphStore";
 import {
@@ -20,6 +20,7 @@ const SORT_OPTIONS: Array<{ key: HomeSortKey; en: string; zh: string }> = [
   { key: "latest", en: "Latest", zh: "最新" },
   { key: "quality", en: "Quality", zh: "质量" },
   { key: "active", en: "Active", zh: "活跃" },
+  { key: "for_you", en: "For You", zh: "为你推荐" },
 ];
 
 function Hero({ onOpenSearch }: { onOpenSearch: () => void }) {
@@ -203,20 +204,48 @@ export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
   const activeNav = useHomeStore((s) => s.activeNav);
   const sortBy = useHomeStore((s) => s.sortBy);
   const userId = useAuthStore((s) => s.userId);
+  const feedItems = useHomeStore((s) => s.feedItems);
+  const loadFeed = useHomeStore((s) => s.loadFeed);
+  const followingTargetIds = useHomeStore((s) => s.followingTargetIds);
+  const loadFollowing = useHomeStore((s) => s.loadFollowing);
 
-  const visible = useMemo(
-    () => sortRhizomes(filterRhizomes(rhizomes, activeNav, userId), sortBy),
-    [rhizomes, activeNav, userId, sortBy],
-  );
+  // 当用户切到 "For You" 排序时拉取后端 feed —— 这是真正的个性化内容来源。
+  useEffect(() => {
+    if (sortBy === "for_you" && userId) {
+      loadFeed().catch(console.error);
+    }
+  }, [sortBy, userId, loadFeed]);
+
+  // 进入 "Following" 频道时刷新关注列表，保证过滤集合是最新的。
+  useEffect(() => {
+    if (activeNav === "following" && userId) {
+      loadFollowing().catch(console.error);
+    }
+  }, [activeNav, userId, loadFollowing]);
+
+  const visible = useMemo(() => {
+    if (sortBy === "for_you" && userId) {
+      // For You 直接消费 feed 接口的结果，仍然走一遍本地排序兜底。
+      return sortRhizomes(feedItems, sortBy);
+    }
+    return sortRhizomes(
+      filterRhizomes(rhizomes, activeNav, userId, followingTargetIds),
+      sortBy,
+    );
+  }, [rhizomes, activeNav, userId, sortBy, feedItems, followingTargetIds]);
 
   const emptyReason =
-    rhizomes.length === 0
+    sortBy === "for_you"
+      ? "Your personalized feed is empty — follow topics or people to fill it."
+      : rhizomes.length === 0
       ? "No rhizomes yet."
       : activeNav === "mine"
         ? "You haven't seeded any rhizomes yet."
-        : activeNav === "recent"
-          ? "No rhizomes in the last 24 hours."
-          : "No rhizomes match this filter.";
+        : activeNav === "following"
+          ? "Nothing from the people / topics you follow yet."
+          : activeNav === "recent"
+            ? "No rhizomes in the last 24 hours."
+            : "No rhizomes match this filter.";
 
   return (
     <section className="flex-1 min-w-0 flex flex-col">
