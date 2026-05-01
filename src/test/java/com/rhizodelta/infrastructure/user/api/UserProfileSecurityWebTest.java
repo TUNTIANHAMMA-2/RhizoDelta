@@ -2,6 +2,9 @@ package com.rhizodelta.infrastructure.user.api;
 
 import com.rhizodelta.infrastructure.security.config.SecurityConfig;
 import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.user.service.AvatarStorageService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,6 +37,15 @@ class UserProfileSecurityWebTest {
 
     @MockBean
     private Neo4jClient neo4jClient;
+
+    @MockBean
+    private AvatarStorageService avatarStorageService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private OnlineStatusService onlineStatusService;
 
     @Test
     void getProfileWithoutJwtReturnsUnauthorized() throws Exception {

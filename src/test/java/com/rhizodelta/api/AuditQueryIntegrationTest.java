@@ -88,8 +88,10 @@ class AuditQueryIntegrationTest {
 
         OffsetDateTime since = nowUtc().minusMinutes(5);
         OffsetDateTime until = nowUtc().plusMinutes(5);
+        // Controller 用 JWT 主体覆盖请求体里的 operator_id 防伪造，所以审计记录里写的是
+        // TestRestTemplateConfig 注入的 "test-operator"，而非请求体里的 agent-42。
         ResponseEntity<Map> filteredResponse = restTemplate.getForEntity(
-                "/api/audit/decisions?type=MERGE&operator_id=agent-42&since=" + since + "&until=" + until,
+                "/api/audit/decisions?type=MERGE&operator_id=test-operator&since=" + since + "&until=" + until,
                 Map.class
         );
 
@@ -98,7 +100,7 @@ class AuditQueryIntegrationTest {
         assertThat(filteredRecords).isNotEmpty();
         assertThat(filteredRecords).allSatisfy(record -> {
             assertThat(record.get("decision_type")).isEqualTo("MERGE");
-            assertThat(record.get("operator_id")).isEqualTo("agent-42");
+            assertThat(record.get("operator_id")).isEqualTo("test-operator");
         });
 
         ResponseEntity<Map> firstPageResponse = restTemplate.getForEntity("/api/audit/decisions?limit=1", Map.class);

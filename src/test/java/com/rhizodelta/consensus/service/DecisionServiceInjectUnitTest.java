@@ -7,6 +7,8 @@ import com.rhizodelta.consensus.domain.exception.DagIntegrityViolationException;
 import com.rhizodelta.consensus.repository.AIConsensusRepository;
 import com.rhizodelta.core.repository.HumanPostRepository;
 import com.rhizodelta.consensus.repository.ResultRepository;
+import com.rhizodelta.infrastructure.user.service.TopicService;
+import com.rhizodelta.consensus.service.DecisionMetadataService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
@@ -47,12 +49,18 @@ class DecisionServiceInjectUnitTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private TopicService topicService;
+
+    @Mock
+    private DecisionMetadataService decisionMetadataService;
+
     @Test
     void executeInjectShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         DecisionService decisionService = new DecisionService(
                 neo4jClient, humanPostRepository, aiConsensusRepository,
-                resultRepository, dagIntegrityService, eventPublisher);
+                resultRepository, dagIntegrityService, eventPublisher, topicService, decisionMetadataService);
 
         UUID sourceNodeId = UUID.randomUUID();
         InjectDecisionCommand command = newInjectCommand(sourceNodeId);
@@ -71,7 +79,7 @@ class DecisionServiceInjectUnitTest {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         DecisionService decisionService = new DecisionService(
                 neo4jClient, humanPostRepository, aiConsensusRepository,
-                resultRepository, dagIntegrityService, eventPublisher);
+                resultRepository, dagIntegrityService, eventPublisher, topicService, decisionMetadataService);
 
         UUID sourceNodeId = UUID.randomUUID();
         UUID decisionNodeId = UUID.randomUUID();
@@ -98,7 +106,7 @@ class DecisionServiceInjectUnitTest {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         DecisionService decisionService = new DecisionService(
                 neo4jClient, humanPostRepository, aiConsensusRepository,
-                resultRepository, dagIntegrityService, eventPublisher);
+                resultRepository, dagIntegrityService, eventPublisher, topicService, decisionMetadataService);
 
         UUID sourceNodeId = UUID.randomUUID();
         InjectDecisionCommand command = newInjectCommand(sourceNodeId);

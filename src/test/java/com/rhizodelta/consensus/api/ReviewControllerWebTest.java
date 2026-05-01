@@ -4,8 +4,11 @@ import com.rhizodelta.infrastructure.security.config.SecurityConfig;
 import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
 import com.rhizodelta.consensus.domain.decision.DecisionResult;
 import com.rhizodelta.consensus.domain.review.ReviewTask;
+import com.rhizodelta.consensus.service.AuditRelationService;
 import com.rhizodelta.consensus.service.DecisionService;
 import com.rhizodelta.consensus.service.ReviewTaskService;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -47,6 +50,15 @@ class ReviewControllerWebTest {
 
     @MockBean
     private DecisionService decisionService;
+
+    @MockBean
+    private AuditRelationService auditRelationService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private OnlineStatusService onlineStatusService;
 
     @Test
     void shouldReturnPendingReviewsForAgentRole() throws Exception {

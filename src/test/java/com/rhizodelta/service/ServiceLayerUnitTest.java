@@ -87,6 +87,10 @@ class ServiceLayerUnitTest {
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (user:UserAccount")) )
+                .bind(eq("author")).to(eq("authorId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (post:Human_Post")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .bind(any()).to(eq("nodeId"))
@@ -96,6 +100,12 @@ class ServiceLayerUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (author)-[rel:AUTHORED]")) )
+                .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
+                .bind(eq("author")).to(eq("authorId"))
+                .bind(any()).to(eq("createdAt"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("relType", "AUTHORED")));
         when(humanPostRepository.findByNodeId(persistedNodeId)).thenReturn(Optional.of(persisted));
 
         HumanPost result = postService.createHumanPost(new PostService.CreateHumanPostCommand(requestId, "author", "content")).post();
@@ -118,6 +128,10 @@ class ServiceLayerUnitTest {
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (user:UserAccount")) )
+                .bind(eq("author")).to(eq("authorId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (node:GraphNode")) )
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .fetch()
@@ -131,6 +145,12 @@ class ServiceLayerUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (author)-[rel:AUTHORED]")) )
+                .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
+                .bind(eq("author")).to(eq("authorId"))
+                .bind(any()).to(eq("createdAt"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("relType", "AUTHORED")));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")) )
                 .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
@@ -161,6 +181,10 @@ class ServiceLayerUnitTest {
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (user:UserAccount")) )
+                .bind(eq("author")).to(eq("authorId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (node:GraphNode")) )
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .fetch()

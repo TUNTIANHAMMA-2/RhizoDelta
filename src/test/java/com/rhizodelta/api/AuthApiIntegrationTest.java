@@ -153,6 +153,7 @@ class AuthApiIntegrationTest {
         Map<String, Object> claims = parseJwtPayload(responseData(response).get("token").toString());
 
         assertThat(claims.keySet()).containsExactlyInAnyOrder(
+                "jti",
                 "sub",
                 "roles",
                 "username",
@@ -160,6 +161,7 @@ class AuthApiIntegrationTest {
                 "iat",
                 "exp"
         );
+        assertThat(claims.get("jti")).asString().isNotBlank();
         assertThat(claims.get("sub")).isEqualTo(responseUser(response).get("user_id"));
         assertThat(claims.get("roles")).isEqualTo(List.of("USER"));
         assertThat(claims.get("username")).isEqualTo("dave");

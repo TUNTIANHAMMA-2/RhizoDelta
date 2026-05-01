@@ -6,8 +6,11 @@ import com.rhizodelta.consensus.domain.decision.MergeDecisionCommand;
 import com.rhizodelta.infrastructure.security.config.SecurityConfig;
 import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
 import com.rhizodelta.consensus.domain.exception.DagIntegrityViolationException;
+import com.rhizodelta.consensus.service.AuditRelationService;
 import com.rhizodelta.consensus.service.DecisionService;
 import com.rhizodelta.consensus.service.RollbackService;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -53,6 +56,15 @@ class DecisionControllerWebTest {
 
     @MockBean
     private RollbackService rollbackService;
+
+    @MockBean
+    private AuditRelationService auditRelationService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private OnlineStatusService onlineStatusService;
 
     @Test
     void shouldAcceptMergeDecisionRequest() throws Exception {

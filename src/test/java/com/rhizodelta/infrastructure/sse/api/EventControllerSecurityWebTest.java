@@ -2,7 +2,9 @@ package com.rhizodelta.infrastructure.sse.api;
 
 import com.rhizodelta.infrastructure.security.config.SecurityConfig;
 import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
 import com.rhizodelta.infrastructure.sse.service.SseEventService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,6 +30,12 @@ class EventControllerSecurityWebTest {
 
     @MockBean
     private SseEventService sseEventService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private OnlineStatusService onlineStatusService;
 
     @Test
     void asyncDispatcherShouldBypassAuthenticationForSseRedispatch() throws Exception {

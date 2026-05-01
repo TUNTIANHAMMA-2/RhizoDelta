@@ -52,6 +52,10 @@ class PostReplyUnitTest {
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (user:UserAccount")) )
+                .bind(eq("user-1")).to(eq("authorId"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("exists", true)));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (node:GraphNode")) )
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))
                 .fetch()
@@ -65,6 +69,12 @@ class PostReplyUnitTest {
                 .bind(any()).to(eq("createdAt"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.of(persistedNodeId.toString()));
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MERGE (author)-[rel:AUTHORED]")) )
+                .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
+                .bind(eq("user-1")).to(eq("authorId"))
+                .bind(any()).to(eq("createdAt"))
+                .fetch()
+                .one()).thenReturn(Optional.of(Map.of("relType", "AUTHORED")));
         when(deepStubClient.query(argThat((String query) -> query != null && query.contains("CONTINUES_FROM")) )
                 .bind(eq(persistedNodeId.toString())).to(eq("postNodeId"))
                 .bind(eq(targetNodeId)).to(eq("targetNodeId"))

@@ -94,6 +94,11 @@ class SseIntegrationTest {
     @BeforeEach
     void cleanDatabase() {
         neo4jClient.query("MATCH (n) DETACH DELETE n").run();
+        // PostService 现在要求 author_id 必须对应已存在的 UserAccount。
+        neo4jClient.query("CREATE (:UserAccount {user_id: 'author-accepted', username: 'author-accepted', created_at: datetime()})").run();
+        neo4jClient.query("CREATE (:UserAccount {user_id: $authorId, username: $authorId, created_at: datetime()})")
+                .bind(TEST_AUTHOR_ID).to("authorId")
+                .run();
         doAnswer(invocation -> {
             CorrelationData correlationData = invocation.getArgument(3);
             correlationData.getFuture().complete(new CorrelationData.Confirm(true, null));

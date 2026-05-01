@@ -8,6 +8,8 @@ import com.rhizodelta.consensus.domain.exception.DagIntegrityViolationException;
 import com.rhizodelta.consensus.repository.AIConsensusRepository;
 import com.rhizodelta.core.repository.HumanPostRepository;
 import com.rhizodelta.consensus.repository.ResultRepository;
+import com.rhizodelta.infrastructure.user.service.TopicService;
+import com.rhizodelta.consensus.service.DecisionMetadataService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
@@ -49,6 +51,12 @@ class DecisionServiceBranchUnitTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private TopicService topicService;
+
+    @Mock
+    private DecisionMetadataService decisionMetadataService;
+
     @Test
     void executeBranchShouldRejectMissingSourceNode() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
@@ -58,7 +66,9 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 resultRepository,
                 dagIntegrityService,
-                eventPublisher
+                eventPublisher,
+                topicService,
+                decisionMetadataService
         );
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);
@@ -81,7 +91,9 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 resultRepository,
                 dagIntegrityService,
-                eventPublisher
+                eventPublisher,
+                topicService,
+                decisionMetadataService
         );
         UUID sourceNodeId = UUID.randomUUID();
         UUID decisionNodeId = UUID.randomUUID();
@@ -114,7 +126,9 @@ class DecisionServiceBranchUnitTest {
                 aiConsensusRepository,
                 resultRepository,
                 dagIntegrityService,
-                eventPublisher
+                eventPublisher,
+                topicService,
+                decisionMetadataService
         );
         UUID sourceNodeId = UUID.randomUUID();
         BranchDecisionCommand command = newBranchCommand(sourceNodeId);

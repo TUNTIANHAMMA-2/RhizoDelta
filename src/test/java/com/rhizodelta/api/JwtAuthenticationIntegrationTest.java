@@ -2,6 +2,9 @@ package com.rhizodelta.api;
 
 import com.rhizodelta.infrastructure.security.config.SecurityConfig;
 import com.rhizodelta.infrastructure.security.filter.JwtAuthenticationFilter;
+import com.rhizodelta.infrastructure.security.service.TokenBlacklistService;
+import com.rhizodelta.infrastructure.user.service.OnlineStatusService;
+import com.rhizodelta.infrastructure.user.service.PreferenceEventService;
 import com.rhizodelta.ai.context.service.EmbeddingService;
 import com.rhizodelta.core.service.AssociationService;
 import com.rhizodelta.query.api.NodeQueryController;
@@ -51,6 +54,15 @@ class JwtAuthenticationIntegrationTest {
 
     @MockBean
     private EmbeddingService embeddingService;
+
+    @MockBean
+    private PreferenceEventService preferenceEventService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private OnlineStatusService onlineStatusService;
 
     @Test
     void requestWithoutToken_returns401() throws Exception {

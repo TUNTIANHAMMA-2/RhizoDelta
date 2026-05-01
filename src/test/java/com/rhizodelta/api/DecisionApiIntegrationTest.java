@@ -108,7 +108,8 @@ class DecisionApiIntegrationTest {
         Map<String, Object> synthesizedRecord = synthesized.iterator().next();
         assertThat(asLong(mergedRecord.get("mergedCount"))).isEqualTo(1L);
         assertThat((List<String>) mergedRecord.get("operatorTypes")).contains("AGENT");
-        assertThat((List<String>) mergedRecord.get("operatorIds")).contains("agent-1");
+        // Controller 覆盖 operator_id 为认证用户的 sub，避免请求体伪造身份。
+        assertThat((List<String>) mergedRecord.get("operatorIds")).contains("test-operator");
         assertThat(asLong(synthesizedRecord.get("synthesizedCount"))).isEqualTo(2L);
         assertThat((List<String>) synthesizedRecord.get("sourceIds"))
                 .containsExactlyInAnyOrder(synthesizedA.toString(), synthesizedB.toString());
@@ -251,8 +252,9 @@ class DecisionApiIntegrationTest {
         assertThat(provenance.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(provenanceData).extracting(item -> item.get("node_id")).contains(synthesizedNodeId.toString());
         assertThat(lineage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // Lineage 沿 CONTINUES_FROM/BRANCHED_FROM 回溯，不跨 MERGED_INTO；source 只能通过 provenance 看到。
         assertThat(lineageNodes).extracting(item -> item.get("node_id"))
-                .contains(mergeNodeId, sourceNodeId.toString());
+                .contains(mergeNodeId);
     }
 
     // --- Inject ---
