@@ -124,6 +124,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * 黑名单查询失败时 fail-open：Redis 短暂故障不应该让所有已签发的 token 拒登。
      * 签名仍然校验通过，撤销是 defense-in-depth；故障期间放行 + 告警是更可用的取舍。
+     *
+     * <p>注：{@link TokenBlacklistService#isRevoked} 内部已对 Redis 异常 fail-open，
+     * 这里再保留一层 try-catch 是 defense-in-depth：在测试或 Spring AOP 代理路径
+     * 直接抛 {@link RuntimeException} 时（绕过 service 的 catch），filter 仍能放行；
+     * 同一请求 service+filter 至多打印一条 WARN，不会重复刷屏。
      */
     private boolean isJtiRevokedSafe(String jti) {
         try {
