@@ -48,7 +48,7 @@ class PostReplyUnitTest {
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "reply content", "user-1", requestId);
 
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("RETURN toString(post.node_id)")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());

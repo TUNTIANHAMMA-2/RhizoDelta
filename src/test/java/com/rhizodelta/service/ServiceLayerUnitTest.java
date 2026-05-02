@@ -83,7 +83,7 @@ class ServiceLayerUnitTest {
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
 
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("RETURN toString(post.node_id)")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
@@ -124,7 +124,7 @@ class ServiceLayerUnitTest {
         UUID persistedNodeId = UUID.randomUUID();
         HumanPost persisted = HumanPost.create(persistedNodeId, "content", "author", requestId);
 
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("RETURN toString(post.node_id)")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
@@ -177,7 +177,7 @@ class ServiceLayerUnitTest {
         String requestId = "req-003";
         String targetNodeId = "missing-target";
 
-        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("MATCH (post:Human_Post")) )
+        when(deepStubClient.query(argThat((String query) -> query != null && query.contains("RETURN toString(post.node_id)")) )
                 .bind(eq(requestId)).to(eq("requestId"))
                 .fetchAs(String.class)
                 .one()).thenReturn(Optional.empty());
