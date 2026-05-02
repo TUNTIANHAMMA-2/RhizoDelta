@@ -90,6 +90,9 @@ public class DecisionService {
             MATCH (source:GraphNode {node_id: $sourceNodeId})
             WHERE NOT coalesce(source._deleted, false)
             SET source._merge_seq = coalesce(source._merge_seq, 0) + 1
+            // Neo4j 5 要求 SET 与后续 MATCH/OPTIONAL MATCH 之间必须有 WITH，
+            // 否则会报 "WITH is required between SET and MATCH"。
+            WITH source
 
             // Level 1 — direct consensus: is there already a consensus MERGED_INTO this exact source node?
             OPTIONAL MATCH (direct:AI_Consensus)-[:MERGED_INTO]->(source)
