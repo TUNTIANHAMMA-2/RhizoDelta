@@ -150,7 +150,7 @@ function NewThreadButton() {
     <button
       type="button"
       onClick={openPostPanel}
-      className="group flex items-center gap-2 border border-text-primary bg-text-primary text-bg-primary px-4 py-2 hover:bg-accent hover:border-accent transition-colors"
+      className="group flex items-center gap-2 border border-accent-deep bg-accent-deep text-bg-primary px-4 py-2 hover:bg-accent hover:border-accent transition-colors"
     >
       <span className={clsx(metaLabel)}>New thread</span>
       <span className="font-content italic text-sm">发起</span>
@@ -185,7 +185,7 @@ function EmptyState({ reason }: { reason: string }) {
       <button
         type="button"
         onClick={openPostPanel}
-        className="group flex items-center gap-3 border border-text-primary bg-text-primary text-bg-primary px-5 py-3 hover:bg-accent hover:border-accent transition-colors"
+        className="group flex items-center gap-3 border border-accent-deep bg-accent-deep text-bg-primary px-5 py-3 hover:bg-accent hover:border-accent transition-colors"
       >
         <span className={clsx(metaLabel)}>Plant a rhizome</span>
         <span

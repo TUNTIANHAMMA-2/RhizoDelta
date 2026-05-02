@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <script>
+      // 同步应用上一次的圆角偏好，避免首屏闪烁。
+      (function () {
+        try {
+          var m = localStorage.getItem("rd-radius-mode");
+          if (m === "sharp") {
+            document.documentElement.setAttribute("data-radius", "sharp");
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

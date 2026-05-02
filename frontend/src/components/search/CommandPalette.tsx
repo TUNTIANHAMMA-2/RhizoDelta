@@ -244,7 +244,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         aria-label="搜索节点"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
-        className="max-w-[560px] w-[90%] mt-[18vh] bg-bg-elevated rounded-xl shadow-xl border border-border-default overflow-hidden font-ui animate-scale-in"
+        className="max-w-[560px] w-[90%] mt-[18vh] bg-bg-elevated rounded-md shadow-xl border border-border-default overflow-hidden font-ui animate-scale-in"
       >
         {/* Search input */}
         <input

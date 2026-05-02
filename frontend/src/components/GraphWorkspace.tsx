@@ -21,7 +21,7 @@ function CanvasModeSwitch() {
   const setCanvasMode = useUiStore((s) => s.setCanvasMode);
 
   return (
-    <div className="absolute top-[72px] left-4 z-20 flex gap-[2px] p-1 bg-[rgba(253,252,249,0.88)] border border-border-default rounded-lg shadow-md backdrop-blur-md backdrop-saturate-150">
+    <div className="absolute top-[72px] left-4 z-20 flex gap-[2px] p-1 bg-[rgba(253,252,249,0.88)] border border-border-default rounded-md shadow-md backdrop-blur-md backdrop-saturate-150">
       {[
         ["lineage", "版本视图"],
         ["explore", "探索视图"],
@@ -35,7 +35,7 @@ function CanvasModeSwitch() {
             className={clsx(
               "border-none rounded-md px-4 py-2 cursor-pointer font-ui text-sm transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
               active
-                ? "bg-text-primary text-bg-primary font-semibold"
+                ? "bg-accent-deep text-bg-primary font-semibold"
                 : "bg-transparent text-text-secondary font-medium",
             )}
           >

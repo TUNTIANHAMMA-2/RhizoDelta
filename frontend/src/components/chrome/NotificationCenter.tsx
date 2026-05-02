@@ -47,7 +47,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
   };
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-[320px] max-h-[400px] overflow-y-auto bg-bg-primary border border-border-default rounded-lg shadow-lg z-[200] font-ui text-sm">
+    <div className="absolute top-full right-0 mt-2 w-[320px] max-h-[400px] overflow-y-auto bg-bg-primary border border-border-default rounded-md shadow-lg z-[200] font-ui text-sm">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
         <span className="font-semibold text-text-primary">通知</span>
         <button

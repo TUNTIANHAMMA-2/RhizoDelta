@@ -19,7 +19,7 @@ export function EditDraftPanel() {
 
   return (
     <aside
-      className="rd-panel w-[45vw] min-w-[460px] relative overflow-y-auto p-4 border-l border-border-default bg-bg-primary"
+      className="rd-panel w-[50vw] min-w-[520px] max-w-[920px] relative overflow-y-auto p-4 border-l border-border-default bg-bg-primary"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >

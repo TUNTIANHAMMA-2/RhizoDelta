@@ -9,6 +9,7 @@ import clsx from "clsx";
 import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
 import { NotificationCenter } from "./NotificationCenter";
+import { RadiusModeToggle } from "./RadiusModeToggle";
 
 const SSE_STATUS_COLOR = {
   connecting: "var(--color-warning)",
@@ -76,7 +77,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           <div
             className={clsx(
               CAPSULE_SURFACE,
-              "flex items-center h-10 rounded-lg px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
+              "flex items-center h-10 rounded-md px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
               onWorkspace && "cursor-pointer group",
             )}
             onClick={onWorkspace ? () => navigate("/") : undefined}
@@ -107,7 +108,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
         {/* 面包屑胶囊 */}
         <div
           className={clsx(
-            "absolute top-0 flex items-center h-10 rounded-lg overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
+            "absolute top-0 flex items-center h-10 rounded-md overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
             "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150",
             selectedNodeId
               ? "border border-border-default px-4 shadow-md pointer-events-auto opacity-100 max-w-[400px]"
@@ -121,13 +122,15 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
         </div>
       </div>
 
-      {/* 右侧控件组 */}
+      {/* 右侧控件组 — translate 量与当前 panel 宽度同步 */}
       <div
         className="pointer-events-auto flex items-center gap-2 transition-transform duration-300 ease-[var(--ease-out)]"
         style={{
           transform:
-            rightPanelMode !== "hidden"
-              ? "translateX(calc(-1 * max(45vw, 460px)))"
+            rightPanelMode === "edit"
+              ? "translateX(calc(-1 * min(max(50vw, 520px), 920px)))"
+              : rightPanelMode !== "hidden"
+              ? "translateX(calc(-1 * min(max(38vw, 420px), 720px)))"
               : "translateX(0)",
         }}
       >
@@ -181,6 +184,9 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
             </>
           )}
         </button>
+
+        {/* 圆角档位切换 —— 实时验收两套设计 */}
+        <RadiusModeToggle />
 
         {/* 通知铃铛 */}
         <div ref={notifContainerRef} className="relative">

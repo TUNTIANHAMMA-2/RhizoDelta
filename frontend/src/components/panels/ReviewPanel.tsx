@@ -80,7 +80,7 @@ export function ReviewPanel() {
 
   return (
     <aside
-      className="rd-panel w-[45vw] min-w-[460px] relative border-l border-border-default bg-bg-primary flex flex-col font-ui h-full"
+      className="rd-panel w-[38vw] min-w-[420px] max-w-[720px] relative border-l border-border-default bg-bg-primary flex flex-col font-ui h-full"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >

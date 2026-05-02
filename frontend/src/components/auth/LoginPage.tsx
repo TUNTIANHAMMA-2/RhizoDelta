@@ -373,7 +373,7 @@ export function LoginPage() {
               type="submit"
               disabled={submitting}
               className={clsx(
-                "group relative w-full flex items-center justify-between border border-text-primary bg-text-primary text-bg-primary py-[14px] px-5 transition-all",
+                "group relative w-full flex items-center justify-between border border-accent-deep bg-accent-deep text-bg-primary py-[14px] px-5 transition-all",
                 submitting
                   ? "cursor-wait opacity-70"
                   : "cursor-pointer hover:bg-accent hover:border-accent",

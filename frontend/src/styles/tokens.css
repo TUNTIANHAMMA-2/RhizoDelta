@@ -37,6 +37,8 @@
   --color-edge-default:     #C8C3B8;
 
   --color-accent:           #4A7C59;
+  --color-accent-deep:      #2D4F3A;
+  --color-accent-soft:      #E8EFE9;
   --color-accent-warm:      #C4713B;
   --color-danger:           #C4453A;
   --color-warning:          #C4913B;
@@ -69,11 +71,19 @@
   --text-2xl:               32px;
   --text-2xl--line-height:  1.1;
 
-  /* ── Radii (→ rounded-*) ── */
+  /* ── Radii (→ rounded-*) ──
+     两档语义：
+       --radius-control  按钮 / 输入框 / dropdown trigger 等可交互单元
+       --radius-card     面板 / 卡片 / 对话框 / popover 等容器
+     运行时圆角档位（round | sharp）由 <html data-radius="..."> 在
+     index.css 顶层覆盖；切换 toggle 见 RadiusModeToggle。 */
   --radius-sm:              6px;
   --radius-md:              10px;
   --radius-lg:              14px;
   --radius-xl:              20px;
+
+  --radius-control:         var(--radius-sm);
+  --radius-card:            var(--radius-md);
 
   /* ── Shadows (→ shadow-*) ── */
   --shadow-sm:              0 1px 2px rgb(26 29 27 / 0.04),
@@ -159,4 +169,17 @@
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* ── Runtime radius mode ──
+   Default mode is "round" — declared above via :root vars.
+   Toggling <html data-radius="sharp"> flips to flat-edge mode for
+   side-by-side visual comparison. */
+:root[data-radius="sharp"] {
+  --radius-control:         0px;
+  --radius-card:            0px;
+  --radius-sm:              0px;
+  --radius-md:              0px;
+  --radius-lg:              0px;
+  --radius-xl:              0px;
 }

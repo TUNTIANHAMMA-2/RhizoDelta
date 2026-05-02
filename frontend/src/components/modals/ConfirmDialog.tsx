@@ -75,7 +75,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="bg-bg-primary rounded-lg shadow-lg p-6 max-w-[400px] w-[90%] font-ui"
+        className="bg-bg-primary rounded-md shadow-lg p-6 max-w-[400px] w-[90%] font-ui"
       >
         <h3
           className={`m-0 mb-3 text-md font-semibold ${isDestructive ? "text-danger" : "text-text-primary"}`}

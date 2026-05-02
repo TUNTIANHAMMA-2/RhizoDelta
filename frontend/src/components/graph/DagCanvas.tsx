@@ -210,7 +210,7 @@ export function DagCanvas() {
         <MiniMap
           nodeColor={MINIMAP_NODE_COLOR}
           maskColor="rgba(255, 255, 255, 0.7)"
-          className="rounded-lg"
+          className="rounded-md"
         />
       )}
     </ReactFlow>
