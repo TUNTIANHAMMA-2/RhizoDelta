@@ -28,18 +28,32 @@ import java.util.Set;
 public final class UpdateUserProfileRequest {
     static final Set<String> MUTABLE_FIELDS = Set.of(
             "display_name",
-            "avatar_url",
             "language",
             "timezone",
             "theme",
             "notification_prefs"
     );
 
+    /**
+     * 在 PUT /me/profile 上显式拒绝的字段。这些字段必须走专用端点写入：
+     * <ul>
+     *   <li>{@code avatar_url} —— 必须经过 {@code PUT /api/users/me/avatar}
+     *       的 magic-byte 校验，否则用户可写入任意外链导致 SSRF / phishing。</li>
+     * </ul>
+     */
+    static final Set<String> READ_ONLY_FIELDS = Set.of("avatar_url");
+
     private final Map<String, Object> raw;
 
     @JsonCreator
     public UpdateUserProfileRequest(Map<String, Object> raw) {
         this.raw = raw == null ? Map.of() : new LinkedHashMap<>(raw);
+        for (String forbidden : READ_ONLY_FIELDS) {
+            if (this.raw.containsKey(forbidden)) {
+                throw new IllegalArgumentException(
+                        forbidden + " is read-only here; use the dedicated endpoint to update it");
+            }
+        }
     }
 
     /**

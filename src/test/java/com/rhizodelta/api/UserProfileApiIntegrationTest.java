@@ -95,7 +95,7 @@ class UserProfileApiIntegrationTest {
     @Test
     void shouldUpdateOnlySpecifiedFieldsOnPut() {
         String token = registerUser("carol", "password123", "Carol");
-        Map<String, Object> firstBody = Map.of("theme", "dark", "avatar_url", "https://cdn/c.png");
+        Map<String, Object> firstBody = Map.of("theme", "dark", "language", "en");
         ResponseEntity<Map> firstPut = authorizedPut(token, "/api/users/me/profile", firstBody);
         assertThat(firstPut.getStatusCode()).isEqualTo(HttpStatus.OK);
         String firstUpdatedAt = responseData(firstPut).get("updated_at").toString();
@@ -109,7 +109,9 @@ class UserProfileApiIntegrationTest {
         assertThat(payload.get("theme"))
                 .as("theme set by the first PUT must survive the second PUT that did not mention it")
                 .isEqualTo("dark");
-        assertThat(payload.get("avatar_url")).isEqualTo("https://cdn/c.png");
+        assertThat(payload.get("language"))
+                .as("language set by the first PUT must survive too")
+                .isEqualTo("en");
         assertThat(payload.get("updated_at").toString())
                 .as("updated_at must advance on every successful PUT")
                 .isNotEqualTo(firstUpdatedAt);
@@ -118,16 +120,32 @@ class UserProfileApiIntegrationTest {
     @Test
     void shouldClearFieldOnExplicitNull() {
         String token = registerUser("dave", "password123", "Dave");
-        authorizedPut(token, "/api/users/me/profile", Map.of("avatar_url", "https://cdn/d.png"));
+        authorizedPut(token, "/api/users/me/profile", Map.of("language", "en"));
 
         Map<String, Object> clearing = new HashMap<>();
-        clearing.put("avatar_url", null);
+        clearing.put("language", null);
         ResponseEntity<Map> response = authorizedPut(token, "/api/users/me/profile", clearing);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(responseData(response).get("avatar_url"))
+        assertThat(responseData(response).get("language"))
                 .as("explicit null in body must clear the stored field")
                 .isNull();
+    }
+
+    /**
+     * SSRF / phishing guard: avatar_url is read-only on the generic profile PUT —
+     * users must not be able to inject arbitrary external URLs that other users
+     * then fetch via &lt;img src&gt;. The dedicated PUT /me/avatar endpoint
+     * runs magic-byte validation and writes the storage path; this PUT must reject
+     * any avatar_url field outright.
+     */
+    @Test
+    void shouldRejectAvatarUrlOnGenericProfilePut() {
+        String token = registerUser("eve", "password123", "Eve");
+        ResponseEntity<Map> response = authorizedPut(token, "/api/users/me/profile",
+                Map.of("avatar_url", "http://attacker.example/track.gif"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
