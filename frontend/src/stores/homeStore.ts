@@ -29,6 +29,7 @@ export interface HomeState {
   sortBy: HomeSortKey;
   feedItems: GraphNodeDTO[];
   feedLoading: boolean;
+  feedError: string | null;
   followingTargetIds: Set<string>;
   followingLoading: boolean;
   setActiveNav: (key: HomeNavKey) => void;
@@ -37,23 +38,37 @@ export interface HomeState {
   loadFollowing: () => Promise<void>;
 }
 
+// Module-level monotonic counter so two stores can't race; each loadFeed
+// call captures its sequence number and aborts state-writes if a newer
+// call has already started.
+let feedRequestSeq = 0;
+
 export const useHomeStore = create<HomeState>((set) => ({
   activeNav: "all",
   sortBy: "latest",
   feedItems: [],
   feedLoading: false,
+  feedError: null,
   followingTargetIds: new Set<string>(),
   followingLoading: false,
   setActiveNav: (key) => set({ activeNav: key }),
   setSortBy: (key) => set({ sortBy: key }),
   loadFeed: async () => {
-    set({ feedLoading: true });
+    const myReq = ++feedRequestSeq;
+    set({ feedLoading: true, feedError: null });
     try {
       const response = await getFeed(0, 50);
+      if (myReq !== feedRequestSeq) return; // 用户已经切到别的 sortBy，丢弃
       const items = (response.items as GraphNodeDTO[]) ?? [];
       set({ feedItems: items });
+    } catch (e) {
+      if (myReq !== feedRequestSeq) return;
+      set({
+        feedError: e instanceof Error ? e.message : "feed request failed",
+      });
     } finally {
-      set({ feedLoading: false });
+      // 只在「我们仍是最新请求」时清 loading，避免覆盖更晚启动的请求的状态
+      if (myReq === feedRequestSeq) set({ feedLoading: false });
     }
   },
   loadFollowing: async () => {

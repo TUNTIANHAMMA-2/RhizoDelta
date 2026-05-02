@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { uploadAvatar, deleteAvatar } from "../../api/profile";
+import { uploadAvatar, deleteAvatar, getMyProfile } from "../../api/profile";
 import { useAuthStore } from "../../stores/authStore";
 import { metaLabel } from "../../lib/typography";
 
@@ -11,6 +11,22 @@ export function AvatarUpload() {
   const [error, setError] = useState<string | null>(null);
   const displayName = useAuthStore((s) => s.displayName);
   const username = useAuthStore((s) => s.username);
+
+  // 进入设置页时拉取一次 profile —— 否则用户已上传的头像不会回显，
+  // 直到用户重新触发上传操作为止。
+  useEffect(() => {
+    let cancelled = false;
+    getMyProfile()
+      .then((p) => {
+        if (!cancelled) setAvatarUrl(p.avatar_url);
+      })
+      .catch(() => {
+        // 静默：失败时退化为占位首字母，不打断设置页加载
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

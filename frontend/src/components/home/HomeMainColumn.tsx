@@ -205,6 +205,7 @@ export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
   const sortBy = useHomeStore((s) => s.sortBy);
   const userId = useAuthStore((s) => s.userId);
   const feedItems = useHomeStore((s) => s.feedItems);
+  const feedError = useHomeStore((s) => s.feedError);
   const loadFeed = useHomeStore((s) => s.loadFeed);
   const followingTargetIds = useHomeStore((s) => s.followingTargetIds);
   const loadFollowing = useHomeStore((s) => s.loadFollowing);
@@ -235,7 +236,9 @@ export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
   }, [rhizomes, activeNav, userId, sortBy, feedItems, followingTargetIds]);
 
   const emptyReason =
-    sortBy === "for_you"
+    sortBy === "for_you" && feedError
+      ? `Feed unavailable: ${feedError}`
+      : sortBy === "for_you"
       ? "Your personalized feed is empty — follow topics or people to fill it."
       : rhizomes.length === 0
       ? "No rhizomes yet."
