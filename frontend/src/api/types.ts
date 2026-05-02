@@ -321,9 +321,29 @@ export interface MuteItem {
 }
 
 export interface FeedResponse {
-  items: unknown[];
+  items: GraphNodeDTO[];
   page: number;
   size: number;
+  has_next: boolean;
+}
+
+/** POST /api/users/me/mutes 的响应载荷。 */
+export interface MuteCreatedResponse {
+  mute_id: string;
+  target_type: string;
+  target_id: string;
+  since: string;
+  reason: string;
+  status: string;
+}
+
+/** GET /api/users/me/mutes 的响应载荷。 */
+export interface MuteListResponse {
+  items: MuteItem[];
+  page: number;
+  size: number;
+  total: number;
+  total_pages: number;
   has_next: boolean;
 }
 

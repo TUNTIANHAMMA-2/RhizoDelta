@@ -1,23 +1,12 @@
 import { request } from "./client";
-import type { MuteItem, MuteRequest } from "./types";
+import type {
+  MuteCreatedResponse,
+  MuteItem,
+  MuteListResponse,
+  MuteRequest,
+} from "./types";
 
-export interface MuteCreatedResponse {
-  mute_id: string;
-  target_type: string;
-  target_id: string;
-  since: string;
-  reason: string;
-  status: string;
-}
-
-export interface MuteListResponse {
-  items: MuteItem[];
-  page: number;
-  size: number;
-  total: number;
-  total_pages: number;
-  has_next: boolean;
-}
+export type { MuteCreatedResponse, MuteItem, MuteListResponse };
 
 export async function mute(data: MuteRequest): Promise<MuteCreatedResponse> {
   return request<MuteCreatedResponse>("/api/users/me/mutes", {

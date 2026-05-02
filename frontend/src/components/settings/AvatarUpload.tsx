@@ -57,6 +57,7 @@ export function AvatarUpload() {
   };
 
   const initials = (displayName ?? username ?? "?")[0]?.toUpperCase() ?? "?";
+  const altText = `${displayName ?? username ?? "User"} avatar`;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -64,7 +65,7 @@ export function AvatarUpload() {
         {avatarUrl ? (
           <img
             src={avatarUrl}
-            alt="Avatar"
+            alt={altText}
             className="w-24 h-24 rounded-full object-cover border-2 border-border-default"
           />
         ) : (
