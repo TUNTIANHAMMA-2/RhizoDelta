@@ -30,6 +30,11 @@ import java.util.Map;
 public class FeedService {
     private static final int DEFAULT_PAGE_SIZE = 50;
 
+    /**
+     * 三条候选分支，每条都用具体标签 MATCH 而不是 (n) WHERE n:Label OR ...
+     * 后者会让 planner 退化为 AllNodesScan；具体标签可以走 NodeByLabelScan
+     * 或者带索引的 NodeIndexSeek。
+     */
     private static final String FEED_QUERY = """
             CALL {
                 WITH $userId AS userId, $mutedUserIds AS mutedUsers, $mutedTopicIds AS mutedTopics
@@ -42,9 +47,18 @@ public class FeedService {
                 WITH $userId AS userId, $mutedUserIds AS mutedUsers, $mutedTopicIds AS mutedTopics
                 MATCH (u:UserAccount {user_id: userId})-[:FOLLOWS]->(t:Topic)
                 WHERE NOT t.topic_id IN mutedTopics
-                MATCH (n) WHERE n.topic_id = t.topic_id
-                  AND (n:Human_Post OR n:AI_Consensus OR n:Result)
-                  AND NOT coalesce(n._deleted, false)
+                CALL {
+                    WITH t
+                    MATCH (n:Human_Post {topic_id: t.topic_id}) RETURN n
+                  UNION
+                    WITH t
+                    MATCH (n:AI_Consensus {topic_id: t.topic_id}) RETURN n
+                  UNION
+                    WITH t
+                    MATCH (n:Result {topic_id: t.topic_id}) RETURN n
+                }
+                WITH n, mutedUsers
+                WHERE NOT coalesce(n._deleted, false)
                   AND NOT coalesce(n.author_id, '__none__') IN mutedUsers
                 RETURN n
               UNION
@@ -78,9 +92,14 @@ public class FeedService {
             """;
 
     private static final String GLOBAL_FEED_QUERY = """
-            MATCH (n)
-            WHERE (n:Human_Post OR n:AI_Consensus OR n:Result)
-              AND NOT coalesce(n._deleted, false)
+            CALL {
+                MATCH (n:Human_Post) WHERE NOT coalesce(n._deleted, false) RETURN n
+              UNION
+                MATCH (n:AI_Consensus) WHERE NOT coalesce(n._deleted, false) RETURN n
+              UNION
+                MATCH (n:Result) WHERE NOT coalesce(n._deleted, false) RETURN n
+            }
+            WITH n
             OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
             OPTIONAL MATCH (author)-[:HAS_PROFILE]->(authorProfile:UserProfile)
             WITH n, author, authorProfile, labels(n) AS nodeLabels
