@@ -11,7 +11,7 @@ const ROLE_CLASSES: Record<RoleBadgeProps["role"], string> = {
 export function RoleBadge({ role }: RoleBadgeProps) {
   return (
     <span
-      className={`inline-flex items-center py-[2px] px-2 rounded-full font-ui text-xs font-medium leading-[1.5] ${ROLE_CLASSES[role]}`}
+      className={`inline-flex items-center py-[2px] px-2 rounded-pill font-ui text-xs font-medium leading-[1.5] ${ROLE_CLASSES[role]}`}
     >
       {role}
     </span>

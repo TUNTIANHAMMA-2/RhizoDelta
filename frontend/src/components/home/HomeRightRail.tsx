@@ -181,13 +181,13 @@ function QualityDistribution() {
             </div>
             <div
               className={clsx(
-                "h-[3px] rounded-full overflow-hidden transition-colors",
+                "h-[3px] rounded-pill overflow-hidden transition-colors",
                 active ? "bg-accent/10" : "bg-border-subtle",
               )}
             >
               <div
                 className={clsx(
-                  "h-full rounded-full transition-all",
+                  "h-full rounded-pill transition-all",
                   colorClass,
                 )}
                 style={{ width: `${pct}%` }}

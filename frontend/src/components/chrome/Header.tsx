@@ -140,7 +140,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
             onClick={openReviewPanel}
             className={clsx(
               CAPSULE_SURFACE,
-              "flex items-center h-9 rounded-full px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
+              "flex items-center h-9 rounded-pill px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
             )}
           >
             复核
@@ -162,7 +162,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           }}
           onClick={userHovered ? handleLogout : undefined}
           className={clsx(
-            "flex items-center gap-2 h-9 rounded-full px-[14px] backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
+            "flex items-center gap-2 h-9 rounded-pill px-[14px] backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
             userHovered
               ? "border border-danger bg-[rgba(196,69,58,0.06)] text-danger cursor-pointer"
               : "border border-border-default bg-[rgba(253,252,249,0.88)] text-text-secondary cursor-default",

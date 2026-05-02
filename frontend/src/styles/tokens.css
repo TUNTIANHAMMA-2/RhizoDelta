@@ -84,6 +84,10 @@
 
   --radius-control:         var(--radius-sm);
   --radius-card:            var(--radius-md);
+  /* Pills (chip-shaped capsule buttons): pill-shaped in round mode,
+     flat in sharp mode — distinct from --radius-full which always
+     stays round (avatars, dots, true circular indicators). */
+  --radius-pill:            9999px;
 
   /* ── Shadows (→ shadow-*) ── */
   --shadow-sm:              0 1px 2px rgb(26 29 27 / 0.04),
@@ -178,8 +182,11 @@
 :root[data-radius="sharp"] {
   --radius-control:         0px;
   --radius-card:            0px;
+  --radius-pill:            0px;
   --radius-sm:              0px;
   --radius-md:              0px;
   --radius-lg:              0px;
   --radius-xl:              0px;
+  /* --radius-full intentionally NOT overridden: avatars / dots /
+     true-circle indicators stay round in both modes. */
 }

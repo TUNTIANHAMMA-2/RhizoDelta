@@ -78,7 +78,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
         aria-hidden
       >
         <span
-          className="inline-block w-[3px] h-10 rounded-full"
+          className="inline-block w-[3px] h-10 rounded-pill"
           style={{ background: labelMeta.colorVar }}
         />
         <span

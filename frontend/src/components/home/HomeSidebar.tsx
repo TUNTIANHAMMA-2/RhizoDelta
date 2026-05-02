@@ -68,7 +68,7 @@ function NavRow({
       <span className="flex items-center gap-3 min-w-0">
         <span
           className={clsx(
-            "inline-block w-[3px] h-5 rounded-full transition-colors",
+            "inline-block w-[3px] h-5 rounded-pill transition-colors",
             active
               ? "bg-accent"
               : (indicatorClass ?? "bg-transparent group-hover:bg-accent/30"),
@@ -242,7 +242,7 @@ export function HomeSidebar() {
           className="group w-full flex items-center gap-3 px-5 py-2.5 text-left text-text-secondary hover:bg-bg-hover/50 hover:text-text-primary transition-colors"
         >
           <span
-            className="inline-block w-[3px] h-5 rounded-full bg-transparent group-hover:bg-accent/30"
+            className="inline-block w-[3px] h-5 rounded-pill bg-transparent group-hover:bg-accent/30"
             aria-hidden
           />
           <span className="font-ui text-[14.5px]">图谱视图 · Graph</span>
@@ -261,7 +261,7 @@ export function HomeSidebar() {
           className="group w-full flex items-center gap-3 px-5 py-2.5 text-left text-text-secondary hover:bg-bg-hover/50 hover:text-text-primary transition-colors"
         >
           <span
-            className="inline-block w-[3px] h-5 rounded-full bg-transparent group-hover:bg-accent/30"
+            className="inline-block w-[3px] h-5 rounded-pill bg-transparent group-hover:bg-accent/30"
             aria-hidden
           />
           <span className="font-ui text-[14.5px]">设置 · Settings</span>

@@ -124,7 +124,7 @@ export function GraphWorkspace() {
         </>
       ) : (
         <button
-          className="sidebar-toggle-btn fixed top-1/2 left-0 -translate-y-1/2 z-50 w-6 h-12 flex items-center justify-center bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default border-l-0 rounded-r-full cursor-pointer text-text-tertiary shadow-sm p-0"
+          className="sidebar-toggle-btn fixed top-1/2 left-0 -translate-y-1/2 z-50 w-6 h-12 flex items-center justify-center bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default border-l-0 rounded-r-pill cursor-pointer text-text-tertiary shadow-sm p-0"
           onClick={toggleLeftSidebar}
           aria-label="展开侧边栏"
         >
