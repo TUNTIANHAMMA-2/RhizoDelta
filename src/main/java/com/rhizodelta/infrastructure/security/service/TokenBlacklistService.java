@@ -53,11 +53,18 @@ public class TokenBlacklistService {
     /**
      * 把当前时刻设为 {@code userId} 的「revoke-before」标记。
      * 在此之前签发的所有 access token 在 {@link #revokedBefore} 比对时会被拒绝。
+     *
+     * <p>JWT 的 {@code iat} 字段按 RFC 7519 是秒精度，jjwt 解析回来后毫秒位是 0。
+     * 我们把 revokedBefore 向上对齐到下一秒边界，避免「revoke 与 token 落在同一秒」
+     * 时因毫秒位丢失出现的边界判定不一致 —— 同一秒内的 token 必定 iat ≤ revokedBefore，
+     * 都被吊销，对调用方语义更直观。
      */
     public void revokeAllForUser(String userId) {
-        Instant now = Instant.now();
+        Instant alignedToNextSecond = Instant.now().plusMillis(1000).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
         tokenBlacklistRedisTemplate.opsForValue()
-                .set(USER_REVOKE_KEY_PREFIX + userId, String.valueOf(now.toEpochMilli()), USER_REVOKE_TTL);
+                .set(USER_REVOKE_KEY_PREFIX + userId,
+                        String.valueOf(alignedToNextSecond.toEpochMilli()),
+                        USER_REVOKE_TTL);
     }
 
     /**
