@@ -49,15 +49,18 @@ public class RefreshTokenService {
     private final RedisTemplate<String, String> refreshTokenRedisTemplate;
     private final ObjectMapper objectMapper;
     private final Duration refreshTtl;
+    private final Duration reuseDetectionTtl;
 
     public RefreshTokenService(
             RedisTemplate<String, String> refreshTokenRedisTemplate,
             ObjectMapper objectMapper,
-            @Value("${rhizodelta.jwt.refresh-ttl:P30D}") Duration refreshTtl
+            @Value("${rhizodelta.jwt.refresh-ttl:P30D}") Duration refreshTtl,
+            @Value("${rhizodelta.jwt.reuse-detection-ttl:P90D}") Duration reuseDetectionTtl
     ) {
         this.refreshTokenRedisTemplate = refreshTokenRedisTemplate;
         this.objectMapper = objectMapper;
         this.refreshTtl = refreshTtl;
+        this.reuseDetectionTtl = reuseDetectionTtl;
     }
 
     public String issue(String userId) {
@@ -121,7 +124,12 @@ public class RefreshTokenService {
                 refreshTokenRedisTemplate.opsForSet().remove(USER_REFRESH_SET_PREFIX + userId, tokenHash);
                 // 注意：保留 userIndexKey 作为「该 hash 曾归属此用户」的 tombstone。
                 // 若被消费过的 token 再次出现（replay），我们才能识别为盗用并触发全员吊销。
-                // userIndex 自身已带 TTL，会随 refresh-ttl 自然失效，不会无限增长。
+                //
+                // TTL 与 refresh-ttl 解耦：攻击者通常不在轮换窗口内重放（那样太醒目），
+                // 而是会等正主已经轮换好几轮、原 token 看似过期之后才出招。把 tombstone
+                // 续期到 reuse-detection-ttl（默认 90d）能覆盖这类 late-replay。
+                refreshTokenRedisTemplate.expire(
+                        userIndexKey, reuseDetectionTtl.getSeconds(), TimeUnit.SECONDS);
                 return userId;
             } catch (JsonProcessingException e) {
                 throw new IllegalStateException("failed to parse refresh token payload", e);
