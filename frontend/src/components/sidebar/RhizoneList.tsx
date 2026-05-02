@@ -4,6 +4,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
 import { AuthorLabel } from "../shared/AuthorLabel";
 import { selectRhizome } from "../../lib/selectRhizome";
+import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
 import { stripMarkdown } from "../../lib/markdown";
 
 export function RhizoneList() {

@@ -35,7 +35,15 @@ function ExploreViewportListener() {
     }
     const timer = setTimeout(() => {
       const { zoom: currentZoom } = getViewport();
-      setCenter(node.position.x, node.position.y, { zoom: Math.max(currentZoom, 0.8), duration: 600 });
+      const targetZoom = Math.max(currentZoom, 0.8);
+      // 与 useGraphInteractions.focusNode 对齐：右侧面板打开时，节点偏左
+      // ~80px（屏幕坐标），换算成 flow 坐标后再交给 setCenter。
+      const offsetScreenPx = rightPanelMode !== "hidden" ? 80 : 0;
+      const offsetFlow = offsetScreenPx / targetZoom;
+      setCenter(node.position.x + offsetFlow, node.position.y, {
+        zoom: targetZoom,
+        duration: 600,
+      });
     }, 300);
     return () => clearTimeout(timer);
   }, [exploreRfNodes, rootNodeId, selectedNodeId, rightPanelMode, setCenter, getViewport]);

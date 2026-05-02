@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useGraphStore } from "../stores/graphStore";
+import { useUiStore } from "../stores/uiStore";
 
 /**
  * Hook for graph canvas interactions:
@@ -10,6 +11,13 @@ import { useGraphStore } from "../stores/graphStore";
  */
 export function useGraphInteractions() {
   const { setCenter, getEdges, getNode, getViewport } = useReactFlow();
+  // 当右侧 detail/edit/review 面板打开时，画布 DOM 已经按 flex 缩小到剩余宽度。
+  // setCenter 把节点坐标对到画布 DOM 中心，这本身就是可见区域中心 —— 但用户更喜欢
+  // 节点稍稍偏左，与右侧面板留出阅读距离。下面用 zoom 比例把一段固定的屏幕像素
+  // 转换成 flow 坐标偏移。
+  const rightPanelOpen = useUiStore(
+    (s) => s.rightPanelMode !== "hidden",
+  );
 
   const focusNode = useCallback(
     (nodeId: string, delayMs = 0) => {
@@ -18,10 +26,14 @@ export function useGraphInteractions() {
 
       const performCenter = () => {
         const { zoom: currentZoom } = getViewport();
+        const targetZoom = Math.max(currentZoom, 0.8);
+        // 让节点出现在可见区域偏左 ~12% 的位置，给右侧面板留呼吸感。
+        const offsetScreenPx = rightPanelOpen ? 80 : 0;
+        const offsetFlow = offsetScreenPx / targetZoom;
         setCenter(
-          node.position.x,
+          node.position.x + offsetFlow,
           node.position.y,
-          { zoom: Math.max(currentZoom, 0.8), duration: 600 },
+          { zoom: targetZoom, duration: 600 },
         );
       };
 
@@ -46,7 +58,7 @@ export function useGraphInteractions() {
 
       return { connectedNodeIds, connectedEdgeIds };
     },
-    [getEdges, getNode, getViewport, setCenter],
+    [getEdges, getNode, getViewport, rightPanelOpen, setCenter],
   );
 
   const resetFocus = useCallback(() => {

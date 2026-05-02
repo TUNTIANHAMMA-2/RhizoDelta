@@ -5,6 +5,7 @@ import { useGraphStore } from "../../stores/graphStore";
 import { AuthorLabel } from "../shared/AuthorLabel";
 import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
+import { NodeActionToolbar } from "./NodeActionToolbar";
 import { QualityBadge } from "./QualityBadge";
 import { stripMarkdown } from "../../lib/markdown";
 
