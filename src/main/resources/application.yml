@@ -47,17 +47,17 @@ rhizodelta:
       auto-branch-threshold: 0.3
     models:
       routing:
-        base-url: https://api.siliconflow.cn/v1
-        model-name: Qwen/Qwen2.5-7B-Instruct
-        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        model-name: deepseek-v4-flash
+        api-key: ${DASHSCOPE_API_KEY:your-placeholder-key}
       summary:
-        base-url: https://api.siliconflow.cn/v1
-        model-name: Qwen/Qwen2.5-14B-Instruct
-        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        model-name: deepseek-v4-flash
+        api-key: ${DASHSCOPE_API_KEY:your-placeholder-key}
       quality:
-        base-url: https://api.siliconflow.cn/v1
-        model-name: Qwen/Qwen2.5-7B-Instruct
-        api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        model-name: deepseek-v4-flash
+        api-key: ${DASHSCOPE_API_KEY:your-placeholder-key}
     sweeper:
       batch-size: 50
       cron: "0 */30 * * * *"
@@ -74,13 +74,13 @@ rhizodelta:
 langchain4j:
   open-ai:
     chat-model:
-      base-url: https://api.siliconflow.cn/v1
-      model-name: Qwen/Qwen2.5-7B-Instruct
-      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model-name: deepseek-v4-flash
+      api-key: ${DASHSCOPE_API_KEY:your-placeholder-key}
     embedding-model:
-      base-url: https://api.siliconflow.cn/v1
-      model-name: Qwen/Qwen3-Embedding-0.6B
-      api-key: ${SILICON_FLOW_API_KEY:your-placeholder-key}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model-name: text-embedding-v3
+      api-key: ${DASHSCOPE_API_KEY:your-placeholder-key}
 
 # Suppress Tomcat ERROR logs for broken SSE connections (client disconnect).
 # These two loggers only fire when a servlet or error page write fails mid-flight,
