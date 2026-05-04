@@ -71,4 +71,20 @@ describe("HumanPostNode author display", () => {
 
     expect(screen.getByText("Anonymous")).toBeInTheDocument();
   });
+
+  it("formats agent_version as the author for AI-style nodes without a human author", () => {
+    // AI / 共识节点没有 UserProfile 也没有 username —— 此前会落到 "Anonymous"，
+    // 把模型名当作 author 兜底显示更直观，也回答了"AI 节点是哪个模型生成的"。
+    const node = makeNode({
+      author_id: undefined,
+      author_username: undefined,
+      author_display_name: undefined,
+      agent_version: "deepseek-v4-flash",
+    });
+
+    render(<HumanPostNode data={node} selected={false} {...({} as any)} />);
+
+    // 模型 slug 会被 formatAgentVersion 美化成 "DeepSeek V4 Flash"。
+    expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
+  });
 });

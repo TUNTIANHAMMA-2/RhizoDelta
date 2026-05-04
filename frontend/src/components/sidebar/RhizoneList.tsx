@@ -79,6 +79,7 @@ export function RhizoneList() {
                     displayName={node.author_display_name}
                     username={node.author_username}
                     authorId={node.author_id}
+                    agentVersion={node.agent_version}
                   />
                 </div>
               </button>

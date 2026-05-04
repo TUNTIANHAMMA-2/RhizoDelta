@@ -55,6 +55,7 @@ export const HumanPostNode = memo(function HumanPostNode({ data, selected }: Nod
                 displayName={node.author_display_name}
                 username={node.author_username}
                 authorId={node.author_id}
+                agentVersion={node.agent_version}
               />
               <span className="flex items-center gap-1">
                 {node.quality_overall != null && <QualityBadge qualityOverall={node.quality_overall} />}

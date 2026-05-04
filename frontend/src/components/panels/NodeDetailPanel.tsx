@@ -66,9 +66,12 @@ export function NodeDetailPanel() {
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
   if (!node) return null;
-  const authorName = resolveAuthorName(node.author_display_name, node.author_username, node.author_id)
-    || node.agent_version
-    || "System";
+  const authorName = resolveAuthorName(
+    node.author_display_name,
+    node.author_username,
+    node.author_id,
+    node.agent_version,
+  );
 
   // Resolve current follow/mute state for this node when the panel opens. We
   // page through follows/mutes once — for the typical user with O(10) follows

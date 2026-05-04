@@ -119,6 +119,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
               displayName={node.author_display_name}
               username={node.author_username}
               authorId={node.author_id}
+              agentVersion={node.agent_version}
             />
           </span>
           <span className="text-text-tertiary/50">·</span>

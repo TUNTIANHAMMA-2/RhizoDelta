@@ -38,6 +38,7 @@ function ProvenanceItem({ item, onSelect }: { item: GraphNodeDTO; onSelect: () =
             displayName={item.author_display_name}
             username={item.author_username}
             authorId={item.author_id}
+            agentVersion={item.agent_version}
           /> &middot;{" "}
           {new Date(item.created_at).toLocaleDateString()}
         </div>
