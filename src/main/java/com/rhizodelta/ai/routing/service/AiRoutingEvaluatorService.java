@@ -153,23 +153,108 @@ public class AiRoutingEvaluatorService {
      * 解析模型返回的结构化决策。
      *
      * <p>这里会统一校验动作是否合法、理由是否为空，以及置信度是否落在允许区间内。
+     *
+     * <p>容忍模型常见的"脏"输出：markdown fence (` ```json ... ``` `)、
+     * 前置/后置说明文字、思考链泄露。先做最宽松的提取再交给 Jackson 严格反序列化。
      */
     private ModelDecision parseDecision(String responseText) {
+        String candidate = extractJsonObject(responseText);
         try {
-            ModelDecision decision = objectMapper.readValue(responseText, ModelDecision.class);
+            ModelDecision decision = objectMapper.readValue(candidate, ModelDecision.class);
             String action = normalizeAction(decision.action());
             String reason = DecisionCommandValidation.requireText(decision.reason(), "reason");
             double confidence = requireConfidence(decision.confidence());
             return new ModelDecision(action, confidence, reason);
         } catch (IOException exception) {
+            // 解析失败时记录完整原文（不只是 160 字预览），否则线上没法回溯模型到底吐了什么。
             LOGGER.error(
-                    "AI routing evaluator failed to parse response model={} response={}",
+                    "AI routing evaluator failed to parse response model={} extracted_candidate={} raw_response={}",
                     resolveModelName(),
-                    previewText(responseText),
+                    candidate,
+                    blankToEmpty(responseText),
                     exception
             );
             throw new IllegalStateException("failed to parse routing evaluator response", exception);
         }
+    }
+
+    /**
+     * 把模型自由文本里夹带的 JSON 对象抠出来。
+     *
+     * <p>覆盖三类常见污染：
+     * <ol>
+     *   <li>` ```json ... ``` ` markdown 围栏</li>
+     *   <li>"Here is the decision: {...}" 前置说明 + "{...} ←仅供参考" 后置注释</li>
+     *   <li>思考链 / chain-of-thought 段落 leak 在 JSON 之前</li>
+     * </ol>
+     *
+     * <p>策略：先剥围栏 + 全局 trim，再扫第一个 {，按花括号深度寻找匹配的 }。
+     * 注意要正确处理字符串字面量内部的 { 和 }，否则碰到形如 {"reason":"分支 {x}"} 会数错。
+     *
+     * <p>若文本里完全找不到 JSON，原样返回；调用方的 readValue 会照常抛错并把原文写入日志。
+     */
+    static String extractJsonObject(String responseText) {
+        if (responseText == null) {
+            return "";
+        }
+        String stripped = stripCodeFence(responseText.trim());
+        int start = stripped.indexOf('{');
+        if (start < 0) {
+            return stripped;
+        }
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = start; i < stripped.length(); i++) {
+            char c = stripped.charAt(i);
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) {
+                continue;
+            }
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return stripped.substring(start, i + 1);
+                }
+            }
+        }
+        // 不平衡 → 让上层走错误日志
+        return stripped.substring(start);
+    }
+
+    /**
+     * 剥掉 ` ```json ... ``` ` / ` ``` ... ``` ` 这类 markdown 围栏，只保留中间内容。
+     * 模型即便在系统提示里被明确禁止，也常常会自发包一层。
+     */
+    private static String stripCodeFence(String text) {
+        String t = text.trim();
+        if (!t.startsWith("```")) {
+            return t;
+        }
+        int firstNewline = t.indexOf('\n');
+        if (firstNewline < 0) {
+            return t;
+        }
+        // 第一行可能是 ```json / ```JSON / ``` 等，整行丢弃
+        String body = t.substring(firstNewline + 1);
+        int closing = body.lastIndexOf("```");
+        if (closing < 0) {
+            return body.trim();
+        }
+        return body.substring(0, closing).trim();
     }
 
     /**
