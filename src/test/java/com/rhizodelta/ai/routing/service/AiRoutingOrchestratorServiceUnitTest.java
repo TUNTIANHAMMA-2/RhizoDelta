@@ -47,8 +47,11 @@ class AiRoutingOrchestratorServiceUnitTest {
         UUID postNodeId = UUID.randomUUID();
         UUID recalledCandidateNodeId = UUID.randomUUID();
         UUID workflowCandidateNodeId = UUID.randomUUID();
+        UUID targetNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "post content", "author-1", "req-1");
-        PostEventMessage message = new PostEventMessage("req-1", "author-1", "post content", null, "evt-1");
+        // 必须传 targetNodeId — 没有 target 时 L0 短路会让 routing 直接出 STANDALONE，
+        // 后续 review 路径根本不会被触达，本用例就失去了验证意义。
+        PostEventMessage message = new PostEventMessage("req-1", "author-1", "post content", targetNodeId.toString(), "evt-1");
         ReviewTask reviewTask = new ReviewTask(
                 "review-1",
                 "req-1",
@@ -63,7 +66,7 @@ class AiRoutingOrchestratorServiceUnitTest {
                 Instant.parse("2026-03-23T00:00:00Z"),
                 Instant.parse("2026-03-30T00:00:00Z")
         );
-        when(routingRecallService.recall("post content", null)).thenReturn(new PrunedContext(
+        when(routingRecallService.recall("post content", targetNodeId.toString())).thenReturn(new PrunedContext(
                 List.of(new SimilaritySearchResult(recalledCandidateNodeId, "Human_Post", 0.95d, "candidate", Instant.now(), List.of())),
                 false,
                 0
@@ -143,9 +146,10 @@ class AiRoutingOrchestratorServiceUnitTest {
         );
         UUID postNodeId = UUID.randomUUID();
         UUID candidateNodeId = UUID.randomUUID();
+        UUID targetNodeId = UUID.randomUUID();
         HumanPost post = HumanPost.create(postNodeId, "merged content", "author-1", "req-1");
-        PostEventMessage message = new PostEventMessage("req-1", "author-1", "merged content", null, "evt-1");
-        when(routingRecallService.recall("merged content", null)).thenReturn(new PrunedContext(
+        PostEventMessage message = new PostEventMessage("req-1", "author-1", "merged content", targetNodeId.toString(), "evt-1");
+        when(routingRecallService.recall("merged content", targetNodeId.toString())).thenReturn(new PrunedContext(
                 List.of(new SimilaritySearchResult(candidateNodeId, "Human_Post", 0.98d, "candidate", Instant.now(), List.of())),
                 false,
                 0
@@ -185,5 +189,142 @@ class AiRoutingOrchestratorServiceUnitTest {
                 (SseEventService.OrchestrationStatusPayload) payloads.get(payloads.size() - 1);
         assertThat(lastPayload.status()).isEqualTo("MERGE_QUEUED");
         assertThat(lastPayload.message()).contains("evt-1:merge");
+    }
+
+    /**
+     * L0 - 根帖（无 targetNodeId）必须在 orchestrate 入口被短路。
+     * 期望：直接广播 STANDALONE，不调 recall、不调 workflow、不创建复核任务。
+     */
+    @Test
+    void shouldShortCircuitWithStandaloneStatusForRootPost() {
+        AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
+        RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
+        AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
+        ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
+        SseEventService sseEventService = mock(SseEventService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
+        AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
+                workflowService,
+                routingRecallService,
+                aiRoutingExecutionService,
+                reviewTaskService,
+                sseEventService,
+                branchContextService,
+                "gpt-4o-test"
+        );
+        UUID postNodeId = UUID.randomUUID();
+        HumanPost post = HumanPost.create(postNodeId, "fresh root content", "author-1", "req-root");
+        // targetNodeId == null —— 根帖
+        PostEventMessage message = new PostEventMessage("req-root", "author-1", "fresh root content", null, "evt-root");
+
+        orchestratorService.orchestrate(message, post);
+
+        // 路由链路所有外部依赖都不应被触达
+        org.mockito.Mockito.verifyNoInteractions(routingRecallService);
+        org.mockito.Mockito.verifyNoInteractions(workflowService);
+        org.mockito.Mockito.verifyNoInteractions(branchContextService);
+        org.mockito.Mockito.verifyNoInteractions(reviewTaskService);
+        org.mockito.Mockito.verifyNoInteractions(aiRoutingExecutionService);
+
+        // 唯一的 SSE 应该是 STANDALONE
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(sseEventService, org.mockito.Mockito.times(1))
+                .publish(org.mockito.Mockito.eq(SseEventService.SseEventType.ORCHESTRATION_STATUS), payloadCaptor.capture());
+        SseEventService.OrchestrationStatusPayload payload =
+                (SseEventService.OrchestrationStatusPayload) payloadCaptor.getValue();
+        assertThat(payload.status()).isEqualTo("STANDALONE");
+        assertThat(payload.postNodeId()).isEqualTo(postNodeId.toString());
+        assertThat(payload.message()).contains("root post");
+    }
+
+    /**
+     * L0 防御覆盖空字符串：targetNodeId="" 与 null 同等对待。
+     */
+    @Test
+    void shouldShortCircuitWhenTargetNodeIdIsBlankString() {
+        AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
+        RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
+        AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
+        ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
+        SseEventService sseEventService = mock(SseEventService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
+        AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
+                workflowService,
+                routingRecallService,
+                aiRoutingExecutionService,
+                reviewTaskService,
+                sseEventService,
+                branchContextService,
+                "gpt-4o-test"
+        );
+        UUID postNodeId = UUID.randomUUID();
+        HumanPost post = HumanPost.create(postNodeId, "another root", "author-2", "req-root2");
+        PostEventMessage message = new PostEventMessage("req-root2", "author-2", "another root", "   ", "evt-root2");
+
+        orchestratorService.orchestrate(message, post);
+
+        org.mockito.Mockito.verifyNoInteractions(routingRecallService);
+        org.mockito.Mockito.verifyNoInteractions(workflowService);
+    }
+
+    /**
+     * L4 - 即使上游 L0 没拦住，REVIEW 路径上 sourceNodeId 仍为空时不创建复核任务。
+     * 这是一道兜底防线 —— 不让无意义的"待复核"项漏到人工队列里。
+     */
+    @Test
+    void shouldSuppressReviewTaskWhenSourceNodeIdIsBlank() {
+        AiRoutingWorkflowService workflowService = mock(AiRoutingWorkflowService.class);
+        RoutingRecallService routingRecallService = mock(RoutingRecallService.class);
+        AiRoutingExecutionService aiRoutingExecutionService = mock(AiRoutingExecutionService.class);
+        ReviewTaskService reviewTaskService = mock(ReviewTaskService.class);
+        SseEventService sseEventService = mock(SseEventService.class);
+        BranchContextService branchContextService = mock(BranchContextService.class);
+        AiRoutingOrchestratorService orchestratorService = new AiRoutingOrchestratorService(
+                workflowService,
+                routingRecallService,
+                aiRoutingExecutionService,
+                reviewTaskService,
+                sseEventService,
+                branchContextService,
+                "gpt-4o-test"
+        );
+        UUID postNodeId = UUID.randomUUID();
+        UUID targetNodeId = UUID.randomUUID();
+        HumanPost post = HumanPost.create(postNodeId, "edge case", "author-3", "req-edge");
+        // targetNodeId 非空 —— 进入正式 routing；模拟 workflow 返回 REVIEW + 空 sourceNodeId 的"应该不出现的状态"
+        PostEventMessage message = new PostEventMessage("req-edge", "author-3", "edge case", targetNodeId.toString(), "evt-edge");
+        when(routingRecallService.recall("edge case", targetNodeId.toString())).thenReturn(new PrunedContext(
+                List.of(),
+                false,
+                0
+        ));
+        when(branchContextService.buildContext(any(), any())).thenReturn(
+                new BranchContextService.BranchContext(List.of(), List.of(), List.of()));
+        when(branchContextService.formatForRouting(any())).thenReturn("");
+        when(workflowService.invokeSkeleton(any())).thenReturn(Optional.of(new AiRoutingState(Map.of(
+                AiRoutingState.REQUEST_ID, "req-edge",
+                AiRoutingState.EVENT_ID, "evt-edge",
+                AiRoutingState.POST_NODE_ID, postNodeId.toString(),
+                // 故意留空 source，模拟 contextPrune 未劫持的边界状态
+                AiRoutingState.SOURCE_NODE_ID, "",
+                AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, List.of(),
+                AiRoutingState.ROUTING_ACTION, "REVIEW",
+                AiRoutingState.REVIEW_REASON, "ambiguous"
+        ))));
+
+        orchestratorService.orchestrate(message, post);
+
+        // 关键断言：复核任务不应被创建
+        org.mockito.Mockito.verifyNoInteractions(reviewTaskService);
+
+        // 末条 SSE 应是 SKIPPED 而非 REVIEW_PENDING
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(sseEventService, org.mockito.Mockito.atLeastOnce())
+                .publish(org.mockito.Mockito.eq(SseEventService.SseEventType.ORCHESTRATION_STATUS), payloadCaptor.capture());
+        List<Object> payloads = payloadCaptor.getAllValues();
+        SseEventService.OrchestrationStatusPayload lastPayload =
+                (SseEventService.OrchestrationStatusPayload) payloads.get(payloads.size() - 1);
+        assertThat(lastPayload.status()).isEqualTo("SKIPPED");
+        assertThat(lastPayload.message()).contains("review task suppressed");
     }
 }

@@ -71,12 +71,31 @@ public class AiRoutingOrchestratorService {
      *   <li>跳过执行并广播原因</li>
      * </ul>
      *
+     * <p><b>根帖短路 (L0)</b>：
+     * 当 {@code targetNodeId} 为空，意味着用户提交的是新话题首条帖子（root post），
+     * 没有任何上游上下文可以拿来 merge/branch。此时直接广播 {@code STANDALONE}
+     * 并 return，不进入召回 / LLM / 复核任何环节。
+     *
+     * <p>这是单点拦截：避免下游所有"看似 root 但被相似度劫持"的路径
+     * （contextPrune 把 candidates[0] 顶替成 sourceNodeId、REVIEW 分支创建
+     * source_node_id="" 的复核任务、LLM 在不知道这是根帖的情况下做合并判断）。
+     *
      * <p>
      *
      * @param message 帖子事件消息。
      * @param post 已落库的人类帖子节点。
      */
     public void orchestrate(PostEventMessage message, HumanPost post) {
+        if (message.targetNodeId() == null || message.targetNodeId().isBlank()) {
+            publishStatus(
+                    message,
+                    post.getNodeId().toString(),
+                    "STANDALONE",
+                    null,
+                    "root post; no upstream context to route against"
+            );
+            return;
+        }
         publishStatus(message, post.getNodeId().toString(), "EVALUATION_STARTED", null, "ai routing workflow started");
         PrunedContext prunedContext = routingRecallService.recall(post.getContent(), message.targetNodeId());
         List<String> candidateNodeIds = prunedContext.selected().stream()
@@ -207,8 +226,24 @@ public class AiRoutingOrchestratorService {
      * 创建人工复核任务并广播待复核状态。
      *
      * <p>该方法会把当前帖子和路由结果重建为一份草稿载荷，供人工批准时转为正式决策命令。
+     *
+     * <p><b>L4 防御</b>：拒绝创建 {@code source_node_id} 为空的复核任务。
+     * 正常路径下 L0 已经把根帖在 {@link #orchestrate} 入口短路；如果走到这里
+     * 还能撞上空 source，说明上游某条路径漏了根帖判断（如 contextPrune 在
+     * {@code REVIEW} 路径上没劫持候选）。此时不静默生成无意义任务，而是广播
+     * {@code SKIPPED} 并附明确原因，便于回溯与告警。
      */
     private void createReviewTask(PostEventMessage message, HumanPost post, AiRoutingState state) {
+        if (state.sourceNodeId() == null || state.sourceNodeId().isBlank()) {
+            publishStatus(
+                    message,
+                    post.getNodeId().toString(),
+                    "SKIPPED",
+                    null,
+                    "review task suppressed: source_node_id is empty (likely a root post that bypassed L0 guard)"
+            );
+            return;
+        }
         Map<String, Object> draft = new HashMap<>();
         draft.put("request_id", message.requestId());
         draft.put("post_node_id", post.getNodeId().toString());
