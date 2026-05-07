@@ -44,6 +44,12 @@ public class AiRoutingEvaluatorService {
             - BRANCH: only when the new post is related to a recalled candidate but must remain an independent node because it diverges, extends, or preserves a separate thread.
             - REVIEW: use whenever evidence is missing, multiple candidates compete, the boundary is ambiguous, or confidence is low.
 
+            SPECIAL CASE — empty target_node_id:
+            If target_node_id is empty/missing, the post is a standalone root (a new thread, not a reply).
+            There is no upstream context to merge into or branch from. In this case you MUST return:
+              {"action":"BRANCH","confidence":1.0,"reason":"standalone root post"}
+            Do not consider any recalled_context candidates — they are unrelated by definition.
+
             The recalled context may contain:
             - Candidate nodes with their similarity scores.
             - Branch ancestor chain showing the discussion lineage leading to the source node.

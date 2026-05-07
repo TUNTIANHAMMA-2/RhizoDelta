@@ -165,19 +165,45 @@ public class AiRoutingWorkflowService {
 
     /**
      * 创建上下文裁剪结果归一化节点。
+     *
+     * <p><b>L2 修复</b>：sourceNodeId 兜底改为 {@code targetNodeId} 而非
+     * {@code candidates[0]}。语义更直白 ——
+     * <ul>
+     *   <li>对回复帖：source 就是 target（用户回复哪条就基于哪条做合并/分支判断），
+     *       不再因为相似度排第一的候选恰好不是 target，而把决策导向某个旁支。</li>
+     *   <li>对根帖（{@code L0} 守卫上游已拦截，理论上走不到这里）：target 也为空，
+     *       sourceNodeId 保持空，让 orchestrator 末段的 SKIPPED 分支兜底。</li>
+     * </ul>
      */
     private AsyncNodeAction<AiRoutingState> contextPrune() {
         return AsyncNodeAction.node_async(state -> {
             List<String> selectedCandidateNodeIds = normalizeSelectedCandidates(state);
-            String sourceNodeId = state.sourceNodeId().isBlank() && !selectedCandidateNodeIds.isEmpty()
-                    ? selectedCandidateNodeIds.get(0)
-                    : state.sourceNodeId();
+            String sourceNodeId = resolveSourceNodeId(state);
             return Map.of(
                     AiRoutingState.EXECUTED_NODES, List.of(CONTEXT_PRUNE),
                     AiRoutingState.SELECTED_CANDIDATE_NODE_IDS, selectedCandidateNodeIds,
                     AiRoutingState.SOURCE_NODE_ID, sourceNodeId
             );
         });
+    }
+
+    /**
+     * 选择 source 节点的优先级：
+     * <ol>
+     *   <li>state 上已经有非空 sourceNodeId（外部显式提供）→ 用它</li>
+     *   <li>state 上有非空 targetNodeId（即用户回复的目标）→ 用 target 作为 source</li>
+     *   <li>都没有 → 返回空字符串，后续节点会走 SKIPPED 分支</li>
+     * </ol>
+     * 故意不再回退到候选列表 —— 那会让 routing 决策飘到与本次操作无关的图节点上。
+     */
+    private static String resolveSourceNodeId(AiRoutingState state) {
+        if (state.sourceNodeId() != null && !state.sourceNodeId().isBlank()) {
+            return state.sourceNodeId();
+        }
+        if (state.targetNodeId() != null && !state.targetNodeId().isBlank()) {
+            return state.targetNodeId();
+        }
+        return "";
     }
 
     /**

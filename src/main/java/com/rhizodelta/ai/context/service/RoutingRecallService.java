@@ -42,14 +42,25 @@ public class RoutingRecallService {
      * <p>该方法会先调用 {@link EmbeddingModelService} 生成向量，再使用
      * {@link EmbeddingService} 在向量索引中搜索，最后交给 {@link ContextPruner} 做裁剪。
      *
+     * <p><b>L3 防御</b>：当 {@code targetNodeId} 为空（根帖场景），直接返回空候选。
+     * 此时不再触发 embedding API 调用、不再做向量搜索 ——
+     * 一来根帖没有"上游可对照"，召回出来的全图相似结果毫无路由意义；
+     * 二来 {@code searchSimilar(vector, null, null)} 会退化为对全向量索引的 top-K 扫描，
+     * 大图规模下既贵又会污染 routing 决策。
+     * 上游 {@code AiRoutingOrchestratorService} 的 L0 短路已经在更前面拦截了根帖，
+     * 这里的判断是"防御深度"，确保即便 L0 被绕过，向量层面也不会发生误召回。
+     *
      * <p>
      *
      * @param content 待路由内容。
      * @param targetNodeId 可选目标节点 ID。
-     * @return 裁剪后的召回上下文。
+     * @return 裁剪后的召回上下文；目标为空时返回空 {@link PrunedContext}。
      */
     public PrunedContext recall(String content, String targetNodeId) {
         Objects.requireNonNull(content, "content must not be null");
+        if (targetNodeId == null || targetNodeId.isBlank()) {
+            return new PrunedContext(List.of(), false, 0);
+        }
         List<Float> vector = embeddingModelService.embed(content);
         List<SimilaritySearchResult> candidates = embeddingService.searchSimilar(
                 vector,
