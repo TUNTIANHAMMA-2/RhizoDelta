@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { GraphNodeDTO } from "../api/types";
 import { getFeed } from "../api/feed";
 import { listFollows } from "../api/follows";
+import { useUiStore } from "./uiStore";
 
 export type QualityBand = "top" | "good" | "basic" | "unrated";
 
@@ -63,9 +64,9 @@ export const useHomeStore = create<HomeState>((set) => ({
       set({ feedItems: items });
     } catch (e) {
       if (myReq !== feedRequestSeq) return;
-      set({
-        feedError: e instanceof Error ? e.message : "feed request failed",
-      });
+      const msg = e instanceof Error ? e.message : "feed request failed";
+      set({ feedError: msg });
+      useUiStore.getState().addToast({ type: "error", message: msg });
     } finally {
       // 只在「我们仍是最新请求」时清 loading，避免覆盖更晚启动的请求的状态
       if (myReq === feedRequestSeq) set({ feedLoading: false });
@@ -82,6 +83,11 @@ export const useHomeStore = create<HomeState>((set) => ({
         }
       }
       set({ followingTargetIds: ids });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to load following",
+      });
     } finally {
       set({ followingLoading: false });
     }

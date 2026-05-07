@@ -56,7 +56,7 @@ export interface UiState {
 
 let toastId = 0;
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = create<UiState>((set, get) => ({
   leftSidebarOpen: true,
   toggleLeftSidebar: () =>
     set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
@@ -95,8 +95,25 @@ export const useUiStore = create<UiState>((set) => ({
   // Toast
   toasts: [],
   addToast: (toast) => {
+    let msg = toast.message;
+    if (toast.type === "error") {
+      if (
+        msg.includes("Failed to fetch") ||
+        msg.includes("NetworkError") ||
+        msg.includes("network") ||
+        msg.includes("ECONNREFUSED")
+      ) {
+        msg = "无法连接到服务器，请检查网络或后端状态。";
+      }
+    }
+
+    const { toasts } = get();
+    if (toasts.some((t) => t.type === toast.type && t.message === msg)) {
+      return;
+    }
+
     const id = String(++toastId);
-    set((s) => ({ toasts: [...s.toasts, { ...toast, id }] }));
+    set((s) => ({ toasts: [...s.toasts, { ...toast, message: msg, id }] }));
     const duration = toast.type === "error" ? 5000 : 3000;
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));

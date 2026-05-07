@@ -8,6 +8,7 @@ import type {
 import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
 import { toRfNode } from "../lib/mapping";
 import { buildGraphViews } from "../lib/graphView";
+import { useUiStore } from "./uiStore";
 
 export type SemanticZoom = "micro" | "mini" | "normal";
 
@@ -80,80 +81,108 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   semanticZoom: "normal" as SemanticZoom,
 
   loadRhizomes: async () => {
-    const rhizomes = await fetchRhizomes(50);
-    set({ rhizomes });
+    try {
+      const rhizomes = await fetchRhizomes(50);
+      set({ rhizomes });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to load rhizomes",
+      });
+    }
   },
 
   loadLineage: async (nodeId, maxDepth = 3) => {
     const requestId = get().lineageRequestId + 1;
     set({ lineageRequestId: requestId });
 
-    const topo = await fetchLineage(nodeId, maxDepth);
+    try {
+      const topo = await fetchLineage(nodeId, maxDepth);
 
-    // Discard stale response if a newer request was issued
-    if (get().lineageRequestId !== requestId) return;
+      // Discard stale response if a newer request was issued
+      if (get().lineageRequestId !== requestId) return;
 
-    const nodesMap = new Map<string, GraphNodeDTO>();
-    topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
+      const nodesMap = new Map<string, GraphNodeDTO>();
+      topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
-    const priorExplorePositions = new Map(
-      get().exploreRfNodes.map((node) => [node.id, node.position]),
-    );
-    const views = buildGraphViews(
-      topo.nodes,
-      topo.edges,
-      priorExplorePositions,
-    );
+      const priorExplorePositions = new Map(
+        get().exploreRfNodes.map((node) => [node.id, node.position]),
+      );
+      const views = buildGraphViews(
+        topo.nodes,
+        topo.edges,
+        priorExplorePositions,
+      );
 
-    set({
-      nodes: nodesMap,
-      edges: topo.edges,
-      lineageRfNodes: views.lineage.nodes,
-      lineageRfEdges: views.lineage.edges,
-      exploreRfNodes: views.explore.nodes,
-      exploreRfEdges: views.explore.edges,
-      rfNodes: views.lineage.nodes,
-      rfEdges: views.lineage.edges,
-      rootNodeId: nodeId,
-    });
+      set({
+        nodes: nodesMap,
+        edges: topo.edges,
+        lineageRfNodes: views.lineage.nodes,
+        lineageRfEdges: views.lineage.edges,
+        exploreRfNodes: views.explore.nodes,
+        exploreRfEdges: views.explore.edges,
+        rfNodes: views.lineage.nodes,
+        rfEdges: views.lineage.edges,
+        rootNodeId: nodeId,
+      });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to load graph lineage",
+      });
+    }
   },
 
   loadChildren: async (nodeId) => {
-    const topo = await fetchChildren(nodeId, 2);
-    const nodesMap = new Map(get().nodes);
-    topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
+    try {
+      const topo = await fetchChildren(nodeId, 2);
+      const nodesMap = new Map(get().nodes);
+      topo.nodes.forEach((n) => nodesMap.set(n.node_id, n));
 
-    const edgeMap = new Map(
-      get().edges.map((e) => [`${e.source}-${e.type}-${e.target}`, e]),
-    );
-    for (const e of topo.edges) {
-      edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+      const edgeMap = new Map(
+        get().edges.map((e) => [`${e.source}-${e.type}-${e.target}`, e]),
+      );
+      for (const e of topo.edges) {
+        edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+      }
+      const allEdges = [...edgeMap.values()];
+      const priorExplorePositions = new Map(
+        get().exploreRfNodes.map((node) => [node.id, node.position]),
+      );
+      const views = buildGraphViews(
+        nodesMap.values(),
+        allEdges,
+        priorExplorePositions,
+      );
+
+      set({
+        nodes: nodesMap,
+        edges: allEdges,
+        lineageRfNodes: views.lineage.nodes,
+        lineageRfEdges: views.lineage.edges,
+        exploreRfNodes: views.explore.nodes,
+        exploreRfEdges: views.explore.edges,
+        rfNodes: views.lineage.nodes,
+        rfEdges: views.lineage.edges,
+      });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to load children",
+      });
     }
-    const allEdges = [...edgeMap.values()];
-    const priorExplorePositions = new Map(
-      get().exploreRfNodes.map((node) => [node.id, node.position]),
-    );
-    const views = buildGraphViews(
-      nodesMap.values(),
-      allEdges,
-      priorExplorePositions,
-    );
-
-    set({
-      nodes: nodesMap,
-      edges: allEdges,
-      lineageRfNodes: views.lineage.nodes,
-      lineageRfEdges: views.lineage.edges,
-      exploreRfNodes: views.explore.nodes,
-      exploreRfEdges: views.explore.edges,
-      rfNodes: views.lineage.nodes,
-      rfEdges: views.lineage.edges,
-    });
   },
 
   loadAssociations: async (nodeId) => {
-    const associations = await fetchAssociations(nodeId);
-    set({ associations });
+    try {
+      const associations = await fetchAssociations(nodeId);
+      set({ associations });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to load associations",
+      });
+    }
   },
 
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
@@ -185,6 +214,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
       set({ nodes: nodesMap, edges: allEdges });
       get().flushLayout();
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message: e instanceof Error ? e.message : "Failed to expand children",
+      });
     } finally {
       const next = new Set(get().expandingNodeIds);
       next.delete(nodeId);

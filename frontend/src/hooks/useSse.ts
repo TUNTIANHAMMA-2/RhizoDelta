@@ -3,6 +3,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useSseStore } from "../stores/sseStore";
 import { useGraphStore } from "../stores/graphStore";
 import { useNotificationStore } from "../stores/notificationStore";
+import { useUiStore } from "../stores/uiStore";
 import { fetchNode } from "../api/nodes";
 import type {
   NodeCreatedEvent,
@@ -152,7 +153,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse NODE_CREATED event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       fetchNode(payload.node_id).then((node) => {
@@ -172,7 +173,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse EDGE_CREATED event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       const edge: GraphEdgeDTO = {
@@ -217,7 +218,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse EDGE_REMOVED event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       graphStore.removeEdgesBySourceAndType(payload.source, payload.type);
@@ -228,7 +229,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse DECISION_COMPLETE event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       fetchNode(payload.node_id).then((node) => {
@@ -248,7 +249,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse ORCHESTRATION_STATUS event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       useSseStore.getState().setOrchestrationStatus(payload);
@@ -265,7 +266,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse SUMMARY_GENERATED event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       // Refresh the node to get the updated summary_content
@@ -285,7 +286,7 @@ function handleSseEvent(event: SseEvent) {
       try {
         payload = JSON.parse(event.data);
       } catch (e) {
-        console.error("Failed to parse QUALITY_SCORED event data:", e);
+        useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
       // Refresh the node to get the updated quality score

@@ -19,7 +19,7 @@ export function HomePage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    loadRhizomes().catch(console.error);
+    loadRhizomes();
   }, [loadRhizomes]);
 
   useSse();

@@ -51,7 +51,7 @@ test("filterRhizomes: mine returns empty when not logged in", () => {
 
 test("filterRhizomes: recent uses 24h window", () => {
   const now = Date.parse("2026-04-19T15:00:00Z");
-  const out = filterRhizomes(fixture, "recent", null, now);
+  const out = filterRhizomes(fixture, "recent", null, new Set(), now);
   // a (18 Apr 10:00) 29h ago → out; b (19 Apr 10:00) 5h ago → in; c 9d ago → out; d 53h ago → out
   assert.deepEqual(out.map((n) => n.node_id), ["b"]);
 });

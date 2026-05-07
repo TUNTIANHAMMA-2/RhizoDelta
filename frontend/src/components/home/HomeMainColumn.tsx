@@ -210,17 +210,15 @@ export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
   const followingTargetIds = useHomeStore((s) => s.followingTargetIds);
   const loadFollowing = useHomeStore((s) => s.loadFollowing);
 
-  // 当用户切到 "For You" 排序时拉取后端 feed —— 这是真正的个性化内容来源。
   useEffect(() => {
     if (sortBy === "for_you" && userId) {
-      loadFeed().catch(console.error);
+      loadFeed();
     }
   }, [sortBy, userId, loadFeed]);
 
-  // 进入 "Following" 频道时刷新关注列表，保证过滤集合是最新的。
   useEffect(() => {
     if (activeNav === "following" && userId) {
-      loadFollowing().catch(console.error);
+      loadFollowing();
     }
   }, [activeNav, userId, loadFollowing]);
 

@@ -68,10 +68,9 @@ export function GraphWorkspace() {
       loadGraphForRoot(rhizomeId, {
         loadLineage,
         loadChildren,
-        onChildrenError: console.error,
-      }).catch(console.error);
+      });
       // Also load the rhizome list in the background for the sidebar
-      loadRhizomes().catch(console.error);
+      loadRhizomes();
       return;
     }
 
@@ -84,10 +83,8 @@ export function GraphWorkspace() {
         await loadGraphForRoot(rootNodeId, {
           loadLineage,
           loadChildren,
-          onChildrenError: console.error,
         });
       })
-      .catch(console.error);
   }, [rhizomeId, loadRhizomes, loadLineage, loadChildren]);
 
   useSse();
@@ -98,7 +95,7 @@ export function GraphWorkspace() {
 
       {/* Mobile hamburger */}
       <button
-        className="mobile-menu-btn fixed top-2 right-4 z-[101] bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default rounded-sm p-2 cursor-pointer font-ui text-md text-text-secondary"
+        className="lg:hidden fixed top-2 right-4 z-[101] bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default rounded-sm p-2 cursor-pointer font-ui text-md text-text-secondary"
         onClick={() => {
           if (!leftSidebarOpen) toggleLeftSidebar();
           setMobileMenuOpen(!isMobileMenuOpen);
@@ -111,11 +108,11 @@ export function GraphWorkspace() {
       {/* Left sidebar — overlay on mobile */}
       {leftSidebarOpen ? (
         <>
-          <div className="sidebar-container">
+          <div className="h-full flex flex-col max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:bg-bg-secondary max-lg:w-[80%] max-lg:max-w-[320px]">
             <RhizoneList />
           </div>
           <div
-            className="mobile-backdrop fixed inset-0 z-[49] bg-[rgba(26,29,27,0.25)] backdrop-blur-[2px]"
+            className="lg:hidden fixed inset-0 z-[49] bg-[rgba(26,29,27,0.25)] backdrop-blur-[2px]"
             onClick={() => {
               toggleLeftSidebar();
               setMobileMenuOpen(false);
@@ -124,7 +121,7 @@ export function GraphWorkspace() {
         </>
       ) : (
         <button
-          className="sidebar-toggle-btn fixed top-1/2 left-0 -translate-y-1/2 z-50 w-6 h-12 flex items-center justify-center bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default border-l-0 rounded-r-pill cursor-pointer text-text-tertiary shadow-sm p-0"
+          className="fixed top-1/2 left-0 -translate-y-1/2 z-50 w-6 h-12 flex items-center justify-center bg-[rgba(253,252,249,0.88)] backdrop-blur-md border border-border-default border-l-0 rounded-r-pill cursor-pointer text-text-tertiary shadow-sm p-0 transition-all hover:bg-bg-hover hover:text-text-primary"
           onClick={toggleLeftSidebar}
           aria-label="展开侧边栏"
         >
@@ -158,31 +155,6 @@ export function GraphWorkspace() {
       <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
 
       <ToastContainer />
-
-      {/* Responsive CSS (media-query-based, keep as raw CSS) */}
-      <style>{`
-        .sidebar-toggle-btn { transition: all var(--transition-fast); }
-        .sidebar-toggle-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
-
-        .mobile-menu-btn { display: none; }
-        .mobile-backdrop { display: none; }
-        .sidebar-container { height: 100%; display: flex; flex-direction: column; }
-
-        @media (max-width: 1024px) {
-          .mobile-menu-btn { display: block; }
-          .mobile-backdrop { display: block; }
-          .sidebar-container {
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 50;
-            background: var(--color-bg-secondary);
-            width: 80%;
-            max-width: 320px;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -104,7 +104,7 @@ export function HomeSidebar() {
   // 登录后第一次拉一次关注列表，让侧栏 Following 计数与右栏过滤都拿到真实集合。
   useEffect(() => {
     if (userId) {
-      loadFollowing().catch(console.error);
+      loadFollowing();
     }
   }, [userId, loadFollowing]);
 

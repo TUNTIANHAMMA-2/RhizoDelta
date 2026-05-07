@@ -161,7 +161,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           await loadGraphForRoot(targetNodeId, {
             loadLineage,
             loadChildren,
-            onChildrenError: console.error,
           });
         } catch {
           // swallow — still try to select

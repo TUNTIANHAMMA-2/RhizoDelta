@@ -11,13 +11,13 @@ import {
 function createMemoryStorage() {
   const values = new Map();
   return {
-    getItem(key) {
+    getItem(key: string) {
       return values.has(key) ? values.get(key) : null;
     },
-    setItem(key, value) {
+    setItem(key: string, value: string) {
       values.set(key, value);
     },
-    removeItem(key) {
+    removeItem(key: string) {
       values.delete(key);
     },
   };
