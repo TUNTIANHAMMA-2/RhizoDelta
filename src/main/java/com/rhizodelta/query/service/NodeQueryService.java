@@ -206,6 +206,40 @@ public class NodeQueryService {
             ORDER BY createdAt DESC
             """;
 
+    private static final String HUMAN_POST_PROVENANCE_QUERY = """
+            MATCH (target:Human_Post {node_id: $nodeId})-[:CONTINUES_FROM|BRANCHED_FROM]->(parent:GraphNode)
+            WHERE NOT coalesce(target._deleted, false)
+              AND NOT coalesce(parent._deleted, false)
+            WITH parent, labels(parent) AS parentLabels
+            RETURN parent.node_id AS nodeId,
+                   CASE WHEN 'Human_Post' IN parentLabels THEN 'Human_Post' WHEN 'Result' IN parentLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
+                   parent.content AS content,
+                   parent.summary_content AS summaryContent,
+                   parent.author_id AS authorId,
+                   parent.agent_version AS agentVersion,
+                   parent.created_at AS createdAt,
+                   parent.embedding IS NOT NULL AS hasEmbedding,
+                   parent.quality_overall AS qualityOverall
+            ORDER BY createdAt DESC
+            """;
+
+    private static final String RESULT_PROVENANCE_QUERY = """
+            MATCH (target:Result {node_id: $nodeId})-[:MATERIALIZED_FROM]->(source:GraphNode)
+            WHERE NOT coalesce(target._deleted, false)
+              AND NOT coalesce(source._deleted, false)
+            WITH source, labels(source) AS sourceLabels
+            RETURN source.node_id AS nodeId,
+                   CASE WHEN 'Human_Post' IN sourceLabels THEN 'Human_Post' WHEN 'Result' IN sourceLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
+                   source.content AS content,
+                   source.summary_content AS summaryContent,
+                   source.author_id AS authorId,
+                   source.agent_version AS agentVersion,
+                   source.created_at AS createdAt,
+                   source.embedding IS NOT NULL AS hasEmbedding,
+                   source.quality_overall AS qualityOverall
+            ORDER BY createdAt DESC
+            """;
+
     private static final String ROOTS_QUERY = """
             MATCH (n:GraphNode)
             WHERE NOT coalesce(n._deleted, false)
@@ -391,14 +425,26 @@ public class NodeQueryService {
     }
 
     /**
-     * 返回共识节点的来源摘要列表。
+     * 返回任意节点的直接上游摘要列表，是确权溯源面板的数据来源。
+     *
+     * <p>查询深度固定为 1 跳（直接上游），不进行多层递归——多层谱系视图由
+     * {@link #getLineage(UUID, Integer)} 承担。返回结构按节点类型分发：
+     *
+     * <ul>
+     *   <li>{@code AI_Consensus} → 沿 {@code SYNTHESIZED_FROM} 返回合成来源；</li>
+     *   <li>{@code Human_Post} → 沿 {@code CONTINUES_FROM} 或 {@code BRANCHED_FROM} 返回父节点；</li>
+     *   <li>{@code Result} → 沿 {@code MATERIALIZED_FROM} 返回物化来源。</li>
+     * </ul>
+     *
+     * <p>所有分支均会过滤掉软删除节点，并通过 {@link #enrichAuthorProjections(List)} 补齐作者投影。
+     * 对没有上游的节点（例如根帖、独立 Result）返回空列表。
      *
      * <p>相比 {@link #getProvenance(UUID)}，该方法更轻量，更适合 UI 展示与提示词构建。
      *
      * <p>
      *
      * @param nodeId 节点 ID。
-     * @return 来源摘要列表；若目标本身是帖子节点则返回空列表。
+     * @return 直接上游节点摘要列表；若节点为根或无上游来源则返回空列表。
      */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getProvenanceSummaries(UUID nodeId) {
@@ -408,10 +454,17 @@ public class NodeQueryService {
                 .fetch()
                 .one()
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
-        if ("Human_Post".equals(nodeInfo.get("label"))) {
-            return List.of();
+        String label = (String) nodeInfo.get("label");
+        if (label == null) {
+            throw new IllegalStateException("Node " + nodeId + " has no resolvable label");
         }
-        List<LineageNode> nodes = neo4jClient.query(PROVENANCE_SUMMARY_QUERY)
+        String query = switch (label) {
+            case "AI_Consensus" -> PROVENANCE_SUMMARY_QUERY;
+            case "Human_Post" -> HUMAN_POST_PROVENANCE_QUERY;
+            case "Result" -> RESULT_PROVENANCE_QUERY;
+            default -> throw new IllegalStateException("Unsupported node label '" + label + "' for node " + nodeId);
+        };
+        List<LineageNode> nodes = neo4jClient.query(query)
                 .bind(nodeId.toString()).to("nodeId")
                 .fetch().all()
                 .stream()

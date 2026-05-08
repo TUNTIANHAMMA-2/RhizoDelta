@@ -142,14 +142,21 @@ public class NodeQueryController {
     }
 
     /**
-     * 返回共识节点的来源摘要列表。
+     * 返回任意节点的直接上游摘要列表。
      *
-     * <p>当目标节点本身是帖子节点时，返回空列表表示不存在更底层的来源集合。
+     * <p>查询深度固定为 1 跳。按节点类型返回不同的关系语义：
+     * <ul>
+     *   <li>{@code AI_Consensus} → 沿 {@code SYNTHESIZED_FROM} 返回合成来源；</li>
+     *   <li>{@code Human_Post} → 沿 {@code CONTINUES_FROM} 或 {@code BRANCHED_FROM} 返回父节点；</li>
+     *   <li>{@code Result} → 沿 {@code MATERIALIZED_FROM} 返回物化来源。</li>
+     * </ul>
+     *
+     * <p>对没有上游的节点（例如根帖、无来源的独立 Result）返回空列表。
      *
      * <p>
      *
      * @param id 节点 UUID 字符串。
-     * @return 溯源节点摘要列表。
+     * @return 直接上游节点摘要列表。
      */
     @GetMapping("/{id}/provenance")
     public ApiResponse<List<NodePayload>> getProvenance(@PathVariable("id") String id) {
