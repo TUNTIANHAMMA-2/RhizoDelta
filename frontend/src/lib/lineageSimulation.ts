@@ -11,12 +11,12 @@ import {
 } from "d3-force";
 import type { Edge, Node } from "@xyflow/react";
 
-const LINEAGE_CHARGE_STRENGTH = -180;
-const LINEAGE_COLLISION_RADIUS = 90;
-const LINEAGE_LINK_DISTANCE = 180;
-const LINEAGE_TARGET_FORCE_STRENGTH = 0.72;
-const LINEAGE_TARGET_FORCE_Y_STRENGTH = 0.76;
-const LINEAGE_ALPHA_DECAY = 0.12;
+const LINEAGE_CHARGE_STRENGTH = -120;
+const LINEAGE_COLLISION_RADIUS = 80;
+const LINEAGE_LINK_DISTANCE = 140;
+const LINEAGE_TARGET_FORCE_STRENGTH = 0.92;
+const LINEAGE_TARGET_FORCE_Y_STRENGTH = 0.95;
+const LINEAGE_ALPHA_DECAY = 0.18;
 
 interface LineageTarget {
   x: number;

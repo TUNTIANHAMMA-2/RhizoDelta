@@ -12,11 +12,11 @@ import {
 } from "d3-force";
 import type { Edge, Node } from "@xyflow/react";
 
-const CHARGE_STRENGTH = -2500;
-const COLLIDE_RADIUS = 180; 
-const COLLIDE_ITERATIONS = 4;
-const GRAVITY_STRENGTH = 0.015; // Weak sea-gravity float effect
-const ALPHA_DECAY = 0.05; // Slower decay for organic floating
+const CHARGE_STRENGTH = -4000;
+const COLLIDE_RADIUS = 220;
+const COLLIDE_ITERATIONS = 6;
+const GRAVITY_STRENGTH = 0.012;
+const ALPHA_DECAY = 0.04;
 
 interface ExploreSimulationNode extends SimulationNodeDatum {
   id: string;
@@ -51,7 +51,7 @@ function assignRadialTreeInitialPositions(
   const positions = new Map<string, { x: number; y: number }>();
   positions.set(anchorNodeId, { x: 0, y: 0 });
 
-  const BASE_RADIUS = 300;
+  const BASE_RADIUS = 400;
   const queue: Array<{ id: string; startAngle: number; sweep: number; level: number }> = [];
   const visited = new Set<string>([anchorNodeId]);
 
@@ -165,12 +165,12 @@ export function createExploreSimulation(
         .distance((link) => {
           const relType = String(link.edgeData.data?.relType ?? "");
           if (relType === "CONTINUES_FROM") {
-            return 160; // Tighter, linear-like connection
+            return 250;
           }
           if (relType === "BRANCHED_FROM") {
-            return 320; // Looser, branching out widely
+            return 400;
           }
-          return 240; // Default organic distance
+          return 320;
         }),
     )
     // 4. Breathe & Float
