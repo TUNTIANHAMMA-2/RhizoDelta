@@ -11,7 +11,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final String localStoragePath;
 
     public WebMvcConfig(
-            @Value("${rhizodelta.avatar.local-storage-path:/tmp/rhizodelta/avatars}") String localStoragePath
+            @Value("${rhizodelta.avatar.local-storage-path:./data/avatars}") String localStoragePath
     ) {
         this.localStoragePath = localStoragePath;
     }

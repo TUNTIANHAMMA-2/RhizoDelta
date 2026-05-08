@@ -1,4 +1,4 @@
-﻿# Environment variables (contains credentials)
+# Environment variables (contains credentials)
 .env
 
 # Build output
@@ -34,3 +34,6 @@ src/main/resources/application-local.yml
 
 # Ad-hoc local demo scripts
 k6-demo.js
+
+# Local data (avatar uploads, etc.)
+data/

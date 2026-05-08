@@ -13,6 +13,8 @@ services:
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+    networks:
+      - rhizodelta-net
   rabbitmq:
     image: rabbitmq:3-management
     container_name: ${RABBITMQ_CONTAINER_NAME:-rhizodelta-rabbitmq}
@@ -23,12 +25,16 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    networks:
+      - rhizodelta-net
   redis:
     image: redis:7-alpine
     container_name: ${REDIS_CONTAINER_NAME:-rhizodelta-redis}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    networks:
+      - rhizodelta-net
   minio:
     image: minio/minio:latest
     container_name: ${MINIO_CONTAINER_NAME:-rhizodelta-minio}
@@ -42,8 +48,14 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - minio_data:/data
+    networks:
+      - rhizodelta-net
 
 volumes:
   neo4j_data:
   neo4j_logs:
   minio_data:
+
+networks:
+  rhizodelta-net:
+    driver: bridge

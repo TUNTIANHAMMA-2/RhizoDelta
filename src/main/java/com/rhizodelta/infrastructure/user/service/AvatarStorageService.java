@@ -32,7 +32,7 @@ public class AvatarStorageService {
             ObjectProvider<MinioClient> minioClientProvider,
             @Value("${rhizodelta.minio.bucket:rhizodelta-avatars}") String bucket,
             @Value("${rhizodelta.minio.enabled:false}") boolean enabled,
-            @Value("${rhizodelta.avatar.local-storage-path:/tmp/rhizodelta/avatars}") String localStoragePath
+            @Value("${rhizodelta.avatar.local-storage-path:./data/avatars}") String localStoragePath
     ) {
         this.minioClient = minioClientProvider.getIfAvailable();
         this.bucket = bucket;
