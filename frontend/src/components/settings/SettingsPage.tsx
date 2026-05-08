@@ -5,12 +5,10 @@ import { useAuthStore } from "../../stores/authStore";
 import { metaLabel } from "../../lib/typography";
 import { AvatarUpload } from "./AvatarUpload";
 import { useNavigate } from "react-router-dom";
-import type { UserProfile } from "../../api/types";
 import { RadiusModeToggle } from "../chrome/RadiusModeToggle";
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -19,10 +17,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     getMyProfile()
-      .then((p) => {
-        setProfile(p);
-        setDisplayName(p.display_name ?? "");
-      })
+      .then((p) => setDisplayName(p.display_name ?? ""))
       .finally(() => setLoading(false));
   }, []);
 
@@ -30,8 +25,7 @@ export function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const updated = await updateProfile({ display_name: displayName || null });
-      setProfile(updated);
+      await updateProfile({ display_name: displayName || null });
       setMessage("Saved");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
