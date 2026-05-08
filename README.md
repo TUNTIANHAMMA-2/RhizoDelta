@@ -51,7 +51,7 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | 审计与治理 | `audit-governance-layer` | 白皮书 §五、开发文档 §7.3 | ✅ 基本完成 |
 | 向量嵌入与搜索 | `embedding-vector-search` | 白皮书 §三.1、开发文档 §7.1 | ✅ 已完成 |
 | P0/P1 后端基础 | `p0-p1-backend-foundation` | 开发文档 §2、§5 | ✅ 基本完成 |
-| AI 编排层 | — (见 `Doc/ai-orchestration-execution-plan.md`) | 开发文档 §12 | ⏳ 骨架完成，4 阶段待推进 |
+| AI 编排层 | `ai-orchestration-layer` | 开发文档 §12 | ✅ 已完成 |
 | 前端 DAG 渲染 | — | 前端开发文档 全文 | ✅ 已完成 |
 | 动态声誉系统 | — | 白皮书 §六 | ❌ 未启动 |
 
@@ -63,9 +63,8 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | **项目开发文档** | [Doc/项目开发文档.md](Doc/项目开发文档.md) | 后端技术架构、API 规范、数据模型、AI 编排路线 |
 | **前端开发文档** | [Doc/前端开发文档.md](Doc/前端开发文档.md) | 前端设计系统、组件规范、React Flow 集成、交互流程 |
 | **使用手册** | [Doc/使用手册.md](Doc/使用手册.md) | 面向开发者的实操指南：启动、调试、API 用法 |
-| **AI 编排实施计划** | [Doc/ai-orchestration-execution-plan.md](Doc/ai-orchestration-execution-plan.md) | AI 编排层 4 阶段文件级实施清单 |
 | **前端 README** | [frontend/README.md](frontend/README.md) | 前端启动、JWT 调试、页面使用说明 |
-| **openspec 任务** | [openspec/changes/](openspec/changes/) | 6 个变更集的 proposal / design / tasks |
+| **openspec 任务** | [openspec/changes/](openspec/changes/) | 7 个变更集的 proposal / design / tasks |
 
 ## 快速启动
 
