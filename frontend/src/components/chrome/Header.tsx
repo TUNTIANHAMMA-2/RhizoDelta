@@ -9,7 +9,7 @@ import clsx from "clsx";
 import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
 import { NotificationCenter } from "./NotificationCenter";
-import { RadiusModeToggle } from "./RadiusModeToggle";
+
 
 const SSE_STATUS_COLOR = {
   connecting: "var(--color-warning)",
@@ -185,8 +185,6 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           )}
         </button>
 
-        {/* 圆角档位切换 —— 实时验收两套设计 */}
-        <RadiusModeToggle />
 
         {/* 通知铃铛 */}
         <div ref={notifContainerRef} className="relative">

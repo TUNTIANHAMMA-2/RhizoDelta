@@ -4,9 +4,12 @@ import { getMyProfile, updateProfile } from "../../api/profile";
 import { useAuthStore } from "../../stores/authStore";
 import { metaLabel } from "../../lib/typography";
 import { AvatarUpload } from "./AvatarUpload";
+import { useNavigate } from "react-router-dom";
 import type { UserProfile } from "../../api/types";
+import { RadiusModeToggle } from "../chrome/RadiusModeToggle";
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,12 @@ export function SettingsPage() {
   return (
     <div className="max-w-lg mx-auto py-12 px-6 space-y-10">
       <div>
+        <button
+          onClick={() => navigate("/")}
+          className="mb-6 flex items-center text-text-tertiary hover:text-text-primary transition-colors text-sm font-ui"
+        >
+          ← Back to Home
+        </button>
         <h1 className="font-content text-3xl tracking-[-0.02em] text-text-primary mb-2">
           Settings
         </h1>
@@ -55,6 +64,25 @@ export function SettingsPage() {
           设置
         </p>
       </div>
+
+      <section className="space-y-4">
+        <h2
+          className={clsx(
+            metaLabel,
+            "text-text-tertiary uppercase tracking-[0.18em]",
+          )}
+        >
+          Appearance
+        </h2>
+        <div className="space-y-2">
+          <label className={clsx(metaLabel, "block text-text-secondary")}>
+            Corner Radius
+          </label>
+          <div>
+            <RadiusModeToggle />
+          </div>
+        </div>
+      </section>
 
       <section className="space-y-4">
         <h2

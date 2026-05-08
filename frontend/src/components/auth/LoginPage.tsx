@@ -201,7 +201,7 @@ export function LoginPage() {
         <header className="relative z-10 inline-block">
           <WordMark className="block text-[26px] leading-none" />
           <div className="mt-2.5 h-px w-32 bg-accent/40" />
-          <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-text-tertiary">
+          <div className="mt-2 font-mono text-[10px] tracking-[0.22em] text-text-tertiary">
             A thinking thicket · in threads
           </div>
         </header>
@@ -239,7 +239,7 @@ export function LoginPage() {
                 <span className="font-bold tabular-nums">{n}</span>
                 <span>{en}</span>
               </dt>
-              <dd className="font-content italic text-[17px] text-text-secondary">
+              <dd className="font-content text-[17px] text-text-secondary">
                 {zh}
               </dd>
             </div>
@@ -258,7 +258,7 @@ export function LoginPage() {
             <h1>
               <WordMark className="block text-[22px] leading-none" />
             </h1>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
+            <div className="font-mono text-[10px] tracking-[0.18em] text-text-tertiary">
               A thinking thicket · in threads
             </div>
           </div>
