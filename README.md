@@ -65,6 +65,8 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | **使用手册** | [Doc/使用手册.md](Doc/使用手册.md) | 面向开发者的实操指南：启动、调试、API 用法 |
 | **前端 README** | [frontend/README.md](frontend/README.md) | 前端启动、JWT 调试、页面使用说明 |
 | **openspec 任务** | [openspec/changes/](openspec/changes/) | 7 个变更集的 proposal / design / tasks |
+| **可观测性 Runbook** | [docs/runbooks/observability.md](docs/runbooks/observability.md) | Prometheus / Grafana 访问、看板解读、容量阈值 |
+| **Feature Flags Runbook** | [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md) | 全项目 feature flag 命名约定与切换流程 |
 
 ## 快速启动
 
@@ -168,6 +170,10 @@ npm run build
 cd frontend
 npm run lint
 ```
+
+## 可观测性
+
+项目自带 Prometheus + Grafana 监控栈，对所有 LLM 调用透明埋点（token / latency / errors）。详见 [docs/runbooks/observability.md](docs/runbooks/observability.md)。一行启用：`docker compose up -d prometheus grafana`，访问 http://127.0.0.1:3000 看 "AI Cost & Latency" 看板。可观测性与所有 AI 能力都有独立 feature flag，详见 [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md)。
 
 ## 项目入口
 
