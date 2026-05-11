@@ -15,7 +15,27 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: rhizodelta
+
 rhizodelta:
+  feature:
+    observability:
+      enabled: ${RHIZODELTA_FEATURE_OBSERVABILITY_ENABLED:true}
+    sweeper:
+      enabled: ${RHIZODELTA_FEATURE_SWEEPER_ENABLED:false}
+    proposal:
+      enabled: ${RHIZODELTA_FEATURE_PROPOSAL_ENABLED:false}
+    prefers-aggregation:
+      enabled: ${RHIZODELTA_FEATURE_PREFERS_AGGREGATION_ENABLED:false}
+    prefers-feed-ranking:
+      enabled: ${RHIZODELTA_FEATURE_PREFERS_FEED_RANKING_ENABLED:false}
   embedding:
     dimension: 1024
   ai:
