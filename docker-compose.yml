@@ -50,11 +50,48 @@ services:
       - minio_data:/data
     networks:
       - rhizodelta-net
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: ${PROMETHEUS_CONTAINER_NAME:-rhizodelta-prometheus}
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - rhizodelta-net
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: ${GRAFANA_CONTAINER_NAME:-rhizodelta-grafana}
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - rhizodelta-net
 
 volumes:
   neo4j_data:
   neo4j_logs:
   minio_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   rhizodelta-net:

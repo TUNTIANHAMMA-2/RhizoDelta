@@ -1,0 +1,16 @@
+# Grafana dashboard provider provisioning.
+#
+# 启动时把 /etc/grafana/provisioning/dashboards/*.json 自动加载为 dashboard。
+apiVersion: 1
+
+providers:
+  - name: rhizodelta-default
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
