@@ -64,9 +64,11 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | **前端开发文档** | [Doc/前端开发文档.md](Doc/前端开发文档.md) | 前端设计系统、组件规范、React Flow 集成、交互流程 |
 | **使用手册** | [Doc/使用手册.md](Doc/使用手册.md) | 面向开发者的实操指南：启动、调试、API 用法 |
 | **前端 README** | [frontend/README.md](frontend/README.md) | 前端启动、JWT 调试、页面使用说明 |
-| **openspec 任务** | [openspec/changes/](openspec/changes/) | 7 个变更集的 proposal / design / tasks |
+| **openspec 任务** | [openspec/changes/](openspec/changes/) | 10 个变更集的 proposal / design / tasks |
 | **可观测性 Runbook** | [docs/runbooks/observability.md](docs/runbooks/observability.md) | Prometheus / Grafana 访问、看板解读、容量阈值 |
-| **Feature Flags Runbook** | [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md) | 全项目 feature flag 命名约定与切换流程 |
+|| **Feature Flags Runbook** | [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md) | 全项目 feature flag 命名约定与切换流程 |
+|| **CLAUDE.md** | [CLAUDE.md](CLAUDE.md) | AI 协作者速查：技术栈、命令、约定、文件路径 |
+|| **AGENTS.md** | [AGENTS.md](AGENTS.md) | AI 代理协作指南：代码规范、Git 工作流、测试要求 |
 
 ## 快速启动
 
@@ -78,7 +80,7 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 - Maven
 - Node.js 与 npm
 - Docker Compose
-- 可用的 `SILICON_FLOW_API_KEY`
+- 可用的 `DASHSCOPE_API_KEY`（LLM 提供方已从 SiliconFlow 迁移至 DashScope）
 
 ### 2. 准备 Docker 环境变量
 
@@ -115,10 +117,10 @@ docker compose up -d neo4j rabbitmq redis
 ### 4. 导出 AI 模型 API Key
 
 后端启动时会校验 `langchain4j.open-ai.*.api-key`，为空会直接启动失败。
-本地 profile 通过环境变量读取 `SILICON_FLOW_API_KEY`：
+本地 profile 通过环境变量读取 `DASHSCOPE_API_KEY`（已从 SiliconFlow 迁移至 DashScope）：
 
 ```bash
-export SILICON_FLOW_API_KEY=your_api_key_here
+export DASHSCOPE_API_KEY=your_api_key_here
 ```
 
 ### 5. 启动后端
