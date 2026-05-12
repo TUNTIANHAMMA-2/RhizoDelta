@@ -149,6 +149,21 @@ class DecisionApiIntegrationTest {
     }
 
     @Test
+    void shouldRejectMergeRequestWithNonExistentSourceNode() {
+        UUID missingSourceId = UUID.randomUUID();
+        UUID synthesizedNodeId = UUID.randomUUID();
+        createHumanPostNode(synthesizedNodeId, "req-s1", "author-1", "s1", null);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/merge",
+                mergeRequest("merge-missing-source-001", missingSourceId, List.of(synthesizedNodeId)),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
     void shouldCreateBranchDecisionAndBranchedFromRelationship() {
         UUID sourceNodeId = UUID.randomUUID();
         createHumanPostNode(sourceNodeId, "req-source", "author-source", "source", null);
@@ -203,6 +218,19 @@ class DecisionApiIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().get("code")).isEqualTo(40001);
+    }
+
+    @Test
+    void shouldRejectBranchRequestWithNonExistentSourceNode() {
+        UUID missingSourceId = UUID.randomUUID();
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/branch",
+                branchRequest("branch-missing-source-001", missingSourceId, "branch content"),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
