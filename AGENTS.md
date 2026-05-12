@@ -1,6 +1,6 @@
-# AGENTS.md — AI 代理协作指南
+# AGENTS.md — Claude Code 代理协作指南
 
-本文件为在 RhizoDelta 仓库中工作的 AI 代理（Claude Code、Codex、Gemini、Hermes 子代理等）
+本文件为在 RhizoDelta 仓库中工作的 Claude Code 代理
 定义统一的代码规范、Git 工作流、测试要求与文档更新规则。
 
 ## 1. 代码规范
@@ -13,7 +13,7 @@
   - `ai` — AI 编排（routing / context / summary / quality / shared）
   - `query` — 节点查询 API
   - `infrastructure` — config / messaging / persistence / security / sse / observability / user
-- **技术约定以 CLAUDE.md §5 为准**：API 返回结构、不可变 DAG、关系/节点标签、request_id、角色枚举等已在 CLAUDE.md 中定义。此处不重复。
+- **技术约定以 CLAUDE.md 第 5 节（关键约定）为准**：API 返回结构、不可变 DAG、关系/节点标签、request_id、角色枚举等已在 CLAUDE.md 中定义。此处不重复。
 - **Agent 行为约束**：
   - 禁止 `UPDATE` 历史节点，任何数据修改通过新增节点完成
   - 发帖、决策接口必须透传 `request_id`
@@ -43,7 +43,7 @@
   cd frontend && npm run lint              # 前端 lint
   ```
 - **不要 force push 到 main**
-- **gitignore 约定**：`Doc/`、`frontend/README.md` 已在历史上被 tracked，更新这些文件仍会进入 git diff；但其他 `.gitignore` 中的目录（`data/`、`Pic/`、`.idea/` 等）不要新增未跟踪文件
+- **gitignore 约定**：Doc/、frontend/README.md 已被历史跟踪，修改会产生 diff；其他 .gitignore 中的目录（data/、Pic/、.idea/ 等）请勿新增未跟踪文件进入暂存区（除非有意移除对应 gitignore 规则）。
 
 ## 3. OpenSpec / opsx 工作流
 
@@ -82,21 +82,21 @@
 
 ### 5.1 文档分类与更新触发条件
 
-| 文档 | 更新触发条件 |
-|------|-------------|
-| CLAUDE.md | 技术栈变更、目录结构重组、重要新命令、新 feature flag |
-| 白皮书 | 架构理念变更、核心设计原则调整 |
-| 项目开发文档 | 后端 API 规范变更、数据模型变更、AI 编排路线调整 |
-| 前端开发文档 | 设计系统变更、组件结构重组、技术栈升级 |
-| 使用手册 | 启动流程变更、API 用法变更、排障步骤调整 |
-| Feature flags runbook | 新增/移除 feature flag，默认值变更 |
-| Observability runbook | 仪表盘、阈值、验证步骤变更 |
-| 用户域 runbooks | 用户域 schema 变更、迁移流程调整 |
-| 设计文档 | 新设计方案、旧方案废弃 |
-| Code review 报告 | 每次大型 review 完成后 |
-| 测试计划 | 新增手动测试场景 |
-| OpenSpec 提案 | 新模块提案、已完成的变更归档到 `archive/` |
-| README.md | 模块完成度变更、文档导航新增链接、快速启动步骤调整 |
+| 文档 | 路径 | 更新触发条件 |
+|------|------|-------------|
+| CLAUDE.md | `CLAUDE.md` | 技术栈变更、目录结构重组、重要新命令、新 feature flag |
+| 白皮书 | `Doc/RhizoDeltΔ 白皮书.md` | 架构理念变更、核心设计原则调整 |
+| 项目开发文档 | `Doc/项目开发文档.md` | 后端 API 规范变更、数据模型变更、AI 编排路线调整 |
+| 前端开发文档 | `Doc/前端开发文档.md` | 设计系统变更、组件结构重组、技术栈升级 |
+| 使用手册 | `Doc/使用手册.md` | 启动流程变更、API 用法变更、排障步骤调整 |
+| Feature flags runbook | `docs/runbooks/feature-flags.md` | 新增/移除 feature flag，默认值变更 |
+| Observability runbook | `docs/runbooks/observability.md` | 仪表盘、阈值、验证步骤变更 |
+| 用户域 runbooks | `docs/runbooks/user-identity-integrity.md` 等 | 用户域 schema 变更、迁移流程调整 |
+| 设计文档 | `Doc/`（设计目录） | 新设计方案、旧方案废弃 |
+| Code review 报告 | `docs/reviews/` | 每次大型 review 完成后 |
+| 测试计划 | — | 新增手动测试场景 |
+| OpenSpec 提案 | `openspec/changes/` | 新模块提案、已完成的变更归档到 `archive/` |
+| README.md | `README.md` | 模块完成度变更、文档导航新增链接、快速启动步骤调整 |
 
 ### 5.2 更新原则
 
@@ -107,19 +107,23 @@
 - **OpenSpec 变更集完成时**：更新 `README.md` 的模块完成度表
 - **不要删除历史文档**：过时的设计文档移动到 `docs/archive/`，code review 报告保留在 `docs/reviews/`
 
-## 6. 多模型协作
+## 6. 当前代理模型
 
-本项目历史上使用多模型协作，相关入口与分工约定见 `.claude/commands/opsx/*`。
-当前主要使用 Claude Code 作为开发代理。
+本项目当前使用 Claude Code 作为主要开发代理。Claude Code 专属配置文件位于 `.claude/commands/opsx/` 和 `.claude/skills/openspec-*`。多模型协作历史上曾使用，相关遗留引用见文档归档。
 
 ## 7. 关键环境变量
 
-| 变量 | 用途 |
-|------|------|
-| `DASHSCOPE_API_KEY` | DashScope LLM API 密钥（后端启动必需） |
-| `NEO4J_AUTH` | Neo4j 认证（Docker Compose 使用） |
-| `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码 |
-| `RHIZODELTA_FEATURE_*_ENABLED` | Feature flag 环境变量覆盖 |
+| 变量 | 用途 | 必需 |
+|------|------|------|
+| `DASHSCOPE_API_KEY` | DashScope LLM API 密钥（后端启动必需） | 是 |
+| `NEO4J_URI` | Neo4j 连接 URI（如 `bolt://localhost:7687`） | 是 |
+| `NEO4J_USERNAME` | Neo4j 用户名 | 是 |
+| `NEO4J_PASSWORD` | Neo4j 密码 | 是 |
+| `NEO4J_AUTH` | Neo4j 认证（Docker Compose 使用，格式 `username/password`） | 是 |
+| `SPRING_PROFILES_ACTIVE` | Spring 激活的 profile（如 `test`） | 否 |
+| `JWT_SECRET` | JWT 签名密钥（使用 `{}` 占位符表示需替换） | 是 |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码 | 否 |
+| `RHIZODELTA_FEATURE_*_ENABLED` | Feature flag 环境变量覆盖 | 否 |
 ## 8. 参考
 
 - 项目全貌与速查：`CLAUDE.md`

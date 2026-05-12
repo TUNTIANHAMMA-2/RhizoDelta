@@ -29,7 +29,7 @@ RhizoDelta（RhizoDeltΔ）是一个**基于图谱的非线性讨论系统**：
 | 维度 | 选型 | 关键版本 |
 |---|---|---|
 | 后端框架 | Spring Boot | 3.2.3，JDK 17 |
-| 图数据库 | Neo4j + Spring Data Neo4j | 5.22 |
+| 图数据库 | Neo4j 数据库 5.22 + Spring Data Neo4j（由 Spring Boot 3.2.3 管理） | 5.22 (Neo4j) / 3.2.3 (Spring Boot) |
 | 异步消息 | RabbitMQ | 3-management |
 | 缓存/复核 TTL | Redis | 7-alpine |
 | AI 编排 | LangChain4j + LangGraph4j | 0.36.2 / 1.8.10 |
@@ -40,7 +40,7 @@ RhizoDelta（RhizoDeltΔ）是一个**基于图谱的非线性讨论系统**：
 | 前端框架 | React + TypeScript + Vite | 19 / 5.x / ^8.0.0 |
 | 前端图谱 | @xyflow/react + @dagrejs/dagre | 12.x / latest |
 | 前端状态 | Zustand | 5.x |
-| 前端编辑器 | TipTap + tiptap-markdown | 3.x |
+| 前端编辑器 | TipTap 3.x + tiptap-markdown 0.9 | TipTap 3.20.5 / tiptap-markdown 0.9.0 |
 
 ## 3. 目录结构
 

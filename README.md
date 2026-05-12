@@ -39,6 +39,8 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 └──────────────┘
 ```
 
+> **状态机节点 → 源码包映射**：`VECTOR_RECALL` → `ai/context/` | `CONTEXT_PRUNE` → `ai/context/` | `LLM_EVALUATE` → `ai/routing/` + `ai/quality/` | `PRE_COMMIT_GUARD` → `ai/quality/` | `EXECUTE_MERGE/BRANCH` → `ai/routing/`
+
 ## 模块完成度
 
 下表对齐 `openspec/changes/` 中的各变更集与 `Doc/` 文档章节的映射关系。
@@ -52,8 +54,16 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | 向量嵌入与搜索 | `embedding-vector-search` | 白皮书 §三.1、开发文档 §7.1 | ✅ 已完成 |
 | P0/P1 后端基础 | `p0-p1-backend-foundation` | 开发文档 §2、§5 | ✅ 基本完成 |
 | AI 编排层 | `ai-orchestration-layer` | 开发文档 §12 | ✅ 已完成 |
-| 前端 DAG 渲染 | — | 前端开发文档 全文 | ✅ 已完成 |
-| 动态声誉系统 | — | 白皮书 §六 | ❌ 未启动 |
+| 可观测性基础 | `observability-foundation` | 开发文档 §12、可观测性 Runbook | ✅ 已完成 |
+| Phase 3-4 迁移 | `phase3-4-personalization-volatile-migration` | 开发文档 §7、§8 | 🔄 进行中 |
+| 用户创作边 | `user-authored-edge` | 开发文档 §6.6 | 🔄 进行中 |
+
+### 非 openspec 模块
+
+| 模块 | 对应文档章节 | 完成度 |
+|------|-------------|--------|
+| 前端 DAG 渲染 | 前端开发文档 全文 | ✅ 已完成 |
+| 动态声誉系统 | 白皮书 §六 | ❌ 未启动 |
 
 ## 文档导航
 
@@ -117,7 +127,13 @@ docker compose up -d neo4j rabbitmq redis
 ### 4. 导出 AI 模型 API Key
 
 后端启动时会校验 `langchain4j.open-ai.*.api-key`，为空会直接启动失败。
-本地 profile 通过环境变量读取 `DASHSCOPE_API_KEY`（已从 SiliconFlow 迁移至 DashScope）：
+本地 profile 通过环境变量读取 `DASHSCOPE_API_KEY`（已从 SiliconFlow 迁移至 DashScope）。
+
+> **启动前硬性检查（详见 [CLAUDE.md §4](CLAUDE.md)）：**
+> 1. Neo4j 连通性
+> 2. 约束/索引/向量索引自动创建
+> 3. API key 非空非占位符
+> 4. UserAccount 完整性预检
 
 ```bash
 export DASHSCOPE_API_KEY=your_api_key_here
@@ -173,9 +189,16 @@ cd frontend
 npm run lint
 ```
 
+前端测试：
+
+```bash
+cd frontend
+npx vitest
+```
+
 ## 可观测性
 
-项目自带 Prometheus + Grafana 监控栈，对所有 LLM 调用透明埋点（token / latency / errors）。详见 [docs/runbooks/observability.md](docs/runbooks/observability.md)。一行启用：`docker compose up -d prometheus grafana`，访问 http://127.0.0.1:3000 看 "AI Cost & Latency" 看板。可观测性与所有 AI 能力都有独立 feature flag，详见 [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md)。
+项目自带 Prometheus + Grafana 监控栈，对所有 LLM 调用透明埋点（token / latency / errors）。详见 [docs/runbooks/observability.md](docs/runbooks/observability.md)。一行启用：`docker compose up -d prometheus grafana`，访问 `http://127.0.0.1:${GRAFANA_PORT:-3000}`（若自定义 `GRAFANA_PORT` 请相应调整）看 "AI Cost & Latency" 看板。可观测性与所有 AI 能力都有独立 feature flag，详见 [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md)。
 
 ## 项目入口
 
