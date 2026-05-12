@@ -97,6 +97,8 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_result_created_at_idx IF NOT EXISTS FOR (n:Result) ON (n.created_at)",
             "CREATE INDEX rhizodelta_result_topic_id_idx IF NOT EXISTS FOR (n:Result) ON (n.topic_id)",
             "CREATE INDEX rhizodelta_human_post_operation_id_idx IF NOT EXISTS FOR (n:Human_Post) ON (n.operation_id)",
+            "CREATE INDEX rhizodelta_merged_into_decision_id_idx IF NOT EXISTS FOR ()-[r:MERGED_INTO]-() ON (r.decision_id)",
+            "CREATE INDEX rhizodelta_branched_from_decision_id_idx IF NOT EXISTS FOR ()-[r:BRANCHED_FROM]-() ON (r.decision_id)",
             "CREATE INDEX rhizodelta_authored_created_at_idx IF NOT EXISTS FOR ()-[r:AUTHORED]-() ON (r.created_at)",
             "CREATE INDEX rhizodelta_conceptual_overlap_association_id_idx IF NOT EXISTS FOR ()-[r:CONCEPTUAL_OVERLAP]-() ON (r.association_id)",
             "CREATE INDEX rhizodelta_relates_to_association_id_idx IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.association_id)",
