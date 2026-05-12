@@ -111,6 +111,25 @@ class AssociationLineageIsolationIntegrationTest {
         assertThat(response.getBody().get("code")).isEqualTo(0);
     }
 
+    @Test
+    void shouldAllowBranchDecisionWhenSemanticCycleExists() {
+        UUID nodeA = UUID.randomUUID();
+        UUID nodeB = UUID.randomUUID();
+        createHumanPostNode(nodeA, "req-branch-a", "author-a", "A");
+        createHumanPostNode(nodeB, "req-branch-b", "author-b", "B");
+        createAssociation(nodeA, nodeB, "CONCEPTUAL_OVERLAP");
+        createAssociation(nodeB, nodeA, "CONCEPTUAL_OVERLAP");
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/decisions/branch",
+                branchRequest("branch-semantic-cycle-001", nodeA, "branched content"),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(response.getBody().get("code")).isEqualTo(0);
+    }
+
     private void createAssociation(UUID sourceNodeId, UUID targetNodeId, String type) {
         ResponseEntity<Map> response = restTemplate.postForEntity(
                 "/api/associations",
@@ -131,6 +150,19 @@ class AssociationLineageIsolationIntegrationTest {
                 "operator_type", "AGENT",
                 "operator_id", "agent-1",
                 "reason", "merge"
+        );
+    }
+
+    private Map<String, Object> branchRequest(String decisionId, UUID sourceNodeId, String content) {
+        return Map.of(
+                "decision_id", decisionId,
+                "request_id", "req-" + decisionId,
+                "source_node_id", sourceNodeId.toString(),
+                "content", content,
+                "author_id", "author-1",
+                "operator_type", "HUMAN",
+                "operator_id", "human-1",
+                "reason", "branch"
         );
     }
 

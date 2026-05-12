@@ -169,6 +169,28 @@ class AssociationServiceUnitTest {
     }
 
     @Test
+    void deleteAssociationShouldReturnOutcomeWhenAssociationExists() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        AssociationService service = new AssociationService(neo4jClient);
+        UUID associationId = UUID.randomUUID();
+        UUID sourceNodeId = UUID.randomUUID();
+        UUID targetNodeId = UUID.randomUUID();
+
+        when(neo4jClient.query(argThat((String query) -> query != null && query.contains("DELETE association")))
+                .bind(eq(associationId.toString())).to("associationId")
+                .fetch().one()).thenReturn(Optional.of(Map.of(
+                "sourceNodeId", sourceNodeId.toString(),
+                "targetNodeId", targetNodeId.toString(),
+                "associationType", "CONCEPTUAL_OVERLAP"
+        )));
+
+        AssociationService.DeleteAssociationOutcome outcome = service.deleteAssociation(associationId);
+
+        assertThat(outcome.association_id()).isEqualTo(associationId);
+        assertThat(outcome.deleted()).isTrue();
+    }
+
+    @Test
     void findAssociationsByNodeIdShouldMapDirectionAndBindTypeFilter() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         AssociationService service = new AssociationService(neo4jClient);
