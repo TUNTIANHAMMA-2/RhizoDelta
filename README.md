@@ -66,9 +66,9 @@ RhizoDelta 是一个基于图谱的非线性讨论系统——它把传统论坛
 | **前端 README** | [frontend/README.md](frontend/README.md) | 前端启动、JWT 调试、页面使用说明 |
 | **openspec 任务** | [openspec/changes/](openspec/changes/) | 10 个变更集的 proposal / design / tasks |
 | **可观测性 Runbook** | [docs/runbooks/observability.md](docs/runbooks/observability.md) | Prometheus / Grafana 访问、看板解读、容量阈值 |
-|| **Feature Flags Runbook** | [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md) | 全项目 feature flag 命名约定与切换流程 |
-|| **CLAUDE.md** | [CLAUDE.md](CLAUDE.md) | AI 协作者速查：技术栈、命令、约定、文件路径 |
-|| **AGENTS.md** | [AGENTS.md](AGENTS.md) | AI 代理协作指南：代码规范、Git 工作流、测试要求 |
+| **Feature Flags Runbook** | [docs/runbooks/feature-flags.md](docs/runbooks/feature-flags.md) | 全项目 feature flag 命名约定与切换流程 |
+| **CLAUDE.md** | [CLAUDE.md](CLAUDE.md) | AI 协作者速查：技术栈、命令、约定、文件路径 |
+| **AGENTS.md** | [AGENTS.md](AGENTS.md) | AI 代理协作指南：代码规范、Git 工作流、测试要求 |
 
 ## 快速启动
 

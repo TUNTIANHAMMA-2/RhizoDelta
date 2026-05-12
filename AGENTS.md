@@ -117,7 +117,6 @@
 | 变量 | 用途 |
 |------|------|
 | `DASHSCOPE_API_KEY` | DashScope LLM API 密钥（后端启动必需） |
-| `SILICON_FLOW_API_KEY` | SiliconFlow API 密钥（已废弃，迁移至 DashScope） |
 | `NEO4J_AUTH` | Neo4j 认证（Docker Compose 使用） |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码 |
 | `RHIZODELTA_FEATURE_*_ENABLED` | Feature flag 环境变量覆盖 |
