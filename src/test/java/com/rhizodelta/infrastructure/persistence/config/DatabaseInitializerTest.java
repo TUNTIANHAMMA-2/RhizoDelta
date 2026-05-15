@@ -48,6 +48,23 @@ class DatabaseInitializerTest {
     }
 
     @Test
+    void initializeSchemaShouldCreatePrefersRelationshipIndexes() {
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(
+                "CREATE INDEX rhizodelta_prefers_weight_idx IF NOT EXISTS FOR ()-[r:PREFERS]-() ON (r.weight)"
+        );
+        verify(neo4jClient).query(
+                "CREATE INDEX rhizodelta_prefers_updated_at_idx IF NOT EXISTS FOR ()-[r:PREFERS]-() ON (r.updated_at)"
+        );
+    }
+
+    @Test
     void initializeSchemaShouldCreateVectorIndex() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());

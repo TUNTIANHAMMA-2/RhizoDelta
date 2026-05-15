@@ -22,6 +22,9 @@ public final class FeatureFlagRegistry {
             new FeatureFlag("observability", "rhizodelta.feature.observability.enabled", true),
             new FeatureFlag("sweeper", "rhizodelta.feature.sweeper.enabled", false),
             new FeatureFlag("proposal", "rhizodelta.feature.proposal.enabled", false),
+            // Implemented by `prefers-aggregation-job` change. See docs/runbooks/prefers-aggregation.md
+            // for the recommended rollout order: turn `prefers-aggregation` on first, observe for 24h,
+            // then enable `prefers-feed-ranking`. Reverse order on rollback.
             new FeatureFlag("prefers-aggregation", "rhizodelta.feature.prefers-aggregation.enabled", false),
             new FeatureFlag("prefers-feed-ranking", "rhizodelta.feature.prefers-feed-ranking.enabled", false)
     );

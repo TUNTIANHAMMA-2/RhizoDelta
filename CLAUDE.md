@@ -199,8 +199,8 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | `observability` | `true` | 失去 AI metric，业务功能不变 |
 | `sweeper` | `false` | 漫游智能体不调度（依赖此 flag 的 change 待落地） |
 | `proposal` | `false` | 提案系统所有 API 返回 503 |
-| `prefers-aggregation` | `false` | PreferenceEvent 仍记录但不再聚合到 PREFERS 边 |
-| `prefers-feed-ranking` | `false` | Feed 退化为只用 FOLLOWS 排序 |
+| `prefers-aggregation` | `false` | 调度 tick 仍触发但立即标 `outcome=skipped` 并退出；PreferenceEvent 继续写入但不再聚合到 PREFERS 边 |
+| `prefers-feed-ranking` | `false` | Feed 退化为只用 FOLLOWS 排序，PREFERS 边不被读取（flag 切换无需重启） |
 
 切换方式与级联效果见 `docs/runbooks/feature-flags.md`。
 
@@ -245,6 +245,7 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | 实操指南（启动 / API 用法 / 排障） | `Doc/使用手册.md` |
 | 可观测性 runbook | `docs/runbooks/observability.md` |
 | Feature flags runbook | `docs/runbooks/feature-flags.md` |
+| PREFERS 聚合 runbook | `docs/runbooks/prefers-aggregation.md` |
 | 用户身份完整性 | `docs/runbooks/user-identity-integrity.md` |
 | UserProfile 回填 | `docs/runbooks/user-profile-backfill.md` |
 | AUTHORED 边维护 | `docs/runbooks/user-authored-edge-maintenance.md` |

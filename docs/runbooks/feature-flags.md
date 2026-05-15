@@ -24,8 +24,8 @@ rhizodelta.feature.<module>.enabled = true | false
 | `observability` | `rhizodelta.feature.observability.enabled` | `RHIZODELTA_FEATURE_OBSERVABILITY_ENABLED` | `true` | `ObservabilityConfig`、`SweeperMetrics`、`MeteredChatLanguageModel` 装配链 | 失去 AI metric，业务功能不变 |
 | `sweeper` | `rhizodelta.feature.sweeper.enabled` | `RHIZODELTA_FEATURE_SWEEPER_ENABLED` | `false` | （由 `sweeper-candidate-edge` change 实现） | 漫游智能体不调度，候选边停止生产 |
 | `proposal` | `rhizodelta.feature.proposal.enabled` | `RHIZODELTA_FEATURE_PROPOSAL_ENABLED` | `false` | （由 `proposal-governance-full` change 实现） | 提案系统所有 API 返回 503，已存在的 Proposal 不再被驱动状态机 |
-| `prefers-aggregation` | `rhizodelta.feature.prefers-aggregation.enabled` | `RHIZODELTA_FEATURE_PREFERS_AGGREGATION_ENABLED` | `false` | （由 `prefers-aggregation` change 实现） | PreferenceEvent 仍记录但不再聚合到 PREFERS 边 |
-| `prefers-feed-ranking` | `rhizodelta.feature.prefers-feed-ranking.enabled` | `RHIZODELTA_FEATURE_PREFERS_FEED_RANKING_ENABLED` | `false` | （由 `prefers-aggregation` change 实现） | Feed 退化为只用 FOLLOWS 排序，PREFERS 边不参与 |
+| `prefers-aggregation` | `rhizodelta.feature.prefers-aggregation.enabled` | `RHIZODELTA_FEATURE_PREFERS_AGGREGATION_ENABLED` | `false` | `PrefersAggregationJob` 调度入口（每 5 分钟一次） | 调度 tick 仍然触发，但立即递增 `outcome="skipped"` 指标后返回；PreferenceEvent 继续写入但不再聚合到 PREFERS 边，已存在的 PREFERS 边停留在最近一次聚合时的权重，自然衰减需依赖下一次聚合或手动重跑 |
+| `prefers-feed-ranking` | `rhizodelta.feature.prefers-feed-ranking.enabled` | `RHIZODELTA_FEATURE_PREFERS_FEED_RANKING_ENABLED` | `false` | `FeedService` Cypher 选择分支 | Feed 排序退化为今天的 FOLLOWS-only 行为，PREFERS 边不被读取；切换 flag 不需要重启，下一次 feed 请求即生效 |
 
 > `default=false` 的 flag 是显式默认关闭，避免新部署在未配置时无意启用。
 > `default=true` 的 flag 是基础设施（如 observability），新部署应该默认启用。
