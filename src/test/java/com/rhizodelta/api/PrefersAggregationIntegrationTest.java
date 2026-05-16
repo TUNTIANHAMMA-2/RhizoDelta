@@ -53,7 +53,7 @@ import static org.mockito.Mockito.when;
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "spring.rabbitmq.listener.direct.auto-startup=false",
         "rhizodelta.feature.prefers-aggregation.enabled=true",
-        "rhizodelta.preference.prefers-half-life-days=30",
+        "rhizodelta.preference.half-life-days=30",
         "rhizodelta.preference.window-hours=24"
 })
 class PrefersAggregationIntegrationTest {

@@ -55,7 +55,7 @@ clampedWeight = min(max(weight, 0), 1000)
 
 默认参数：
 
-- `rhizodelta.preference.prefers-half-life-days = 30`（半衰期 30 天，即 30 天前的事件贡献减半）
+- `rhizodelta.preference.half-life-days = 30`（半衰期 30 天，即 30 天前的事件贡献减半）
 - `rhizodelta.preference.window-hours = 24`（每 tick 扫最近 24 小时事件）
 - `rhizodelta.preference.weight-floor = 0.0`
 - `rhizodelta.preference.weight-ceiling = 1000.0`（防止一次密集 burst 把一个 topic 永久钉在 feed 顶端）
@@ -95,7 +95,12 @@ ranking on 但 aggregation off。按上面"推荐上线顺序"的回滚段处理
 
 ### 立刻补跑一轮聚合（不等 5 分钟）
 
-通过应用内的 actuator 或直接调用 `PrefersAggregationJob.runOnce()`。本变更没有引入新的 actuator endpoint；如果运维需要这个能力，最快的路径是通过 admin REPL 或 management 端调用 `JobBean.runOnce()`。集成测试使用相同的入口。
+本变更**没有**引入 actuator 端点；现成的 replay 入口只有两条路径：
+
+1. **JVM 内直接触发**：通过 Spring 应用上下文（如 admin REPL、JMX bean、未来可能添加的 actuator endpoint）拿到 `PrefersAggregationJob` bean，调用 `runOnce()`。集成测试用的是同一个入口（`PrefersAggregationJob.runOnce` 故意 public）。运维需要这个能力时，建议先评估补 actuator endpoint 的工作量，而不是依赖临时通道。
+2. **直接执行下面的 replay Cypher**：完全不经过 Java 层，只要数据库连接可达就能跑。下面 "冷启动 / Replay" 一节给出现成 Cypher。
+
+如果只是想"补一轮当前窗口"，路径 2 + 把窗口设为最近 24h 即可。
 
 ### 冷启动 / Replay：用全部历史 PreferenceEvent 重建 PREFERS
 
@@ -148,10 +153,12 @@ MATCH ()-[r:PREFERS]->() DELETE r
 
 ## Scaling
 
+`PreferenceEvent.at` 在 `DatabaseInitializer.SCHEMA_QUERIES` 里有 BTree 索引（`rhizodelta_preference_event_at_idx`），主 Cypher 的 `WHERE e.at >= $windowStart` 默认走 index-range scan，**不需要事后再加索引**。
+
 如果 `prefers_aggregation_duration_seconds` p99 持续 > 60 秒：
 
 1. 检查 Neo4j 是否在 GC 抖动（heap、`db.checkpoint`）
-2. 用 `EXPLAIN` 看上面那条主 Cypher 的 plan，重点看 `PreferenceEvent` 的扫描是否走了 `at` 索引（如果没建索引，加一条 `CREATE INDEX rhizodelta_preference_event_at_idx IF NOT EXISTS FOR (e:PreferenceEvent) ON (e.at)`，然后回到 `DatabaseInitializer.SCHEMA_QUERIES` 补上）
+2. 用 `EXPLAIN` 看主 Cypher 的 plan，确认 `PreferenceEvent` 上的 `at` 索引仍被使用（如果不是，先排查索引是否被破坏或失效，而不是新加索引）
 3. 缩短 `rhizodelta.preference.window-hours`（例如降到 6 小时）以减少单 tick 扫描量
 4. 极端情况下：按 `user_id` 模哈希分批，多个 tick 各处理 1/N 用户
 

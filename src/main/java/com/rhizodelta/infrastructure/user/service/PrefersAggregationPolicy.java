@@ -52,7 +52,7 @@ public class PrefersAggregationPolicy {
     private final double weightCeiling;
 
     public PrefersAggregationPolicy(
-            @Value("${rhizodelta.preference.prefers-half-life-days:30}") double halfLifeDays,
+            @Value("${rhizodelta.preference.half-life-days:30}") double halfLifeDays,
             @Value("${rhizodelta.preference.window-hours:24}") long windowHours,
             @Value("${rhizodelta.preference.weight-floor:0.0}") double weightFloor,
             @Value("${rhizodelta.preference.weight-ceiling:1000.0}") double weightCeiling
@@ -67,7 +67,7 @@ public class PrefersAggregationPolicy {
     void validate() {
         if (Double.isNaN(halfLifeDays) || halfLifeDays <= 0.0) {
             throw new IllegalArgumentException(
-                    "rhizodelta.preference.prefers-half-life-days must be positive and finite, got " + halfLifeDays);
+                    "rhizodelta.preference.half-life-days must be positive and finite, got " + halfLifeDays);
         }
         if (windowHours <= 0L) {
             throw new IllegalArgumentException(

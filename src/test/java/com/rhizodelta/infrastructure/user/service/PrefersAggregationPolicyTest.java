@@ -42,7 +42,8 @@ class PrefersAggregationPolicyTest {
 
         assertThatThrownBy(policy::validate)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("prefers-half-life-days");
+                .hasMessageContaining("rhizodelta.preference.half-life-days")
+                .hasMessageNotContaining("prefers-half-life-days");
     }
 
     @Test
@@ -51,7 +52,8 @@ class PrefersAggregationPolicyTest {
 
         assertThatThrownBy(policy::validate)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("prefers-half-life-days");
+                .hasMessageContaining("rhizodelta.preference.half-life-days")
+                .hasMessageNotContaining("prefers-half-life-days");
     }
 
     @Test

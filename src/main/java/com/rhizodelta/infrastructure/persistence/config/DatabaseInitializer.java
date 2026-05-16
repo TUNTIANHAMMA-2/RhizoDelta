@@ -112,7 +112,8 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_follows_since_idx IF NOT EXISTS FOR ()-[r:FOLLOWS]-() ON (r.since)",
             "CREATE INDEX rhizodelta_muted_since_idx IF NOT EXISTS FOR ()-[r:MUTED]-() ON (r.since)",
             "CREATE INDEX rhizodelta_prefers_weight_idx IF NOT EXISTS FOR ()-[r:PREFERS]-() ON (r.weight)",
-            "CREATE INDEX rhizodelta_prefers_updated_at_idx IF NOT EXISTS FOR ()-[r:PREFERS]-() ON (r.updated_at)"
+            "CREATE INDEX rhizodelta_prefers_updated_at_idx IF NOT EXISTS FOR ()-[r:PREFERS]-() ON (r.updated_at)",
+            "CREATE INDEX rhizodelta_preference_event_at_idx IF NOT EXISTS FOR (n:PreferenceEvent) ON (n.at)"
     );
 
     private final Neo4jClient neo4jClient;

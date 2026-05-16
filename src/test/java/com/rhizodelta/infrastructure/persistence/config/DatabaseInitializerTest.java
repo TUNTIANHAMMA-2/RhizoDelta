@@ -65,6 +65,22 @@ class DatabaseInitializerTest {
     }
 
     @Test
+    void initializeSchemaShouldCreatePreferenceEventAtIndex() {
+        // PREFERS 聚合 Cypher 的 hot path 是 `WHERE e.at >= $windowStart`；没有 e.at 索引时
+        // planner 会退化为 PreferenceEvent 全标签扫描。在事件量爬升前预先建立索引是廉价收益。
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
+
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(
+                "CREATE INDEX rhizodelta_preference_event_at_idx IF NOT EXISTS FOR (n:PreferenceEvent) ON (n.at)"
+        );
+    }
+
+    @Test
     void initializeSchemaShouldCreateVectorIndex() {
         Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
         when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
