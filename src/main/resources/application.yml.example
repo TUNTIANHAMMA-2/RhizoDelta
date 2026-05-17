@@ -1,3 +1,6 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}

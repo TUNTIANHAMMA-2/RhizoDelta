@@ -204,6 +204,26 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 
 切换方式与级联效果见 `docs/runbooks/feature-flags.md`。
 
+## 6.1 端口约定（Port Convention）
+
+| 服务 | 默认端口 | 覆盖方式 |
+|---|---|---|
+| Backend HTTP（API + Actuator + Prometheus metrics） | `8080` | `SERVER_PORT`（`application.yml` 中 `server.port: ${SERVER_PORT:8080}`） |
+| Frontend Vite dev server | `5173` | `frontend/vite.config.ts` |
+| Neo4j HTTP / Bolt | `7474` / `7687` | `NEO4J_HTTP_PORT` / `NEO4J_BOLT_PORT` + `NEO4J_URI` |
+| RabbitMQ AMQP / Management | `5672` / `15672` | `RABBITMQ_PORT` / `RABBITMQ_MANAGEMENT_PORT` |
+| Redis | `6379` | `REDIS_PORT` |
+| MinIO API / Console（可选） | `9000` / `9001` | `MINIO_API_PORT` / `MINIO_CONSOLE_PORT` |
+| Prometheus | `9090` | `PROMETHEUS_PORT` |
+| Grafana | `3000` | `GRAFANA_PORT` |
+
+约定要点（详见 `docs/runbooks/ports.md`）：
+
+- **Backend 单端口原则**：API、Actuator、Prometheus 指标共用 8080，不要为 management 单开端口。
+- **Vite 代理目标硬编码为 `http://localhost:8080`**，与 backend 实际端口必须一致。
+- 所有 docker-compose 服务只绑定到 `127.0.0.1`，不公网暴露。
+- **修改 backend 端口是横切变更**，必须同步：`.env` 中 `SERVER_PORT` → `prometheus/prometheus.yml` 抓取 target → `frontend/vite.config.ts` 代理 → 所有 runbook/手册中 `localhost:8080/...` 的示例。只改单一文件视为静默 bug（参考 `docs/runbooks/ports.md` 中"历史教训"一节）。
+
 ## 7. 重要文件路径
 
 | 用途 | 路径 |
@@ -245,6 +265,7 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | 实操指南（启动 / API 用法 / 排障） | `Doc/使用手册.md` |
 | 可观测性 runbook | `docs/runbooks/observability.md` |
 | Feature flags runbook | `docs/runbooks/feature-flags.md` |
+| 端口约定 runbook | `docs/runbooks/ports.md` |
 | PREFERS 聚合 runbook | `docs/runbooks/prefers-aggregation.md` |
 | 用户身份完整性 | `docs/runbooks/user-identity-integrity.md` |
 | UserProfile 回填 | `docs/runbooks/user-profile-backfill.md` |
