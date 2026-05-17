@@ -89,6 +89,7 @@ RhizoDelta/
 │   ├── vite.config.ts                   # /api → http://localhost:8090 代理
 │   └── package.json
 ├── docker-compose.yml                   # Neo4j / RabbitMQ / Redis / MinIO / Prometheus / Grafana
+├── scripts/                             # 开发辅助脚本（dev-up.sh：一键启停依赖 + backend）
 ├── prometheus/                          # Prometheus 抓取规则
 ├── grafana/                             # Grafana provisioning（数据源 + 仪表盘）
 ├── README.md                           # 项目入口与文档导航
@@ -112,6 +113,19 @@ RhizoDelta/
 
 ### 4.1 启动本地依赖
 
+**推荐：一键启停（依赖容器 + backend 同生命周期）**
+
+```bash
+export DASHSCOPE_API_KEY=your_dashscope_api_key
+./scripts/dev-up.sh                              # 起 neo4j/rabbitmq/redis + mvn spring-boot:run
+WITH_OBSERVABILITY=true ./scripts/dev-up.sh      # 顺带 prometheus + grafana
+WITH_MINIO=true ./scripts/dev-up.sh              # 顺带 minio（头像上传）
+```
+
+`Ctrl+C` 或 mvn 自然退出时，脚本会自动 `docker compose stop` 停掉它启动的那些容器（数据卷保留），适合不开发时释放服务器内存。
+
+**手动方式（脚本无法满足时的备用）**
+
 ```bash
 docker compose up -d neo4j rabbitmq redis
 # 可选：可观测性
@@ -123,7 +137,8 @@ docker compose up -d minio
 ### 4.2 后端
 
 ```bash
-# 启动（默认 profile=local）
+# 启动（默认 profile=local）—— 推荐用 ./scripts/dev-up.sh（见 §4.1），
+# 它已经包含依赖容器拉起 + 退出时自动停容器释放内存。
 export DASHSCOPE_API_KEY=your_dashscope_api_key
 mvn spring-boot:run
 
