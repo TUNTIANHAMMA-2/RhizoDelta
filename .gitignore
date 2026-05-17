@@ -11,8 +11,9 @@ target/
 # Dependencies
 node_modules/
 
-# AI tooling configs
-.claude/
+# AI tooling configs (allow project-level settings.json into git; ignore everything else under .claude/)
+.claude/*
+!.claude/settings.json
 .codex/
 .gemini/
 openspec/
