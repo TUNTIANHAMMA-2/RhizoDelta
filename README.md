@@ -157,7 +157,7 @@ npm install
 npm run dev
 ```
 
-Vite 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
+Vite 开发服务器会把 `/api` 代理到 `http://localhost:8090`。
 
 ### 7. 准备 JWT
 

@@ -2,12 +2,12 @@
 #
 # 部署假设（依据 docs/runbooks/observability.md）：
 #   - Spring Boot backend 跑在宿主机上（不在 docker-compose 里，IDE 直接 run）
-#   - Prometheus 容器通过 host.docker.internal:8080 抓 backend
+#   - Prometheus 容器通过 host.docker.internal:8090 抓 backend
 #   - 这要求 docker-compose.yml 给 prometheus 服务配置
 #       extra_hosts: ["host.docker.internal:host-gateway"]
 #     Linux 上等价于把 host gateway IP 注入到容器 /etc/hosts
 #
-# 若未来 backend 也容器化，把 host.docker.internal:8080 改成 backend:8080 即可。
+# 若未来 backend 也容器化，把 host.docker.internal:8090 改成 backend:8090 即可。
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -19,7 +19,7 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     scrape_interval: 15s
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: ['host.docker.internal:8090']
         labels:
           service: backend
 

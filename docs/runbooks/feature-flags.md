@@ -104,7 +104,7 @@ docker compose logs backend 2>&1 | grep "Feature flags:"
 
 ```bash
 # 不在默认范围内，需要手工开启 env 端点
-curl -s http://localhost:8080/actuator/env/rhizodelta.feature.observability.enabled
+curl -s http://localhost:8090/actuator/env/rhizodelta.feature.observability.enabled
 ```
 
 ## Related Documents

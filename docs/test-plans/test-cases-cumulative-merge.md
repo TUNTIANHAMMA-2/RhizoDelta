@@ -189,7 +189,7 @@ RETURN ai.node_id, ai.summary_content
 1. 创建帖子 M1, M2
 2. 直接调用手动合并 API：
 ```bash
-curl -X POST http://localhost:8080/api/decisions/merge \
+curl -X POST http://localhost:8090/api/decisions/merge \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{

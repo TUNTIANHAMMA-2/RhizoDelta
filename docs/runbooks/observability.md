@@ -29,7 +29,7 @@ docker compose ps prometheus grafana
 ### 1. backend 自身在暴露指标
 
 ```bash
-curl -s http://localhost:8080/actuator/prometheus | grep -E "^(jvm_|ai_llm_|sweeper_)" | head -10
+curl -s http://localhost:8090/actuator/prometheus | grep -E "^(jvm_|ai_llm_|sweeper_)" | head -10
 ```
 
 预期：

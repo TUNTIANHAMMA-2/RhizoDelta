@@ -86,7 +86,7 @@ RhizoDelta/
 │   │   ├── hooks/                       # useSse / useGraphInteractions / useCommandPalette
 │   │   ├── lib/                         # 通用工具与布局算法
 │   │   └── styles/                      # tokens.css 等
-│   ├── vite.config.ts                   # /api → http://localhost:8080 代理
+│   ├── vite.config.ts                   # /api → http://localhost:8090 代理
 │   └── package.json
 ├── docker-compose.yml                   # Neo4j / RabbitMQ / Redis / MinIO / Prometheus / Grafana
 ├── prometheus/                          # Prometheus 抓取规则
@@ -146,7 +146,7 @@ mvn -Dtest=DecisionServiceTest test
 ```bash
 cd frontend
 npm install
-npm run dev        # http://localhost:5173 → /api → http://localhost:8080
+npm run dev        # http://localhost:5173 → /api → http://localhost:8090
 npm run build      # tsc -b && vite build
 npm run lint
 # vitest（package.json 未列脚本，但 vitest 已装；按需 npx vitest）
@@ -156,7 +156,7 @@ npm run lint
 
 ```bash
 # 后端自身指标
-curl -s http://localhost:8080/actuator/prometheus | grep -E "^(ai_llm_|sweeper_)"
+curl -s http://localhost:8090/actuator/prometheus | grep -E "^(ai_llm_|sweeper_)"
 # Prometheus targets
 open http://127.0.0.1:9090/targets
 # Grafana "AI Cost & Latency"
@@ -208,7 +208,7 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 
 | 服务 | 默认端口 | 覆盖方式 |
 |---|---|---|
-| Backend HTTP（API + Actuator + Prometheus metrics） | `8080` | `SERVER_PORT`（`application.yml` 中 `server.port: ${SERVER_PORT:8080}`） |
+| Backend HTTP（API + Actuator + Prometheus metrics） | `8090` | `SERVER_PORT`（`application.yml` 中 `server.port: ${SERVER_PORT:8090}`） |
 | Frontend Vite dev server | `5173` | `frontend/vite.config.ts` |
 | Neo4j HTTP / Bolt | `7474` / `7687` | `NEO4J_HTTP_PORT` / `NEO4J_BOLT_PORT` + `NEO4J_URI` |
 | RabbitMQ AMQP / Management | `5672` / `15672` | `RABBITMQ_PORT` / `RABBITMQ_MANAGEMENT_PORT` |
@@ -219,10 +219,10 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 
 约定要点（详见 `docs/runbooks/ports.md`）：
 
-- **Backend 单端口原则**：API、Actuator、Prometheus 指标共用 8080，不要为 management 单开端口。
-- **Vite 代理目标硬编码为 `http://localhost:8080`**，与 backend 实际端口必须一致。
+- **Backend 单端口原则**：API、Actuator、Prometheus 指标共用 8090，不要为 management 单开端口。
+- **Vite 代理目标硬编码为 `http://localhost:8090`**，与 backend 实际端口必须一致。
 - 所有 docker-compose 服务只绑定到 `127.0.0.1`，不公网暴露。
-- **修改 backend 端口是横切变更**，必须同步：`.env` 中 `SERVER_PORT` → `prometheus/prometheus.yml` 抓取 target → `frontend/vite.config.ts` 代理 → 所有 runbook/手册中 `localhost:8080/...` 的示例。只改单一文件视为静默 bug（参考 `docs/runbooks/ports.md` 中"历史教训"一节）。
+- **修改 backend 端口是横切变更**，必须同步：`.env` 中 `SERVER_PORT` → `prometheus/prometheus.yml` 抓取 target → `frontend/vite.config.ts` 代理 → 所有 runbook/手册中 `localhost:8090/...` 的示例。只改单一文件视为静默 bug（参考 `docs/runbooks/ports.md` 中"历史教训"一节）。
 
 ## 7. 重要文件路径
 

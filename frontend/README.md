@@ -40,11 +40,11 @@ npm run lint
 前端请求封装在 `src/api/client.ts`。
 
 - 如果没有设置 `VITE_API_BASE_URL`，前端会直接请求相对路径 `/api/...`
-- 开发模式下，Vite 会把 `/api` 代理到 `http://localhost:8080`
+- 开发模式下，Vite 会把 `/api` 代理到 `http://localhost:8090`
 - 如果前后端不在同一个地址上运行，可以手动指定：
 
 ```bash
-VITE_API_BASE_URL=http://localhost:8080 npm run dev
+VITE_API_BASE_URL=http://localhost:8090 npm run dev
 ```
 
 ## JWT 调试
@@ -170,5 +170,5 @@ location.reload();
 如果页面右上角状态从连接态变成断开态，优先检查：
 
 - 浏览器里是否已有有效 `jwt_token`
-- 后端是否正常运行在 `http://localhost:8080`
+- 后端是否正常运行在 `http://localhost:8090`
 - SSE 请求是否返回了 `401`
