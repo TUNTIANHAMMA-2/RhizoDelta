@@ -2,8 +2,11 @@ package com.rhizodelta.infrastructure.user.service;
 
 import com.rhizodelta.infrastructure.user.repository.FollowRepository;
 import com.rhizodelta.infrastructure.user.repository.MuteRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
@@ -35,6 +38,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * PREFERS 边，并按 {@code coalesce(prefers.weight, 0) DESC, n.created_at DESC} 排序——
  * 用户高频互动过的 Topic 下的内容会浮到前面。零权重的候选（用户尚未互动过的 Topic）仍然
  * 出现，只是在按 created_at 排序之后。Flag 关闭时执行原始 Cypher，行为与今天完全一致。
+ *
+ * <p><b>读侧可观测性</b>：每次请求递增 {@code rhizodelta_feed_query_total{variant=...}}；
+ * PREFERS 变体下，按行递增 {@code rhizodelta_feed_items_returned_total{has_prefers_weight=...}}
+ * 让运营能在 Grafana 看出"PREFERS 命中率"。原始 prefers_weight 列只用于埋点，归一化时剥离，
+ * 不进入对外响应。
  */
 @Service
 public class FeedService {
@@ -43,6 +51,12 @@ public class FeedService {
 
     public static final String FLAG_FEED_RANKING_KEY = "rhizodelta.feature.prefers-feed-ranking.enabled";
     public static final String FLAG_AGGREGATION_KEY = "rhizodelta.feature.prefers-aggregation.enabled";
+
+    static final String METRIC_FEED_QUERY = "rhizodelta_feed_query_total";
+    static final String METRIC_FEED_ITEMS = "rhizodelta_feed_items_returned_total";
+    private static final String TAG_VARIANT = "variant";
+    private static final String TAG_HAS_PREFERS_WEIGHT = "has_prefers_weight";
+    private static final String INTERNAL_FIELD_PREFERS_WEIGHT = "prefers_weight";
 
     /**
      * 三条候选分支，每条都用具体标签 MATCH 而不是 (n) WHERE n:Label OR ...
@@ -109,6 +123,9 @@ public class FeedService {
      * Flag-on 变体：在 DISTINCT 之后挂一层到当前用户 PREFERS 边的 OPTIONAL MATCH，
      * 把 {@code coalesce(prefers.weight, 0)} 作为主排序键。其余结构与 {@link #FEED_QUERY} 等价，
      * 便于在 flag 翻转时切换 Cypher 而不发生别的副作用。
+     *
+     * <p>RETURN 末尾多带一列 {@code prefers_weight}，仅供读侧 metrics 统计"命中率"用；
+     * 该列在归一化阶段会被剥离，不会进入对外 API 响应。
      */
     static final String FEED_QUERY_WITH_PREFERS_RANKING = """
             CALL {
@@ -165,7 +182,8 @@ public class FeedService {
                    n.agent_version AS agent_version,
                    toString(n.created_at) AS created_at,
                    n.embedding IS NOT NULL AS has_embedding,
-                   n.quality_overall AS quality_overall
+                   n.quality_overall AS quality_overall,
+                   prefersWeight AS prefers_weight
             """;
 
     private static final String GLOBAL_FEED_QUERY = """
@@ -197,10 +215,22 @@ public class FeedService {
                    n.quality_overall AS quality_overall
             """;
 
+    /**
+     * Feed 查询执行的三个分支，分别对应不同 Cypher。Tag 域封闭、cardinality 仅 3。
+     */
+    enum Variant {
+        PREFERS, PLAIN, GLOBAL;
+
+        String tagValue() {
+            return name().toLowerCase();
+        }
+    }
+
     private final Neo4jClient neo4jClient;
     private final MuteRepository muteRepository;
     private final FollowRepository followRepository;
     private final Environment environment;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
 
     /**
      * 防止"prefers-feed-ranking=on 而 prefers-aggregation=off"组合反复输出 WARN，
@@ -211,55 +241,103 @@ public class FeedService {
     public FeedService(Neo4jClient neo4jClient,
                        MuteRepository muteRepository,
                        FollowRepository followRepository,
-                       Environment environment) {
+                       Environment environment,
+                       ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.neo4jClient = neo4jClient;
         this.muteRepository = muteRepository;
         this.followRepository = followRepository;
         this.environment = environment;
+        this.meterRegistryProvider = meterRegistryProvider;
     }
 
     public List<Map<String, Object>> getFeed(String userId, int page, int size) {
         int resolvedSize = size > 0 ? size : DEFAULT_PAGE_SIZE;
         int skip = Math.max(page, 0) * resolvedSize;
 
+        Variant variant;
+        String cypher;
+        Map<String, Object> params;
+
         long followCount = followRepository.countFollows(userId);
         if (followCount == 0L) {
-            return runQuery(GLOBAL_FEED_QUERY, Map.of("skip", skip, "limit", resolvedSize));
+            variant = Variant.GLOBAL;
+            cypher = GLOBAL_FEED_QUERY;
+            params = Map.of("skip", skip, "limit", resolvedSize);
+        } else {
+            List<String> mutedUserIds = muteRepository.getMutedUserIds(userId);
+            List<String> mutedTopicIds = muteRepository.getMutedTopicIds(userId);
+
+            boolean rankingOn = isEnabled(FLAG_FEED_RANKING_KEY);
+            if (rankingOn) {
+                if (!isEnabled(FLAG_AGGREGATION_KEY) && mismatchedFlagsWarnedOnce.compareAndSet(false, true)) {
+                    LOGGER.warn(
+                            "Mismatched feature flags: {}=true but {}=false. Feed ranking will read stale PREFERS edges. "
+                                    + "See docs/runbooks/prefers-aggregation.md for the recommended rollout order.",
+                            FLAG_FEED_RANKING_KEY, FLAG_AGGREGATION_KEY);
+                }
+                variant = Variant.PREFERS;
+                cypher = FEED_QUERY_WITH_PREFERS_RANKING;
+            } else {
+                variant = Variant.PLAIN;
+                cypher = FEED_QUERY;
+            }
+
+            params = Map.of(
+                    "userId", userId,
+                    "mutedUserIds", mutedUserIds,
+                    "mutedTopicIds", mutedTopicIds,
+                    "skip", skip,
+                    "limit", resolvedSize
+            );
         }
 
-        List<String> mutedUserIds = muteRepository.getMutedUserIds(userId);
-        List<String> mutedTopicIds = muteRepository.getMutedTopicIds(userId);
-
-        String cypher = selectFeedCypher();
-        return runQuery(cypher, Map.of(
-                "userId", userId,
-                "mutedUserIds", mutedUserIds,
-                "mutedTopicIds", mutedTopicIds,
-                "skip", skip,
-                "limit", resolvedSize
-        ));
-    }
-
-    /**
-     * Flag 路由：on → PREFERS 变体；off → 原始 Cypher（行为与 flag 引入前完全一致）。
-     * "ranking on 而 aggregation off"是禁止组合，命中时 WARN 一次。
-     */
-    private String selectFeedCypher() {
-        boolean rankingOn = isEnabled(FLAG_FEED_RANKING_KEY);
-        if (!rankingOn) {
-            return FEED_QUERY;
+        List<Map<String, Object>> items = runQuery(cypher, params);
+        recordMetrics(variant, items);
+        if (variant == Variant.PREFERS) {
+            // prefers_weight 只是为了 metrics 中数命中率，不属于公开 API 字段
+            for (Map<String, Object> row : items) {
+                row.remove(INTERNAL_FIELD_PREFERS_WEIGHT);
+            }
         }
-        if (!isEnabled(FLAG_AGGREGATION_KEY) && mismatchedFlagsWarnedOnce.compareAndSet(false, true)) {
-            LOGGER.warn(
-                    "Mismatched feature flags: {}=true but {}=false. Feed ranking will read stale PREFERS edges. "
-                            + "See docs/runbooks/prefers-aggregation.md for the recommended rollout order.",
-                    FLAG_FEED_RANKING_KEY, FLAG_AGGREGATION_KEY);
-        }
-        return FEED_QUERY_WITH_PREFERS_RANKING;
+        return items;
     }
 
     private boolean isEnabled(String key) {
         return Boolean.TRUE.equals(environment.getProperty(key, Boolean.class, Boolean.FALSE));
+    }
+
+    private void recordMetrics(Variant variant, List<Map<String, Object>> items) {
+        MeterRegistry registry = meterRegistryProvider.getIfAvailable();
+        if (registry == null) {
+            return;
+        }
+        Counter.builder(METRIC_FEED_QUERY)
+                .tag(TAG_VARIANT, variant.tagValue())
+                .description("Number of FeedService.getFeed invocations, tagged by Cypher variant served")
+                .register(registry)
+                .increment();
+
+        if (variant != Variant.PREFERS) {
+            return;
+        }
+        long withWeight = 0L;
+        for (Map<String, Object> row : items) {
+            Object weight = row.get(INTERNAL_FIELD_PREFERS_WEIGHT);
+            if (weight instanceof Number number && number.doubleValue() > 0.0) {
+                withWeight++;
+            }
+        }
+        long withoutWeight = items.size() - withWeight;
+        Counter.builder(METRIC_FEED_ITEMS)
+                .tag(TAG_HAS_PREFERS_WEIGHT, "true")
+                .description("Feed rows served by the PREFERS variant, partitioned by whether the row had a non-zero prefers weight")
+                .register(registry)
+                .increment(withWeight);
+        Counter.builder(METRIC_FEED_ITEMS)
+                .tag(TAG_HAS_PREFERS_WEIGHT, "false")
+                .description("Feed rows served by the PREFERS variant, partitioned by whether the row had a non-zero prefers weight")
+                .register(registry)
+                .increment(withoutWeight);
     }
 
     private List<Map<String, Object>> runQuery(String cypher, Map<String, Object> params) {

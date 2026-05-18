@@ -72,6 +72,39 @@ clampedWeight = min(max(weight, 0), 1000)
 | `prefers_aggregation_edges_upserted_total` | Counter | 单 tick 写入的边数。 |
 | `prefers_aggregation_duration_seconds` | Timer | 端到端耗时。p99 接近 5 分钟意味着调度即将赶不上节奏，准备 scaling out。 |
 
+读侧两个指标（由 `FeedService` 在每次请求时埋点）：
+
+| 指标 | 类型 | 看什么 |
+|---|---|---|
+| `rhizodelta_feed_query_total{variant=prefers\|plain\|global}` | Counter | 当前请求究竟走了哪个 Cypher。`rate(variant="prefers") / rate(...)` 反映 ranking flag 在用户侧的实际覆盖比例。 |
+| `rhizodelta_feed_items_returned_total{has_prefers_weight=true\|false}` | Counter | **只在 PREFERS 变体下递增**。`rate(has_prefers_weight="true") / rate(...)` ≈ PREFERS 命中率——告诉你"排序到底动没动到行"。接近 0 意味着 ranking flag 开了但聚合数据稀薄，feed 仍然事实上按 created_at 排，应继续等 aggregation 富集再观察。 |
+
+## Phase 1 → 2 Promotion Checklist
+
+把"建议停留 24 小时"翻译成可核对的量化绿灯。**所有项绿灯**才把 `RHIZODELTA_FEATURE_PREFERS_FEED_RANKING_ENABLED` 翻 true。任何一项红灯：维持现状，按"诊断手册"定位问题。
+
+写侧（aggregation 已经开了 ≥ 24h）：
+
+1. `rate(prefers_aggregation_run_total{outcome="error"}[24h]) == 0`
+   —— 24h 内没有任何失败 tick。如非 0，先解决错误。
+2. `rate(prefers_aggregation_events_processed_total[24h]) > 0`
+   —— 至少持续地在处理事件，不是干跑。
+3. `histogram_quantile(0.99, rate(prefers_aggregation_duration_seconds_bucket[5m])) < 60s`
+   —— p99 端到端耗时远小于 5 分钟节奏，没有积压。
+4. **PREFERS 覆盖率**：
+   ```cypher
+   MATCH (u:UserAccount {status: 'ACTIVE'})
+   OPTIONAL MATCH (u)-[:PREFERS]->(t:Topic)
+   WITH u, count(t) AS prefersCount
+   RETURN sum(CASE WHEN prefersCount > 0 THEN 1 ELSE 0 END) * 1.0 / count(u) AS coverage_ratio
+   ```
+   coverage_ratio ≥ 0.5（粗略目标，可按业务现状调整）。低于这个值意味着大多数活跃用户的 feed 还没攒到足够 PREFERS 边，翻开 ranking 会让大量用户落到 `weight=0` 的退化排序，体验上等同于今天。
+
+ranking 翻开后（24h 内必须看到这条）：
+
+5. `rate(rhizodelta_feed_items_returned_total{has_prefers_weight="true"}[5m]) > 0`
+   —— 至少有用户的 feed 命中过 PREFERS 边。如果翻开 24h 后这条始终为 0，说明读侧实际上没用到 PREFERS 数据（可能是 `topic_id` 缺失、Cypher schema 漂移、PREFERS 边方向反了等），立刻 `RHIZODELTA_FEATURE_PREFERS_FEED_RANKING_ENABLED=false` 回滚并排查。
+
 ## 诊断手册
 
 ### "Job 在跑但没数据"
@@ -95,12 +128,40 @@ ranking on 但 aggregation off。按上面"推荐上线顺序"的回滚段处理
 
 ### 立刻补跑一轮聚合（不等 5 分钟）
 
-本变更**没有**引入 actuator 端点；现成的 replay 入口只有两条路径：
+通过 actuator 端点直接触发 `PrefersAggregationJob.runOnce()`：
 
-1. **JVM 内直接触发**：通过 Spring 应用上下文（如 admin REPL、JMX bean、未来可能添加的 actuator endpoint）拿到 `PrefersAggregationJob` bean，调用 `runOnce()`。集成测试用的是同一个入口（`PrefersAggregationJob.runOnce` 故意 public）。运维需要这个能力时，建议先评估补 actuator endpoint 的工作量，而不是依赖临时通道。
-2. **直接执行下面的 replay Cypher**：完全不经过 Java 层，只要数据库连接可达就能跑。下面 "冷启动 / Replay" 一节给出现成 Cypher。
+```bash
+curl -s -X POST -H "Authorization: Bearer $ADMIN_JWT" \
+     http://localhost:8090/actuator/prefers-aggregation | jq
+```
 
-如果只是想"补一轮当前窗口"，路径 2 + 把窗口设为最近 24h 即可。
+可能的响应：
+
+```jsonc
+// flag on，本轮完成（典型）
+{
+  "status": "OK",
+  "invoked_at": "2026-05-17T08:32:15.412Z",
+  "result": {
+    "events_processed": 142,
+    "edges_upserted": 38,
+    "window_start": "2026-05-16T08:32:15.412Z"
+  },
+  "error_message": ""
+}
+
+// aggregation flag 关闭
+{ "status": "SKIPPED", "invoked_at": "...", "result": {}, "error_message": "" }
+
+// 聚合期间抛错（Neo4j 不可达、Cypher schema 漂移等）
+{ "status": "ERROR", "invoked_at": "...", "result": {}, "error_message": "..." }
+```
+
+端点要求 `ROLE_ADMIN`；任何其他角色返回 403，未认证返回 401。endpoint 自身不重复校验 flag——
+flag 关闭时仍然 200 + `status=SKIPPED`，方便运营在确认状态后再决定是否翻开 flag。
+
+历史背景：早期版本 runbook 标注「无 actuator 端点」，运维 replay 只能直连 Neo4j 跑下面的 Cypher。
+端点接入后下面那条直连 Cypher 路径仍然保留，作为 backend 不可用时的最后兜底。
 
 ### 冷启动 / Replay：用全部历史 PreferenceEvent 重建 PREFERS
 

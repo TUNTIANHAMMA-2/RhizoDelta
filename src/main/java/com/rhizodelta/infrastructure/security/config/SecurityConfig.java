@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/files/avatars/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/actuator/prefers-aggregation").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/decisions/fork/*/rollback").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/reviews/**").hasRole("ADMIN")

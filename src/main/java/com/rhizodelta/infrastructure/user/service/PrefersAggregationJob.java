@@ -66,31 +66,36 @@ public class PrefersAggregationJob {
      * <p>暴露为 public 是给集成测试和 runbook 中的"replay"动作用：
      * 集成测试可以同步触发一次聚合，而不需要等待 5 分钟的调度周期；
      * 操作员可以通过 actuator 端点在异常恢复后立刻补一轮。
+     *
+     * <p>返回 {@link PrefersAggregationOutcome} 让 actuator endpoint 能把结果摘要透出给调用方；
+     * {@link #scheduled()} 与历史测试不读返回值，向后兼容。
      */
-    public void runOnce() {
+    public PrefersAggregationOutcome runOnce() {
+        Instant invokedAt = Instant.now();
         if (!isEnabled()) {
             metrics.recordSkipped();
-            return;
+            return PrefersAggregationOutcome.skipped(invokedAt);
         }
 
-        Instant runStartedAt = Instant.now();
-        Instant windowStart = runStartedAt.minus(policy.windowHours(), ChronoUnit.HOURS);
+        Instant windowStart = invokedAt.minus(policy.windowHours(), ChronoUnit.HOURS);
 
         try {
             PrefersAggregationResult result = repository.runAggregation(
                     windowStart,
                     policy.halfLifeDays(),
                     policy.weightCeiling(),
-                    runStartedAt
+                    invokedAt
             );
-            Duration elapsed = Duration.between(runStartedAt, Instant.now());
+            Duration elapsed = Duration.between(invokedAt, Instant.now());
             metrics.recordRun(elapsed, result);
             LOGGER.info("PREFERS aggregation completed: events={}, edges={}, duration={}ms, window_start={}",
                     result.eventsProcessed(), result.edgesUpserted(), elapsed.toMillis(), windowStart);
+            return PrefersAggregationOutcome.ok(result, invokedAt);
         } catch (Exception exception) {
             metrics.recordError();
             LOGGER.error("PREFERS aggregation failed (window_start={}): {}", windowStart, exception.getMessage(), exception);
             // Intentionally swallow: a failed tick must not poison the scheduler.
+            return PrefersAggregationOutcome.error(exception.getMessage(), invokedAt);
         }
     }
 

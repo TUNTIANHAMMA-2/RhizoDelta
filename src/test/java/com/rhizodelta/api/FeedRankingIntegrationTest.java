@@ -7,8 +7,10 @@ import com.rhizodelta.infrastructure.user.repository.MuteRepository;
 import com.rhizodelta.infrastructure.user.service.FeedService;
 import com.rhizodelta.infrastructure.user.service.PrefersAggregationJob;
 import com.rhizodelta.infrastructure.user.service.PreferenceEventService;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -136,7 +138,7 @@ class FeedRankingIntegrationTest {
         seedPrefersEdge(userId, topicEngagedId, 25.0);
 
         // Construct a FeedService with flag-off Environment, sharing the real dependencies.
-        FeedService flagOffFeed = new FeedService(neo4jClient, muteRepository, followRepository, flagOffEnvironment());
+        FeedService flagOffFeed = new FeedService(neo4jClient, muteRepository, followRepository, flagOffEnvironment(), nullMeterRegistryProvider());
 
         List<Map<String, Object>> feed = flagOffFeed.getFeed(userId, 0, 50);
 
@@ -269,5 +271,12 @@ class FeedRankingIntegrationTest {
         when(env.getProperty(eq(FeedService.FLAG_AGGREGATION_KEY), eq(Boolean.class), eq(Boolean.FALSE)))
                 .thenReturn(Boolean.FALSE);
         return env;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<MeterRegistry> nullMeterRegistryProvider() {
+        ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        return provider;
     }
 }
