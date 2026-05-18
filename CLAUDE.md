@@ -282,6 +282,7 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | Feature flags runbook | `docs/runbooks/feature-flags.md` |
 | 端口约定 runbook | `docs/runbooks/ports.md` |
 | PREFERS 聚合 runbook | `docs/runbooks/prefers-aggregation.md` |
+| Hermes 监控提示词 | `docs/runbooks/hermes-monitoring.md` |
 | 用户身份完整性 | `docs/runbooks/user-identity-integrity.md` |
 | UserProfile 回填 | `docs/runbooks/user-profile-backfill.md` |
 | AUTHORED 边维护 | `docs/runbooks/user-authored-edge-maintenance.md` |
