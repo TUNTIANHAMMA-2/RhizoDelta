@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,7 +69,7 @@ public class UserProfileController {
     }
 
     @GetMapping("/{userId}/profile")
-    public ApiResponse<Map<String, Object>> getPublicProfile(
+    public ApiResponse<PublicUserProfilePayload> getPublicProfile(
             @PathVariable String userId,
             Authentication authentication
     ) {
@@ -85,6 +84,11 @@ public class UserProfileController {
         requireAuthenticatedUser(authentication);
         Map<String, Object> record = fetchPublicProfile(userId)
                 .orElseThrow(() -> new NoSuchElementException("user not found"));
+        if (!isPubliclyVisible(record.get("status"))) {
+            // SUSPENDED / DELETED 账号下，与 toPublicPayload 一致 fail-close，
+            // 不允许通过头像端点泄露用户存在性或生成预签名 URL。
+            return ResponseEntity.notFound().build();
+        }
         String avatarUrl = stringOrNull(record.get("avatarUrl"));
         if (avatarUrl == null) {
             return ResponseEntity.notFound().build();
@@ -197,19 +201,14 @@ public class UserProfileController {
         );
     }
 
-    private Map<String, Object> toPublicPayload(Map<String, Object> record) {
+    private PublicUserProfilePayload toPublicPayload(Map<String, Object> record) {
         String userId = record.get("userId").toString();
-        String status = stringOrNull(record.get("status"));
-        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-        payload.put("user_id", userId);
-        if (UserStatus.SUSPENDED.name().equals(status) || UserStatus.DELETED.name().equals(status)) {
-            payload.put("status", "UNAVAILABLE");
-            return payload;
+        if (!isPubliclyVisible(record.get("status"))) {
+            return PublicUserProfilePayload.unavailable(userId);
         }
         Object usernameRaw = record.get("username");
         String username = usernameRaw != null ? usernameRaw.toString() : userId;
-        payload.put("username", username);
-        payload.put("display_name", resolveDisplayName(record.get("displayName"), username));
+        String displayName = resolveDisplayName(record.get("displayName"), username);
         String avatarUrl = stringOrNull(record.get("avatarUrl"));
         if (avatarUrl != null) {
             try {
@@ -218,8 +217,16 @@ public class UserProfileController {
                 LOGGER.debug("Failed to resolve avatar URL: {}", e.getMessage());
             }
         }
-        payload.put("avatar_url", avatarUrl);
-        return payload;
+        return PublicUserProfilePayload.visible(userId, username, displayName, avatarUrl);
+    }
+
+    private static boolean isPubliclyVisible(Object statusRaw) {
+        if (statusRaw == null) {
+            return true;
+        }
+        String status = statusRaw.toString();
+        return !UserStatus.SUSPENDED.name().equals(status)
+                && !UserStatus.DELETED.name().equals(status);
     }
 
     private String resolveDisplayName(Object displayNameRaw, String username) {

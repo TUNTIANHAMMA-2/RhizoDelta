@@ -51,23 +51,8 @@ public class DatabaseInitializer {
               sum(CASE WHEN existing IS NULL THEN 1 ELSE 0 END) AS migrated,
               sum(CASE WHEN existing IS NOT NULL THEN 1 ELSE 0 END) AS skipped
             """.formatted(PROFILE_BACKFILL_BATCH_SIZE).trim();
-    private static final String AUTHORED_BACKFILL_QUERY = """
-            MATCH (p:Human_Post)
-            WHERE p.author_id IS NOT NULL
-            MATCH (u:UserAccount {user_id: p.author_id})
-            MERGE (u)-[r:AUTHORED]->(p)
-            ON CREATE SET r.created_at = p.created_at
-            RETURN count(r) AS touched
-            """.trim();
-    private static final String AUTHORED_AUDIT_QUERY = """
-            MATCH (p:Human_Post)
-            WHERE p.author_id IS NOT NULL
-            OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)
-            WITH p, u
-            WHERE u IS NULL
-            RETURN p.node_id AS nodeId, p.author_id AS authorId
-            LIMIT 100
-            """.trim();
+    // AUTHORED 相关查询从启动期搬到 AuthoredMaintenanceService，
+    // 启动期不再做 AUTHORED 回填；运维通过 service 自助触发，便于分批与监控。
     private static final String SHOW_RHIZODELTA_CONSTRAINTS_QUERY = """
             SHOW CONSTRAINTS
             YIELD name
@@ -100,6 +85,7 @@ public class DatabaseInitializer {
             "CREATE INDEX rhizodelta_merged_into_decision_id_idx IF NOT EXISTS FOR ()-[r:MERGED_INTO]-() ON (r.decision_id)",
             "CREATE INDEX rhizodelta_branched_from_decision_id_idx IF NOT EXISTS FOR ()-[r:BRANCHED_FROM]-() ON (r.decision_id)",
             "CREATE INDEX rhizodelta_authored_created_at_idx IF NOT EXISTS FOR ()-[r:AUTHORED]-() ON (r.created_at)",
+            "CREATE CONSTRAINT rhizodelta_authored_id_unique IF NOT EXISTS FOR ()-[r:AUTHORED]-() REQUIRE r.authored_id IS UNIQUE",
             "CREATE INDEX rhizodelta_conceptual_overlap_association_id_idx IF NOT EXISTS FOR ()-[r:CONCEPTUAL_OVERLAP]-() ON (r.association_id)",
             "CREATE INDEX rhizodelta_relates_to_association_id_idx IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.association_id)",
             "CREATE CONSTRAINT rhizodelta_user_account_username_unique IF NOT EXISTS FOR (n:UserAccount) REQUIRE n.username IS UNIQUE",
@@ -197,14 +183,6 @@ public class DatabaseInitializer {
                 .fetch()
                 .one()
                 .orElse(Map.of("migrated", 0L, "skipped", 0L));
-    }
-
-    static String authoredBackfillQuery() {
-        return AUTHORED_BACKFILL_QUERY;
-    }
-
-    static String authoredAuditQuery() {
-        return AUTHORED_AUDIT_QUERY;
     }
 
     private void executeSchemaQuery(String query) {

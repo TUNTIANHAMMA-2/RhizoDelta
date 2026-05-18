@@ -34,9 +34,9 @@ Phase 2 的设计约束是：
 
 相关设计来源：
 
-- `openspec/changes/user-authored-edge/design.md`
-- `openspec/changes/user-authored-edge/specs/user-authored-edge/spec.md`
-- `docs/user-domain-modeling-plan.md` §4 Phase 2
+- `openspec/changes/archive/2026-05-13-user-authored-edge/design.md`
+- `openspec/changes/archive/2026-05-13-user-authored-edge/specs/user-authored-edge/spec.md`
+- `docs/designs/user-domain-modeling-plan.md` §4 Phase 2
 
 ---
 
@@ -58,77 +58,108 @@ Phase 2 的设计约束是：
 - `(:Human_Post {author_id})`
 - `author_id` 非空
 - 存在对应 `(:UserAccount {user_id = author_id})`
+- 当前没有 `(:UserAccount {user_id = author_id})-[:AUTHORED]->(:Human_Post)` 边
 
-### 幂等回填脚本
+### 实施方式
+
+回填**不在启动期执行**，由 `AuthoredMaintenanceService#runAuthoredBackfill()` 显式触发，
+内部按批分页（默认 `rhizodelta.authored.backfill.batch-size=500`），循环直到可修复 pending 为 0：
+
+1. **批次查询**：每次只取尚未有正确边、且作者账号存在的 ≤500 条帖子；
+2. **单批 Cypher**：在同一事务内 `MATCH (UserAccount) MERGE (AUTHORED) ON CREATE SET created_at + authored_id`；
+3. **authored_id 复合键**：`"$authorId:$postNodeId"` —— 与
+   `rhizodelta_authored_id_unique` 关系唯一约束对齐，并发回填或并发写帖
+   最多保留一条 AUTHORED；
+4. **退出条件**：pending=0 或本批 createdCount=0（防御性退出）。
+
+### 手动回填脚本（与 service 行为等价，供应急维护）
 
 ```cypher
+:auto USING PERIODIC COMMIT 500
 MATCH (p:Human_Post)
 WHERE p.author_id IS NOT NULL
+  AND EXISTS { MATCH (:UserAccount {user_id: p.author_id}) }
+  AND NOT EXISTS { MATCH (:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p) }
+WITH p LIMIT 500
 MATCH (u:UserAccount {user_id: p.author_id})
 MERGE (u)-[r:AUTHORED]->(p)
-ON CREATE SET r.created_at = p.created_at
-RETURN count(r) AS touched;
+  ON CREATE SET r.created_at  = coalesce(p.created_at, datetime()),
+                r.authored_id = u.user_id + ':' + p.node_id
+RETURN sum(CASE WHEN r.authored_id IS NULL THEN 0 ELSE 1 END) AS created;
 ```
+
+> 多次执行直至 `created = 0`。
 
 ### 语义说明
 
 - `MERGE` 保证同一用户到同一帖子最多一条 `AUTHORED`
-- `ON CREATE SET` 保证只有首次补边时写入 `created_at`
+- `authored_id` 的关系唯一约束阻断并发产生的重复边（第二个并发 MERGE 在
+  CREATE 时会被约束拒绝并回滚事务）
+- `ON CREATE SET` 保证只在首次补边时写入 `created_at` 与 `authored_id`，
+  既有边的属性不被覆盖
 - 找不到 `UserAccount` 的帖子不会被强行补边，也不会创建占位用户
 
 ### 预期结果
 
-- 历史帖子若能解析到作者账号，则拥有 1 条 `AUTHORED`
-- 重复执行该脚本不会增加重复边
+- 历史帖子若能解析到作者账号，则拥有 1 条 `AUTHORED`，且边上 `authored_id = userId:nodeId`
+- 重复执行（service 或脚本）不会增加重复边或改写既有属性
 
 ---
 
-## 缺边审计
+## 漂移审计
 
 ### 目标
 
-找出仍然只有 `author_id`、但缺少 `AUTHORED` 的帖子，供人工处理。
+仅"缺边审计"不足以保证 `author_id ↔ AUTHORED` 一致：还要识别
+**重复匹配边**、**错误作者来源边**、**多源混合**等漂移情况。
+`AuthoredMaintenanceService#auditDrift()` / `findDriftSamples(int)`
+提供多维分类汇总与样本。
 
-### 审计脚本
+### 审计 Cypher（与 service 等价）
 
 ```cypher
 MATCH (p:Human_Post)
 WHERE p.author_id IS NOT NULL
-OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)
-WITH p, u
-WHERE u IS NULL
-RETURN p.node_id AS nodeId, p.author_id AS authorId
+OPTIONAL MATCH (u:UserAccount)-[:AUTHORED]->(p)
+WITH p,
+     count(u) AS total,
+     sum(CASE WHEN u IS NOT NULL AND u.user_id = p.author_id THEN 1 ELSE 0 END) AS matching
+WHERE matching <> 1 OR total <> matching
+RETURN p.node_id AS nodeId,
+       p.author_id AS authorId,
+       total      AS totalAuthoredEdges,
+       matching   AS matchingAuthoredEdges
 LIMIT 100;
 ```
 
-### 如何理解结果
+### 漂移分类
 
-- `nodeId`：缺边帖子
-- `authorId`：帖子上记录的作者投影
-
-若有结果，通常分成两类：
-
-1. 该作者账号真实不存在  
-处理方式：人工确认是脏数据还是待补账号
-
-2. 作者账号存在，但 `AUTHORED` 漏写  
-处理方式：重新执行回填脚本后再审计
+| `matching` | `total` | 含义 | 处置 |
+|---|---|---|---|
+| 0 | 0 | **MISSING** —— 缺正确边 | 跑回填即可；若 `author_id` 对应账号缺失，先核实账号 |
+| 1 | 1 | HEALTHY | 无动作 |
+| ≥2 | ≥2 | **DUPLICATE_MATCHING** —— 同一正确作者的多条 AUTHORED | 手动 `DELETE` 多余边（保留任一条） |
+| 1 | >1 | **EXTRANEOUS_ALONGSIDE_MATCH** —— 正确边 + 来源不对的额外边 | 删除非匹配作者的边 |
+| 0 | >0 | **EXTRANEOUS_WITHOUT_MATCH** —— 全是错误作者来源的边 | 删除全部 AUTHORED，跑回填补正确边 |
 
 ### 完成判据
 
 ```cypher
 MATCH (p:Human_Post)
 WHERE p.author_id IS NOT NULL
-OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)
-WITH p, u
-WHERE u IS NULL
-RETURN count(p) AS missingCount;
+OPTIONAL MATCH (u:UserAccount)-[:AUTHORED]->(p)
+WITH p,
+     count(u) AS total,
+     sum(CASE WHEN u IS NOT NULL AND u.user_id = p.author_id THEN 1 ELSE 0 END) AS matching
+RETURN
+  sum(CASE WHEN matching = 1 AND total = 1 THEN 1 ELSE 0 END) AS healthyCount,
+  sum(CASE WHEN matching = 0 AND total = 0 THEN 1 ELSE 0 END) AS missingCount,
+  sum(CASE WHEN matching >= 2                THEN 1 ELSE 0 END) AS duplicateMatchingCount,
+  sum(CASE WHEN matching = 1 AND total > 1 THEN 1 ELSE 0 END) AS extraneousAlongsideMatchCount,
+  sum(CASE WHEN matching = 0 AND total > 0 THEN 1 ELSE 0 END) AS extraneousWithoutMatchCount;
 ```
 
-期望：
-
-- `missingCount = 0`
-- 或仅剩明确记录在案、暂不修复的历史脏数据
+期望：除 `healthyCount` 外其余全部为 0，或仅剩明确记录在案、暂不修复的历史脏数据。
 
 ---
 
@@ -145,6 +176,7 @@ MATCH (:UserAccount)-[r:AUTHORED]->(:Human_Post)
 DELETE r;
 
 DROP INDEX rhizodelta_authored_created_at_idx IF EXISTS;
+DROP CONSTRAINT rhizodelta_authored_id_unique IF EXISTS;
 ```
 
 ### 回滚后的行为
@@ -180,8 +212,8 @@ Phase 2 的关键兼容策略是：
 
 ## 相关规范
 
-- OpenSpec change: `openspec/changes/user-authored-edge/`
-- Phase 2 design: `openspec/changes/user-authored-edge/design.md`
-- Phase 2 requirements: `openspec/changes/user-authored-edge/specs/user-authored-edge/spec.md`
-- 顶层建模设计: `docs/user-domain-modeling-plan.md` §4 Phase 2
+- OpenSpec change（已归档）: `openspec/changes/archive/2026-05-13-user-authored-edge/`
+- Phase 2 design: `openspec/changes/archive/2026-05-13-user-authored-edge/design.md`
+- Phase 2 requirements: `openspec/changes/archive/2026-05-13-user-authored-edge/specs/user-authored-edge/spec.md`
+- 顶层建模设计: `docs/designs/user-domain-modeling-plan.md` §4 Phase 2
 - Phase 1 runbook: `docs/runbooks/user-profile-backfill.md`

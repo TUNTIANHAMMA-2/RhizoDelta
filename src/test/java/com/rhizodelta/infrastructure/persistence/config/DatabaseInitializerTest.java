@@ -257,19 +257,18 @@ class DatabaseInitializerTest {
     }
 
     @Test
-    void authoredBackfillAndAuditQueriesShouldMatchPhaseTwoContract() {
-        assertThat(DatabaseInitializer.authoredBackfillQuery())
-                .contains("MATCH (p:Human_Post)")
-                .contains("WHERE p.author_id IS NOT NULL")
-                .contains("MATCH (u:UserAccount {user_id: p.author_id})")
-                .contains("MERGE (u)-[r:AUTHORED]->(p)")
-                .contains("ON CREATE SET r.created_at = p.created_at");
+    void initializeSchemaShouldCreateAuthoredIdUniquenessConstraint() {
+        // 关系唯一约束是阻断并发重复 AUTHORED 边的最后防线。
+        Neo4jClient neo4jClient = mock(Neo4jClient.class, Answers.RETURNS_DEEP_STUBS);
+        when(neo4jClient.query(anyString()).fetch().all()).thenReturn(List.<Map<String, Object>>of());
 
-        assertThat(DatabaseInitializer.authoredAuditQuery())
-                .contains("OPTIONAL MATCH (u:UserAccount {user_id: p.author_id})-[:AUTHORED]->(p)")
-                .contains("WHERE u IS NULL")
-                .contains("RETURN p.node_id AS nodeId, p.author_id AS authorId")
-                .contains("LIMIT 100");
+        DatabaseInitializer initializer = new DatabaseInitializer(neo4jClient, EMBEDDING_DIMENSION);
+
+        initializer.initializeSchema();
+
+        verify(neo4jClient).query(
+                "CREATE CONSTRAINT rhizodelta_authored_id_unique IF NOT EXISTS FOR ()-[r:AUTHORED]-() REQUIRE r.authored_id IS UNIQUE"
+        );
     }
 
     private static void assertReadOnly(String query) {

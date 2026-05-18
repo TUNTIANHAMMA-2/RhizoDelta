@@ -58,7 +58,22 @@ public class PostService {
             MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
             MATCH (author:UserAccount {user_id: $authorId})
             MERGE (author)-[rel:AUTHORED]->(post)
-            ON CREATE SET rel.created_at = $createdAt
+              ON CREATE SET rel.created_at  = $createdAt,
+                            rel.authored_id = $authorId + ':' + $postNodeId
+            RETURN type(rel) AS relType
+            """;
+    /**
+     * 幂等命中（{@code request_id} 已存在）时用的补偿查询：
+     * 如果由于历史数据 / 回滚 / 早期版本写入只保留了 {@code author_id} 投影、
+     * 没有写过 canonical AUTHORED 边，这里会把它补上；反之命中既有边后什么都不做。
+     */
+    private static final String COMPENSATE_AUTHORED_RELATIONSHIP_QUERY = """
+            MATCH (post:Human_Post:GraphNode {node_id: $postNodeId})
+            WHERE post.author_id IS NOT NULL
+            MATCH (author:UserAccount {user_id: post.author_id})
+            MERGE (author)-[rel:AUTHORED]->(post)
+              ON CREATE SET rel.created_at  = coalesce(post.created_at, datetime()),
+                            rel.authored_id = author.user_id + ':' + post.node_id
             RETURN type(rel) AS relType
             """;
     private static final String CREATE_REPLY_RELATIONSHIP_QUERY = """
@@ -111,6 +126,9 @@ public class PostService {
 
         String existingNodeId = findNodeIdByRequestId(command.requestId());
         if (existingNodeId != null) {
+            // 幂等命中分支也要校验 / 补建 canonical AUTHORED 边：历史数据、回滚回放、
+            // 或早期版本（只写 author_id 不写 AUTHORED）落库的帖子在 retry 时不能继续漏边。
+            compensateAuthoredRelationship(existingNodeId);
             HumanPost existing = humanPostRepository.findByNodeId(UUID.fromString(existingNodeId))
                     .orElseThrow(() -> new IllegalStateException("Human_Post not found after upsert"));
             return new CreateHumanPostResult(existing, false);
@@ -178,6 +196,28 @@ public class PostService {
                 .fetch()
                 .one()
                 .orElseThrow(() -> new IllegalStateException("Failed to create AUTHORED relationship"));
+    }
+
+    /**
+     * 用于 {@code request_id} 命中既有节点的幂等分支：根据帖子节点上保存的
+     * {@code author_id} 直接 MERGE canonical AUTHORED 边。
+     *
+     * <p>差异于 {@link #createAuthoredRelationship(String, String, OffsetDateTime)}：
+     * <ul>
+     *   <li>权威来源是节点本身保存的 {@code author_id}，而非传入命令，避免
+     *       重放/合谋请求把别人的帖子改写作者归属；</li>
+     *   <li>命中既有 AUTHORED 边时 MERGE 不写任何属性，已存在边的 {@code created_at}
+     *       与 {@code authored_id} 都保留；</li>
+     *   <li>若帖子节点上 {@code author_id} 为空（理论不应发生）或对应账号缺失，
+     *       查询返回空结果——按"幂等返回旧节点"语义视为已观测到的脏数据，
+     *       不再抛出，由审计端通过漂移报告处理。</li>
+     * </ul>
+     */
+    private void compensateAuthoredRelationship(String postNodeId) {
+        neo4jClient.query(COMPENSATE_AUTHORED_RELATIONSHIP_QUERY)
+                .bind(postNodeId).to("postNodeId")
+                .fetch()
+                .one();
     }
 
     /**
