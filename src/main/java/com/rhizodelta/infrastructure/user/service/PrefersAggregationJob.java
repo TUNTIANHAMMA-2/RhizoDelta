@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 周期性把 PreferenceEvent 聚合成 PREFERS 投影边的 Job。
@@ -39,6 +40,14 @@ public class PrefersAggregationJob {
     private final PrefersAggregationPolicy policy;
     private final PrefersAggregationMetrics metrics;
     private final Environment environment;
+
+    /**
+     * Single-flight guard so that scheduled ticks and manual replay (actuator
+     * {@code /actuator/prefers-aggregation}) cannot run concurrently. When the lock
+     * is already held, the second caller short-circuits to {@code skipped} and the
+     * scheduler is never blocked.
+     */
+    private final ReentrantLock runLock = new ReentrantLock();
 
     public PrefersAggregationJob(
             PrefersAggregationRepository repository,
@@ -77,6 +86,12 @@ public class PrefersAggregationJob {
             return PrefersAggregationOutcome.skipped(invokedAt);
         }
 
+        if (!runLock.tryLock()) {
+            metrics.recordSkipped();
+            LOGGER.info("PREFERS aggregation skipped: another run is in progress");
+            return PrefersAggregationOutcome.skipped(invokedAt);
+        }
+
         Instant windowStart = invokedAt.minus(policy.windowHours(), ChronoUnit.HOURS);
 
         try {
@@ -96,6 +111,8 @@ public class PrefersAggregationJob {
             LOGGER.error("PREFERS aggregation failed (window_start={}): {}", windowStart, exception.getMessage(), exception);
             // Intentionally swallow: a failed tick must not poison the scheduler.
             return PrefersAggregationOutcome.error(exception.getMessage(), invokedAt);
+        } finally {
+            runLock.unlock();
         }
     }
 

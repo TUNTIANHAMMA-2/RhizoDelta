@@ -65,7 +65,7 @@ public class PrefersAggregationPolicy {
 
     @PostConstruct
     void validate() {
-        if (Double.isNaN(halfLifeDays) || halfLifeDays <= 0.0) {
+        if (!Double.isFinite(halfLifeDays) || halfLifeDays <= 0.0) {
             throw new IllegalArgumentException(
                     "rhizodelta.preference.half-life-days must be positive and finite, got " + halfLifeDays);
         }
@@ -73,7 +73,7 @@ public class PrefersAggregationPolicy {
             throw new IllegalArgumentException(
                     "rhizodelta.preference.window-hours must be positive, got " + windowHours);
         }
-        if (Double.isNaN(weightFloor) || Double.isNaN(weightCeiling)) {
+        if (!Double.isFinite(weightFloor) || !Double.isFinite(weightCeiling)) {
             throw new IllegalArgumentException(
                     "rhizodelta.preference.weight-floor/weight-ceiling must be finite, got "
                             + weightFloor + " / " + weightCeiling);

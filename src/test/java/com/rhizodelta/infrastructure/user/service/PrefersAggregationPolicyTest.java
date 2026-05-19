@@ -91,6 +91,33 @@ class PrefersAggregationPolicyTest {
                 .hasMessageContaining("weight-floor/weight-ceiling");
     }
 
+    @Test
+    void rejectsInfiniteHalfLife() {
+        PrefersAggregationPolicy policy = new PrefersAggregationPolicy(Double.POSITIVE_INFINITY, 24L, 0.0, 1000.0);
+
+        assertThatThrownBy(policy::validate)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("rhizodelta.preference.half-life-days");
+    }
+
+    @Test
+    void rejectsInfiniteCeiling() {
+        PrefersAggregationPolicy policy = new PrefersAggregationPolicy(30.0, 24L, 0.0, Double.POSITIVE_INFINITY);
+
+        assertThatThrownBy(policy::validate)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("weight-floor/weight-ceiling");
+    }
+
+    @Test
+    void rejectsNegativeInfiniteFloor() {
+        PrefersAggregationPolicy policy = new PrefersAggregationPolicy(30.0, 24L, Double.NEGATIVE_INFINITY, 1000.0);
+
+        assertThatThrownBy(policy::validate)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("weight-floor/weight-ceiling");
+    }
+
     private PrefersAggregationPolicy newValidPolicy() {
         return new PrefersAggregationPolicy(30.0, 24L, 0.0, 1000.0);
     }

@@ -9,10 +9,24 @@ import java.util.UUID;
 
 @Repository
 public class PreferenceEventRepository {
+    // Resolve TOWARD topic in priority order:
+    //   1. explicit $topicId (callers that already know the topic, e.g. FeedRankingIntegrationTest)
+    //   2. derived from source node's topic_id property (real /api/nodes/{id} read path,
+    //      where NodeQueryController does not pre-resolve topic).
+    // Without this fallback, real user reads never produced TOWARD edges and the
+    // PREFERS aggregation job was effectively a no-op.
     private static final String CREATE_EVENT_QUERY = """
             MATCH (u:UserAccount {user_id: $userId})
-            OPTIONAL MATCH (t:Topic {topic_id: $topicId})
-              WHERE $topicId <> ''
+            OPTIONAL MATCH (src {node_id: $sourceNodeId})
+              WHERE $sourceNodeId <> ''
+            WITH u, src,
+                 CASE
+                   WHEN $topicId <> '' THEN $topicId
+                   WHEN src IS NOT NULL AND src.topic_id IS NOT NULL THEN src.topic_id
+                   ELSE NULL
+                 END AS resolvedTopicId
+            OPTIONAL MATCH (t:Topic {topic_id: resolvedTopicId})
+              WHERE resolvedTopicId IS NOT NULL
             CREATE (e:PreferenceEvent {
               event_id: $eventId,
               type: $type,
@@ -41,7 +55,7 @@ public class PreferenceEventRepository {
                         "eventId", eventId,
                         "type", type,
                         "weight", weight,
-                        "sourceNodeId", sourceNodeId
+                        "sourceNodeId", sourceNodeId != null ? sourceNodeId : ""
                 ))
                 .run();
     }

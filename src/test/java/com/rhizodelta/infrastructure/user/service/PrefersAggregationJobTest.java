@@ -9,13 +9,21 @@ import org.springframework.core.env.Environment;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -108,6 +116,84 @@ class PrefersAggregationJobTest {
 
         assertThatCode(job::scheduled).doesNotThrowAnyException();
         verify(metrics).recordSkipped();
+    }
+
+    @Test
+    void concurrentRunsAreSerializedBySingleFlightLock() throws Exception {
+        // Block the first runAggregation call until the second invocation has already attempted to
+        // acquire the lock. The second call must short-circuit to skipped without touching the
+        // repository, leaving exactly one runAggregation invocation.
+        PrefersAggregationRepository repository = mock(PrefersAggregationRepository.class);
+        PrefersAggregationMetrics metrics = mock(PrefersAggregationMetrics.class);
+        Environment env = enabledEnv();
+
+        CountDownLatch firstEnteredRepo = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        Instant ts = Instant.now();
+        PrefersAggregationResult result = new PrefersAggregationResult(1L, 1L, ts.minus(24L, ChronoUnit.HOURS), ts);
+
+        when(repository.runAggregation(any(), anyDouble(), anyDouble(), any())).thenAnswer(invocation -> {
+            firstEnteredRepo.countDown();
+            // Hold the lock long enough for the second runOnce() to try and fail tryLock().
+            if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("releaseFirst latch was never opened");
+            }
+            return result;
+        });
+
+        PrefersAggregationJob job = new PrefersAggregationJob(repository, newPolicy(), metrics, env);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<PrefersAggregationOutcome> first = pool.submit(job::runOnce);
+            // Make sure thread #1 is inside the locked critical section before #2 starts.
+            assertThat(firstEnteredRepo.await(2, TimeUnit.SECONDS))
+                    .as("first call must reach the repository").isTrue();
+
+            Future<PrefersAggregationOutcome> second = pool.submit(job::runOnce);
+            PrefersAggregationOutcome secondOutcome = second.get(2, TimeUnit.SECONDS);
+            assertThat(secondOutcome.status())
+                    .as("second concurrent runOnce must short-circuit to skipped")
+                    .isEqualTo(PrefersAggregationOutcome.Status.SKIPPED);
+
+            releaseFirst.countDown();
+            PrefersAggregationOutcome firstOutcome = first.get(2, TimeUnit.SECONDS);
+            assertThat(firstOutcome.status()).isEqualTo(PrefersAggregationOutcome.Status.OK);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        // Repository is touched exactly once; metrics record both a successful run and a skip.
+        verify(repository, times(1)).runAggregation(any(), anyDouble(), anyDouble(), any());
+        verify(metrics, times(1)).recordRun(any(Duration.class), eq(result));
+        verify(metrics, times(1)).recordSkipped();
+    }
+
+    @Test
+    void lockIsReleasedAfterFailureSoNextRunCanProceed() {
+        // A failed runAggregation must release the single-flight lock; otherwise an error would
+        // wedge the job permanently.
+        PrefersAggregationRepository repository = mock(PrefersAggregationRepository.class);
+        PrefersAggregationMetrics metrics = mock(PrefersAggregationMetrics.class);
+        Environment env = enabledEnv();
+        AtomicInteger callCount = new AtomicInteger();
+        Instant ts = Instant.now();
+        PrefersAggregationResult success = new PrefersAggregationResult(2L, 1L, ts.minus(24L, ChronoUnit.HOURS), ts);
+        when(repository.runAggregation(any(), anyDouble(), anyDouble(), any())).thenAnswer(invocation -> {
+            if (callCount.getAndIncrement() == 0) {
+                throw new RuntimeException("first run fails");
+            }
+            return success;
+        });
+
+        PrefersAggregationJob job = new PrefersAggregationJob(repository, newPolicy(), metrics, env);
+
+        assertThatCode(job::runOnce).doesNotThrowAnyException();
+        PrefersAggregationOutcome second = job.runOnce();
+        assertThat(second.status()).isEqualTo(PrefersAggregationOutcome.Status.OK);
+
+        verify(metrics, times(1)).recordError();
+        verify(metrics, times(1)).recordRun(any(Duration.class), eq(success));
     }
 
     private PrefersAggregationPolicy newPolicy() {
