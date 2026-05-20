@@ -9,6 +9,7 @@ import {
   type HomeNavKey,
   type QualityBand,
 } from "../../stores/homeStore";
+import { homeSidebarLabels } from "../../i18n/labels";
 import { metaLabel } from "../../lib/typography";
 import { WordMark } from "../brand/WordMark";
 
@@ -143,10 +144,14 @@ export function HomeSidebar() {
   }, [rhizomes, userId, followingTargetIds]);
 
   const streams: NavItem[] = [
-    { key: "all", label: "全部 · All" },
-    { key: "following", label: "关注 · Following", disabled: !userId },
-    { key: "mine", label: "我的话题 · Mine", disabled: !userId },
-    { key: "recent", label: "最近 24 小时 · Recent" },
+    { key: "all", label: homeSidebarLabels.streams.all },
+    {
+      key: "following",
+      label: homeSidebarLabels.streams.following,
+      disabled: !userId,
+    },
+    { key: "mine", label: homeSidebarLabels.streams.mine, disabled: !userId },
+    { key: "recent", label: homeSidebarLabels.streams.recent },
   ];
 
   const qualityBands: {
@@ -157,25 +162,25 @@ export function HomeSidebar() {
   }[] = [
     {
       key: "quality:top",
-      label: "精选 · Top",
+      label: homeSidebarLabels.quality.top,
       count: qualityCounts.top,
       dotClass: "bg-accent",
     },
     {
       key: "quality:good",
-      label: "良好 · Good",
+      label: homeSidebarLabels.quality.good,
       count: qualityCounts.good,
       dotClass: "bg-accent/60",
     },
     {
       key: "quality:basic",
-      label: "基础 · Basic",
+      label: homeSidebarLabels.quality.basic,
       count: qualityCounts.basic,
       dotClass: "bg-text-tertiary/60",
     },
     {
       key: "quality:unrated",
-      label: "未评分 · Unrated",
+      label: homeSidebarLabels.quality.unrated,
       count: qualityCounts.unrated,
       dotClass: "bg-text-tertiary/25",
     },
@@ -183,11 +188,11 @@ export function HomeSidebar() {
 
   return (
     <aside
-      className="flex w-full md:w-[272px] md:shrink-0 h-screen md:sticky md:top-0 flex-col bg-bg-parchment border-r border-border-default/70 font-ui overflow-y-auto"
-      aria-label="Home navigation"
+      className="flex w-full md:w-[272px] md:shrink-0 max-h-[78vh] md:h-screen md:max-h-none md:sticky md:top-0 flex-col bg-bg-parchment md:border-r border-border-default/70 font-ui overflow-y-auto"
+      aria-label={homeSidebarLabels.ariaLabel}
     >
       {/* Brand header */}
-      <div className="px-5 pt-9 pb-7 border-b border-border-default/50">
+      <div className="px-5 pt-4 md:pt-9 pb-5 md:pb-7 border-b border-border-default/50">
         <WordMark className="block text-[28px] leading-none tracking-[-0.02em]" />
         <div
           className={clsx(
@@ -195,11 +200,11 @@ export function HomeSidebar() {
             "text-text-tertiary mt-3 uppercase tracking-[0.22em] text-[10.5px]",
           )}
         >
-          A thinking thicket
+          {homeSidebarLabels.tagline}
         </div>
       </div>
 
-      <SectionHeading>Streams</SectionHeading>
+      <SectionHeading>{homeSidebarLabels.sections.streams}</SectionHeading>
       <nav className="flex flex-col">
         {streams.map((item) => (
           <NavRow
@@ -220,7 +225,7 @@ export function HomeSidebar() {
         ))}
       </nav>
 
-      <SectionHeading>Quality</SectionHeading>
+      <SectionHeading>{homeSidebarLabels.sections.quality}</SectionHeading>
       <nav className="flex flex-col">
         {qualityBands.map((item) => (
           <NavRow
@@ -234,7 +239,7 @@ export function HomeSidebar() {
         ))}
       </nav>
 
-      <SectionHeading>Resources</SectionHeading>
+      <SectionHeading>{homeSidebarLabels.sections.resources}</SectionHeading>
       <nav className="flex flex-col pb-6">
         <button
           type="button"
@@ -245,7 +250,9 @@ export function HomeSidebar() {
             className="inline-block w-[3px] h-5 rounded-pill bg-transparent group-hover:bg-accent/30"
             aria-hidden
           />
-          <span className="font-ui text-[14.5px]">图谱视图 · Graph</span>
+          <span className="font-ui text-[14.5px]">
+            {homeSidebarLabels.resources.graph}
+          </span>
           <span
             className={clsx(
               metaLabel,
@@ -264,7 +271,9 @@ export function HomeSidebar() {
             className="inline-block w-[3px] h-5 rounded-pill bg-transparent group-hover:bg-accent/30"
             aria-hidden
           />
-          <span className="font-ui text-[14.5px]">设置 · Settings</span>
+          <span className="font-ui text-[14.5px]">
+            {homeSidebarLabels.resources.settings}
+          </span>
           <span
             className={clsx(
               metaLabel,
@@ -278,9 +287,9 @@ export function HomeSidebar() {
 
       <div className="mt-auto px-5 py-6 border-t border-border-default/50 space-y-3">
         <p className="font-content italic text-[13px] leading-[1.65] text-text-secondary/90">
-          a thicket of thoughts,
+          {homeSidebarLabels.footerPoem[0]}
           <br />
-          branching outward.
+          {homeSidebarLabels.footerPoem[1]}
         </p>
         <div
           className={clsx(
@@ -288,7 +297,7 @@ export function HomeSidebar() {
             "text-text-tertiary/70 uppercase tracking-[0.18em] text-[10.5px]",
           )}
         >
-          est. 2026 · alpha
+          {homeSidebarLabels.version}
         </div>
       </div>
     </aside>

@@ -1,7 +1,17 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getFeed } from "../api/feed";
+import type { FeedItem } from "../api/types";
+import {
+  collectFollowingTargetIds,
+  filterRhizomes,
+  qualityBandOf,
+  sortRhizomes,
+  useHomeStore,
+} from "./homeStore.ts";
 
-import { filterRhizomes, qualityBandOf, sortRhizomes } from "./homeStore.ts";
+vi.mock("../api/feed", () => ({
+  getFeed: vi.fn(),
+}));
 
 const fixture = [
   {
@@ -34,71 +44,188 @@ const fixture = [
   },
 ];
 
-test("filterRhizomes: all returns everything", () => {
+beforeEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+  useHomeStore.setState({
+    activeNav: "all",
+    sortBy: "latest",
+    feedItems: [],
+    feedLoading: false,
+    feedError: null,
+    followingTargetIds: new Set(),
+    followingLoading: false,
+  });
+});
+
+describe("homeStore helpers", () => {
+it("filterRhizomes: all returns everything", () => {
   const out = filterRhizomes(fixture, "all", null);
-  assert.equal(out.length, 4);
+  expect(out.length).toBe(4);
 });
 
-test("filterRhizomes: mine filters by current user", () => {
+it("filterRhizomes: mine filters by current user", () => {
   const out = filterRhizomes(fixture, "mine", "alice");
-  assert.deepEqual(out.map((n) => n.node_id), ["a", "c", "d"]);
+  expect(out.map((n) => n.node_id)).toEqual(["a", "c", "d"]);
 });
 
-test("filterRhizomes: mine returns empty when not logged in", () => {
+it("filterRhizomes: mine returns empty when not logged in", () => {
   const out = filterRhizomes(fixture, "mine", null);
-  assert.equal(out.length, 0);
+  expect(out.length).toBe(0);
 });
 
-test("filterRhizomes: recent uses 24h window", () => {
+it("filterRhizomes: recent uses 24h window", () => {
   const now = Date.parse("2026-04-19T15:00:00Z");
   const out = filterRhizomes(fixture, "recent", null, new Set(), now);
   // a (18 Apr 10:00) 29h ago → out; b (19 Apr 10:00) 5h ago → in; c 9d ago → out; d 53h ago → out
-  assert.deepEqual(out.map((n) => n.node_id), ["b"]);
+  expect(out.map((n) => n.node_id)).toEqual(["b"]);
 });
 
-test("filterRhizomes: quality:top matches >= 0.8", () => {
+it("filterRhizomes: quality:top matches >= 0.8", () => {
   const out = filterRhizomes(fixture, "quality:top", null);
-  assert.deepEqual(out.map((n) => n.node_id), ["a"]);
+  expect(out.map((n) => n.node_id)).toEqual(["a"]);
 });
 
-test("filterRhizomes: quality:good matches [0.5, 0.8)", () => {
+it("filterRhizomes: quality:good matches [0.5, 0.8)", () => {
   const out = filterRhizomes(fixture, "quality:good", null);
-  assert.deepEqual(out.map((n) => n.node_id), ["d"]);
+  expect(out.map((n) => n.node_id)).toEqual(["d"]);
 });
 
-test("filterRhizomes: quality:basic matches < 0.5", () => {
+it("filterRhizomes: quality:basic matches < 0.5", () => {
   const out = filterRhizomes(fixture, "quality:basic", null);
-  assert.deepEqual(out.map((n) => n.node_id), ["b"]);
+  expect(out.map((n) => n.node_id)).toEqual(["b"]);
 });
 
-test("filterRhizomes: quality:unrated matches missing score", () => {
+it("filterRhizomes: quality:unrated matches missing score", () => {
   const out = filterRhizomes(fixture, "quality:unrated", null);
-  assert.deepEqual(out.map((n) => n.node_id), ["c"]);
+  expect(out.map((n) => n.node_id)).toEqual(["c"]);
 });
 
-test("qualityBandOf: boundaries land in the expected bucket", () => {
-  assert.equal(qualityBandOf(undefined), "unrated");
-  assert.equal(qualityBandOf(null), "unrated");
-  assert.equal(qualityBandOf(NaN), "unrated");
-  assert.equal(qualityBandOf(0), "basic");
-  assert.equal(qualityBandOf(0.49), "basic");
-  assert.equal(qualityBandOf(0.5), "good");
-  assert.equal(qualityBandOf(0.79), "good");
-  assert.equal(qualityBandOf(0.8), "top");
-  assert.equal(qualityBandOf(1), "top");
+it("qualityBandOf: boundaries land in the expected bucket", () => {
+  expect(qualityBandOf(undefined)).toBe("unrated");
+  expect(qualityBandOf(null)).toBe("unrated");
+  expect(qualityBandOf(NaN)).toBe("unrated");
+  expect(qualityBandOf(0)).toBe("basic");
+  expect(qualityBandOf(0.49)).toBe("basic");
+  expect(qualityBandOf(0.5)).toBe("good");
+  expect(qualityBandOf(0.79)).toBe("good");
+  expect(qualityBandOf(0.8)).toBe("top");
+  expect(qualityBandOf(1)).toBe("top");
 });
 
-test("sortRhizomes: latest sorts by created_at DESC", () => {
+it("sortRhizomes: latest sorts by created_at DESC", () => {
   const out = sortRhizomes(fixture, "latest");
-  assert.deepEqual(out.map((n) => n.node_id), ["b", "a", "d", "c"]);
+  expect(out.map((n) => n.node_id)).toEqual(["b", "a", "d", "c"]);
 });
 
-test("sortRhizomes: quality sorts quality DESC, undefined last", () => {
+it("sortRhizomes: quality sorts quality DESC, undefined last", () => {
   const out = sortRhizomes(fixture, "quality");
-  assert.deepEqual(out.map((n) => n.node_id), ["a", "d", "b", "c"]);
+  expect(out.map((n) => n.node_id)).toEqual(["a", "d", "b", "c"]);
 });
 
-test("sortRhizomes: active falls back to latest for MVP", () => {
+it("sortRhizomes: active falls back to latest for MVP", () => {
   const out = sortRhizomes(fixture, "active");
-  assert.deepEqual(out.map((n) => n.node_id), ["b", "a", "d", "c"]);
+  expect(out.map((n) => n.node_id)).toEqual(["b", "a", "d", "c"]);
+});
+
+it("collectFollowingTargetIds fetches pages until exhaustion", async () => {
+  const calls: Array<[number, number]> = [];
+  const ids = await collectFollowingTargetIds(async (page, size) => {
+    calls.push([page, size]);
+    const pages = [
+      {
+        items: [
+          { follow_id: "f1", target_type: "node", target_id: "node-1", since: "now" },
+          { follow_id: "f2", target_type: "topic", target_id: "topic-1", since: "now" },
+        ],
+        page: 0,
+        size,
+        total: 3,
+        total_pages: 2,
+        has_next: true,
+      },
+      {
+        items: [
+          { follow_id: "f3", target_type: "user", target_id: "user-1", since: "now" },
+        ],
+        page: 1,
+        size,
+        total: 3,
+        total_pages: 2,
+        has_next: false,
+      },
+    ];
+    return pages[page];
+  });
+
+  expect(calls).toEqual([[0, 100], [1, 100]]);
+  expect([...ids].sort()).toEqual(["node-1", "user-1"]);
+});
+});
+
+describe("homeStore loadFeed", () => {
+  it("discards stale responses by feedRequestSeq", async () => {
+    vi.useFakeTimers();
+    const slowItems: FeedItem[] = [
+      {
+        ...fixture[0],
+        label: "Human_Post",
+        content: "slow post",
+        has_embedding: false,
+        created_at: fixture[0].created_at,
+      },
+    ];
+    const fastItems: FeedItem[] = [
+      {
+        ...fixture[1],
+        label: "AI_Consensus",
+        summary_content: "fast summary",
+        has_embedding: false,
+        created_at: fixture[1].created_at,
+      },
+    ];
+    vi.mocked(getFeed)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  items: slowItems,
+                  page: 0,
+                  size: 50,
+                  has_next: false,
+                }),
+              100,
+            );
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  items: fastItems,
+                  page: 0,
+                  size: 50,
+                  has_next: false,
+                }),
+              10,
+            );
+          }),
+      );
+
+    const firstRequest = useHomeStore.getState().loadFeed();
+    const secondRequest = useHomeStore.getState().loadFeed();
+
+    await vi.advanceTimersByTimeAsync(10);
+    expect(useHomeStore.getState().feedItems).toEqual(fastItems);
+    expect(useHomeStore.getState().feedLoading).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(90);
+    await Promise.all([firstRequest, secondRequest]);
+
+    expect(useHomeStore.getState().feedItems).toEqual(fastItems);
+  });
 });

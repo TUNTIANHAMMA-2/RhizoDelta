@@ -31,7 +31,7 @@ export function RhizoneList() {
   };
 
   return (
-    <aside className="relative w-[260px] min-w-[260px] h-full bg-bg-secondary border-r border-border-default flex flex-col font-ui pt-20 box-border">
+    <aside className="relative w-full lg:w-[260px] lg:min-w-[260px] h-full max-h-[68vh] lg:max-h-none bg-bg-secondary lg:border-r border-border-default flex flex-col font-ui pt-4 lg:pt-20 box-border">
       <div className="flex justify-between items-center p-4 border-b border-border-subtle">
         <span className="font-semibold text-sm tracking-[0.02em] text-text-secondary">
           Rhizones
@@ -39,7 +39,7 @@ export function RhizoneList() {
       </div>
 
       <button
-        className="sidebar-toggle-btn absolute top-1/2 -right-[14px] -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center bg-bg-elevated border border-border-default rounded-full cursor-pointer text-text-tertiary shadow-sm p-0 transition-[all] duration-[var(--transition-fast)]"
+        className="sidebar-toggle-btn hidden lg:flex absolute top-1/2 -right-[14px] -translate-y-1/2 z-10 w-7 h-7 items-center justify-center bg-bg-elevated border border-border-default rounded-full cursor-pointer text-text-tertiary shadow-sm p-0 transition-[all] duration-[var(--transition-fast)]"
         onClick={toggleSidebar}
         aria-label="折叠侧边栏"
       >

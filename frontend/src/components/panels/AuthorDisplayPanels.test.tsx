@@ -10,11 +10,12 @@ import { useSseStore } from "../../stores/sseStore";
 import type { GraphNodeDTO } from "../../api/types";
 
 const mockFetchProvenance = vi.fn();
+const mockFetchNode = vi.fn();
 
 vi.mock("../../api/nodes", () => ({
   fetchProvenance: (...args: unknown[]) => mockFetchProvenance(...args),
   summarizeNode: vi.fn(),
-  fetchNode: vi.fn(),
+  fetchNode: (...args: unknown[]) => mockFetchNode(...args),
 }));
 
 vi.mock("../editor/MarkdownViewer", () => ({
@@ -52,6 +53,9 @@ function makeNode(overrides: Partial<GraphNodeDTO> = {}): GraphNodeDTO {
 describe("Author display panels", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchNode.mockImplementation((nodeId: string) =>
+      Promise.resolve(useGraphStore.getState().nodes.get(nodeId)),
+    );
     useUiStore.setState({
       rightPanelPayload: null,
       activeNodeTab: "details",
@@ -68,7 +72,7 @@ describe("Author display panels", () => {
     cleanup();
   });
 
-  it("NodeDetailPanel prefers author display name over author_id", () => {
+  it("NodeDetailPanel prefers author display name over author_id", async () => {
     const node = makeNode();
     useUiStore.setState({
       rightPanelPayload: { nodeId: node.node_id },
@@ -80,10 +84,12 @@ describe("Author display panels", () => {
 
     render(<NodeDetailPanel />);
 
-    expect(screen.getByText(/^Alice ·/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/^Alice ·/)).toBeInTheDocument();
+    });
   });
 
-  it("NodeDetailPanel falls back to agent version when no human author fields exist", () => {
+  it("NodeDetailPanel falls back to agent version when no human author fields exist", async () => {
     const node = makeNode({
       label: "AI_Consensus",
       author_id: undefined,
@@ -101,7 +107,9 @@ describe("Author display panels", () => {
 
     render(<NodeDetailPanel />);
 
-    expect(screen.getAllByText(/^v1-agent ·/)).not.toHaveLength(0);
+    await waitFor(() => {
+      expect(screen.getAllByText(/^V1 Agent ·/)).not.toHaveLength(0);
+    });
   });
 
   it("ProvenancePanel prefers human-readable author fields", async () => {
@@ -117,7 +125,7 @@ describe("Author display panels", () => {
     render(<ProvenancePanel nodeId="consensus-1" />);
 
     await waitFor(() => {
-      expect(screen.getByText(/^Bob ·/)).toBeInTheDocument();
+      expect(screen.getByText("Bob").parentElement).toHaveTextContent(/^Bob\s*·/);
     });
   });
 });

@@ -57,7 +57,7 @@ class UpdateUserProfileRequestUnitTest {
         // Defense in depth: even if the constructor guard is bypassed,
         // applyUpdate iterates MUTABLE_FIELDS and would skip avatar_url.
         assertThat(UpdateUserProfileRequest.MUTABLE_FIELDS).doesNotContain("avatar_url");
-        assertThat(UpdateUserProfileRequest.READ_ONLY_FIELDS).contains("avatar_url");
+        assertThat(UpdateUserProfileRequest.READ_ONLY_FIELDS).contains("avatar_url", "avatarUrl");
     }
 
     @Test

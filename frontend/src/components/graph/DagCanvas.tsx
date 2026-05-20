@@ -1,6 +1,7 @@
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   MiniMap,
   type Node as FlowNode,
   useOnViewportChange,
@@ -79,8 +80,8 @@ export function DagCanvas() {
     const edgePart = lineageRfEdges.map((edge) => edge.id).join("|");
     return `${nodePart}::${edgePart}`;
   }, [lineageRfEdges, lineageRfNodes]);
-  const topologyNodes = useMemo(() => lineageRfNodes, [graphSignature]);
-  const topologyEdges = useMemo(() => lineageRfEdges, [graphSignature]);
+  const topologyNodes = useMemo(() => lineageRfNodes, [lineageRfNodes]);
+  const topologyEdges = useMemo(() => lineageRfEdges, [lineageRfEdges]);
 
   const nodesWithSelection = useMemo(() => {
     return rfNodes.map((node) => ({
@@ -201,7 +202,7 @@ export function DagCanvas() {
     >
       <ViewportListener />
       <Background
-        variant={"dots" as any}
+        variant={BackgroundVariant.Dots}
         gap={20}
         size={1}
         color="var(--color-border-default)"

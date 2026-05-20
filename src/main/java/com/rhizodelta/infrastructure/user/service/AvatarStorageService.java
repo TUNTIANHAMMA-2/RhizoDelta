@@ -148,9 +148,9 @@ public class AvatarStorageService {
 
     public String getPresignedUrl(String objectPath) {
         if (objectPath == null) return null;
-        // 已经是绝对 URL（外部 CDN 等）就原样返回，不做 MinIO presign 也不加本地代理前缀。
-        if (objectPath.startsWith("http://") || objectPath.startsWith("https://")) {
-            return objectPath;
+        if (!isAllowedAvatarObjectPath(objectPath)) {
+            LOGGER.debug("Rejected invalid avatar object path: {}", objectPath);
+            return null;
         }
         if (enabled && minioClient != null) {
             try {
@@ -168,6 +168,15 @@ public class AvatarStorageService {
             }
         }
         return "/api/files/avatars/" + objectPath;
+    }
+
+    private static boolean isAllowedAvatarObjectPath(String objectPath) {
+        return objectPath.startsWith("avatars/")
+                && !objectPath.startsWith("/")
+                && !objectPath.contains("..")
+                && !objectPath.contains("//")
+                && !objectPath.startsWith("http://")
+                && !objectPath.startsWith("https://");
     }
 
     private static String contentTypeToExtension(String contentType) {

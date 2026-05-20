@@ -1,8 +1,9 @@
 import { useEditor, EditorContent } from "@tiptap/react";
+import type { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import { Markdown } from "tiptap-markdown";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import "../../styles/editor.css";
 
 interface MarkdownEditorProps {
@@ -15,7 +16,17 @@ interface MarkdownEditorProps {
 const MENU_BTN_BASE =
   "border-none rounded-sm px-2 py-1 cursor-pointer text-sm font-ui";
 
-const MenuBar = ({ editor }: { editor: any }) => {
+const Divider = () => (
+  <span className="w-px bg-border-default mx-1 self-stretch" />
+);
+
+type MarkdownStorage = {
+  markdown?: {
+    getMarkdown: () => string;
+  };
+};
+
+const MenuBar = ({ editor }: { editor: Editor | null }) => {
   if (!editor) {
     return null;
   }
@@ -27,9 +38,6 @@ const MenuBar = ({ editor }: { editor: any }) => {
         : "bg-transparent text-text-secondary font-normal"
     }`;
 
-  const Divider = () => (
-    <span className="w-px bg-border-default mx-1 self-stretch" />
-  );
 
   return (
     <div className="flex flex-wrap gap-1 p-2 border-b border-border-default bg-bg-secondary rounded-t-sm">
@@ -118,7 +126,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
 };
 
 export function MarkdownEditor({ value, onChange, minHeight = 180 }: MarkdownEditorProps) {
-  const [internalValue, setInternalValue] = useState(value);
+  const internalValueRef = useRef(value);
 
   const editor = useEditor({
     extensions: [
@@ -132,8 +140,8 @@ export function MarkdownEditor({ value, onChange, minHeight = 180 }: MarkdownEdi
     ],
     content: value,
     onUpdate: ({ editor }) => {
-      const md = (editor.storage as any).markdown.getMarkdown();
-      setInternalValue(md);
+      const md = (editor.storage as MarkdownStorage).markdown?.getMarkdown() ?? editor.getText();
+      internalValueRef.current = md;
       onChange(md);
     },
     editorProps: {
@@ -145,11 +153,11 @@ export function MarkdownEditor({ value, onChange, minHeight = 180 }: MarkdownEdi
   });
 
   useEffect(() => {
-    if (editor && value !== internalValue) {
+    if (editor && value !== internalValueRef.current) {
       editor.commands.setContent(value);
-      setInternalValue(value);
+      internalValueRef.current = value;
     }
-  }, [value, editor, internalValue]);
+  }, [value, editor]);
 
   return (
     <div className="border border-border-default rounded-sm flex flex-col bg-bg-primary overflow-hidden">

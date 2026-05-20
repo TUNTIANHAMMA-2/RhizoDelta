@@ -149,6 +149,15 @@ class UserProfileApiIntegrationTest {
     }
 
     @Test
+    void shouldRejectCamelCaseAvatarUrlOnGenericProfilePut() {
+        String token = registerUser("eve-camel", "password123", "Eve");
+        ResponseEntity<Map> response = authorizedPut(token, "/api/users/me/profile",
+                Map.of("avatarUrl", "http://attacker.example/track.gif"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void shouldReject400WhenNoMutableFieldProvided() {
         String token = registerUser("erin", "password123", "Erin");
 

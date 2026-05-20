@@ -1,32 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import clsx from "clsx";
-import { uploadAvatar, deleteAvatar, getMyProfile } from "../../api/profile";
+import { uploadAvatar, deleteAvatar } from "../../api/profile";
+import type { UserProfile } from "../../api/types";
 import { useAuthStore } from "../../stores/authStore";
 import { metaLabel } from "../../lib/typography";
 
-export function AvatarUpload() {
+interface AvatarUploadProps {
+  profile: UserProfile;
+  onProfileChange: (profile: UserProfile) => void;
+}
+
+export function AvatarUpload({ profile, onProfileChange }: AvatarUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const displayName = useAuthStore((s) => s.displayName);
+  const authDisplayName = useAuthStore((s) => s.displayName);
   const username = useAuthStore((s) => s.username);
-
-  // 进入设置页时拉取一次 profile —— 否则用户已上传的头像不会回显，
-  // 直到用户重新触发上传操作为止。
-  useEffect(() => {
-    let cancelled = false;
-    getMyProfile()
-      .then((p) => {
-        if (!cancelled) setAvatarUrl(p.avatar_url);
-      })
-      .catch(() => {
-        // 静默：失败时退化为占位首字母，不打断设置页加载
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const avatarUrl = profile.avatar_url;
+  const displayName = profile.display_name ?? authDisplayName;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,8 +25,8 @@ export function AvatarUpload() {
     setError(null);
     setUploading(true);
     try {
-      const profile = await uploadAvatar(file);
-      setAvatarUrl(profile.avatar_url);
+      const updatedProfile = await uploadAvatar(file);
+      onProfileChange(updatedProfile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -48,7 +39,7 @@ export function AvatarUpload() {
     setUploading(true);
     try {
       await deleteAvatar();
-      setAvatarUrl(null);
+      onProfileChange({ ...profile, avatar_url: null });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -88,6 +79,7 @@ export function AvatarUpload() {
         accept="image/jpeg,image/png,image/webp"
         onChange={handleFileChange}
         className="hidden"
+        aria-describedby="avatar-upload-help"
       />
 
       <div className="flex gap-3">
@@ -95,6 +87,8 @@ export function AvatarUpload() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
+          aria-label={avatarUrl ? "Change avatar image" : "Upload avatar image"}
+          aria-describedby="avatar-upload-help"
           className={clsx(
             "px-4 py-2 border border-border-default text-sm hover:border-accent transition-colors",
             uploading && "opacity-50 cursor-not-allowed",
@@ -121,7 +115,10 @@ export function AvatarUpload() {
         <p className={clsx(metaLabel, "text-red-500")}>{error}</p>
       )}
 
-      <p className={clsx(metaLabel, "text-text-tertiary text-center")}>
+      <p
+        id="avatar-upload-help"
+        className={clsx(metaLabel, "text-text-tertiary text-center")}
+      >
         JPEG, PNG, or WebP. Max 2 MB.
       </p>
     </div>

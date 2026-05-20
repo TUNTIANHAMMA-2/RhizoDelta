@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { getMyProfile, updateProfile } from "../../api/profile";
+import type { UserProfile } from "../../api/types";
 import { useAuthStore } from "../../stores/authStore";
 import { metaLabel } from "../../lib/typography";
 import { AvatarUpload } from "./AvatarUpload";
@@ -11,13 +12,21 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const username = useAuthStore((s) => s.username);
 
   useEffect(() => {
     getMyProfile()
-      .then((p) => setDisplayName(p.display_name ?? ""))
+      .then((p) => {
+        setProfile(p);
+        setDisplayName(p.display_name ?? "");
+      })
+      .catch((err) => {
+        setLoadError(err instanceof Error ? err.message : "Failed to load profile");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -25,7 +34,8 @@ export function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      await updateProfile({ display_name: displayName || null });
+      const updatedProfile = await updateProfile({ display_name: displayName || null });
+      setProfile(updatedProfile);
       setMessage("Saved");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
@@ -34,10 +44,14 @@ export function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || profile == null) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="spinner" />
+        {loadError ? (
+          <p className={clsx(metaLabel, "text-red-500")}>{loadError}</p>
+        ) : (
+          <div className="spinner" />
+        )}
       </div>
     );
   }
@@ -87,7 +101,7 @@ export function SettingsPage() {
         >
           Avatar
         </h2>
-        <AvatarUpload />
+        <AvatarUpload profile={profile} onProfileChange={setProfile} />
       </section>
 
       <section className="space-y-4">

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it } from "vitest";
 
 import {
   ORCHESTRATION_STATUS_STORAGE_KEY,
@@ -8,11 +7,20 @@ import {
   writePersistedOrchestrationStatuses,
 } from "./sseStore.ts";
 
-function createMemoryStorage() {
-  const values = new Map();
+function createMemoryStorage(): Storage {
+  const values = new Map<string, string>();
   return {
+    get length() {
+      return values.size;
+    },
+    clear() {
+      values.clear();
+    },
     getItem(key: string) {
-      return values.has(key) ? values.get(key) : null;
+      return values.has(key) ? values.get(key) ?? null : null;
+    },
+    key(index: number) {
+      return [...values.keys()][index] ?? null;
     },
     setItem(key: string, value: string) {
       values.set(key, value);
@@ -23,7 +31,8 @@ function createMemoryStorage() {
   };
 }
 
-test("mergeOrchestrationStatuses should re-key request status to post node id", () => {
+describe("sseStore persistence helpers", () => {
+  it("mergeOrchestrationStatuses should re-key request status to post node id", () => {
   const previous = {
     "req-1": {
       request_id: "req-1",
@@ -42,11 +51,11 @@ test("mergeOrchestrationStatuses should re-key request status to post node id", 
     message: "routing failed",
   });
 
-  assert.equal(merged["req-1"], undefined);
-  assert.equal(merged["node-1"].status, "FAILED");
-});
+  expect(merged["req-1"]).toBeUndefined();
+  expect(merged["node-1"].status).toBe("FAILED");
+  });
 
-test("persisted orchestration statuses should survive a refresh-like reload", () => {
+  it("persisted orchestration statuses should survive a refresh-like reload", () => {
   const storage = createMemoryStorage();
   const statuses = {
     "node-1": {
@@ -61,6 +70,7 @@ test("persisted orchestration statuses should survive a refresh-like reload", ()
   writePersistedOrchestrationStatuses(statuses, storage);
   const restored = readPersistedOrchestrationStatuses(storage);
 
-  assert.equal(storage.getItem(ORCHESTRATION_STATUS_STORAGE_KEY) !== null, true);
-  assert.deepEqual(restored, statuses);
+  expect(storage.getItem(ORCHESTRATION_STATUS_STORAGE_KEY) !== null).toBe(true);
+  expect(restored).toEqual(statuses);
+  });
 });

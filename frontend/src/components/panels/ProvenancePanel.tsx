@@ -49,16 +49,26 @@ function ProvenanceItem({ item, onSelect }: { item: GraphNodeDTO; onSelect: () =
 
 export function ProvenancePanel({ nodeId }: Props) {
   const [items, setItems] = useState<GraphNodeDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedNodeId, setLoadedNodeId] = useState<string | null>(null);
+  const loading = loadedNodeId !== nodeId;
   const selectNode = useGraphStore((s) => s.selectNode);
   const openDetailPanel = useUiStore((s) => s.openDetailPanel);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     fetchProvenance(nodeId)
-      .then(setItems)
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+      .then((nextItems) => {
+        if (!cancelled) setItems(nextItems);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedNodeId(nodeId);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [nodeId]);
 
   if (loading) {

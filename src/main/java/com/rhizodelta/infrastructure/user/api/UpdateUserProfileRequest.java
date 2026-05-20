@@ -47,11 +47,11 @@ public final class UpdateUserProfileRequest {
     /**
      * 在 PUT /me/profile 上显式拒绝的字段。这些字段必须走专用端点写入：
      * <ul>
-     *   <li>{@code avatar_url} —— 必须经过 {@code PUT /api/users/me/avatar}
+     *   <li>{@code avatar_url} / {@code avatarUrl} —— 必须经过 {@code PUT /api/users/me/avatar}
      *       的 magic-byte 校验，否则用户可写入任意外链导致 SSRF / phishing。</li>
      * </ul>
      */
-    static final Set<String> READ_ONLY_FIELDS = Set.of("avatar_url");
+    static final Set<String> READ_ONLY_FIELDS = Set.of("avatar_url", "avatarUrl");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 

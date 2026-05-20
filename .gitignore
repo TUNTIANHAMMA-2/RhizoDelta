@@ -45,3 +45,7 @@ k6-demo.js
 
 # Local data (avatar uploads, etc.)
 data/
+
+# Local production launcher and packaged jar (do not commit binaries)
+rhizodelta-app.jar
+start-prod.sh

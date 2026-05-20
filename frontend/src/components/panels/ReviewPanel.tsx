@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchPendingReviews, approveMerge, approveBranch, rejectReview } from "../../api/reviews";
 import { useAuthStore } from "../../stores/authStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -33,21 +33,23 @@ export function ReviewPanel() {
   const closePanel = useUiStore((s) => s.closeRightPanel);
   const addToast = useUiStore((s) => s.addToast);
 
-  const load = () => {
-    setLoading(true);
+  const load = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     setLoadError(false);
-    fetchPendingReviews(50)
-      .then((res) => setItems(res ?? []))
-      .catch(() => {
-        setItems([]);
-        setLoadError(true);
-      })
-      .finally(() => setLoading(false));
-  };
+    try {
+      const res = await fetchPendingReviews(50);
+      setItems(res ?? []);
+    } catch {
+      setItems([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   const handleConfirm = async () => {
     if (!confirmAction) return;
@@ -63,7 +65,7 @@ export function ReviewPanel() {
         addToast({ type: "success", message: "已拒绝复核" });
       }
       setConfirmAction(null);
-      load();
+      void load(true);
     } catch {
       addToast({ type: "error", message: "操作失败" });
     }

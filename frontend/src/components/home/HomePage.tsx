@@ -38,7 +38,7 @@ export function HomePage() {
         <span className="text-lg leading-none">{mobileNavOpen ? "×" : "☰"}</span>
       </button>
 
-      {/* Left sidebar — md+ static, mobile drawer */}
+      {/* Left sidebar — md+ static, mobile bottom sheet */}
       <div className="hidden md:block">
         <HomeSidebar />
       </div>
@@ -49,7 +49,13 @@ export function HomePage() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="md:hidden fixed inset-y-0 left-0 z-[61] w-[80%] max-w-[320px] shadow-xl">
+          <div
+            className="md:hidden fixed inset-x-0 bottom-0 z-[61] max-h-[82vh] overflow-hidden rounded-t-[28px] border border-border-default/70 border-b-0 bg-bg-parchment shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="移动端导航菜单"
+          >
+            <div className="mx-auto mt-3 mb-1 h-1.5 w-12 rounded-pill bg-border-default/80" aria-hidden />
             <HomeSidebar />
           </div>
         </>

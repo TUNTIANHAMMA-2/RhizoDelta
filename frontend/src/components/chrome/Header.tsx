@@ -10,6 +10,20 @@ import { Breadcrumb } from "./Breadcrumb";
 import { RoleBadge } from "./RoleBadge";
 import { NotificationCenter } from "./NotificationCenter";
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === "undefined" ? true : window.matchMedia("(min-width: 768px)").matches,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+  return isDesktop;
+}
+
 
 const SSE_STATUS_COLOR = {
   connecting: "var(--color-warning)",
@@ -38,14 +52,23 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
   const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
   const rightPanelMode = useUiStore((s) => s.rightPanelMode);
   const openReviewPanel = useUiStore((s) => s.openReviewPanel);
+  const closeRightPanel = useUiStore((s) => s.closeRightPanel);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const selectNode = useGraphStore((s) => s.selectNode);
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const [userHovered, setUserHovered] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifContainerRef = useRef<HTMLDivElement>(null);
+  const isDesktop = useIsDesktop();
 
   const onWorkspace = location.pathname.startsWith("/workspace");
+
+  const handleBackHome = useCallback(() => {
+    selectNode(null);
+    closeRightPanel();
+    navigate("/");
+  }, [selectNode, closeRightPanel, navigate]);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -80,7 +103,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
               "flex items-center h-10 rounded-md px-4 shadow-md pointer-events-auto w-max box-border z-[2]",
               onWorkspace && "cursor-pointer group",
             )}
-            onClick={onWorkspace ? () => navigate("/") : undefined}
+            onClick={onWorkspace ? handleBackHome : undefined}
             role={onWorkspace ? "link" : undefined}
             aria-label={onWorkspace ? "Back to home" : undefined}
           >
@@ -105,10 +128,10 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           </div>
         )}
 
-        {/* 面包屑胶囊 */}
+        {/* 面包屑胶囊 — 桌面端显示；移动端隐藏避免与汉堡/通知冲突 */}
         <div
           className={clsx(
-            "absolute top-0 flex items-center h-10 rounded-md overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
+            "absolute top-0 hidden md:flex items-center h-10 rounded-md overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
             "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150",
             selectedNodeId
               ? "border border-border-default px-4 shadow-md pointer-events-auto opacity-100 max-w-[400px]"
@@ -122,14 +145,14 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
         </div>
       </div>
 
-      {/* 右侧控件组 — translate 量与当前 panel 宽度同步 */}
+      {/* 右侧控件组 — translate 量与当前 panel 宽度同步（桌面端） */}
       <div
         className="pointer-events-auto flex items-center gap-2 transition-transform duration-300 ease-[var(--ease-out)]"
         style={{
           transform:
-            rightPanelMode === "edit"
+            isDesktop && rightPanelMode === "edit"
               ? "translateX(calc(-1 * min(max(50vw, 520px), 920px)))"
-              : rightPanelMode !== "hidden"
+              : isDesktop && rightPanelMode !== "hidden"
               ? "translateX(calc(-1 * min(max(38vw, 420px), 720px)))"
               : "translateX(0)",
         }}
@@ -140,32 +163,36 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
             onClick={openReviewPanel}
             className={clsx(
               CAPSULE_SURFACE,
-              "flex items-center h-9 rounded-pill px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
+              "hidden md:flex items-center h-9 rounded-pill px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
             )}
           >
             复核
           </button>
         )}
 
-        {/* 用户名胶囊 — hover 变退出按钮 */}
+        {/* 用户名胶囊 — 桌面 hover 变退出按钮；移动端紧凑只显示角色徽章，点击直接退出 */}
         <button
           type="button"
           onMouseEnter={() => {
+            if (!isDesktop) return;
             hoverTimerRef.current = setTimeout(() => setUserHovered(true), 300);
           }}
           onMouseLeave={() => {
+            if (!isDesktop) return;
             if (hoverTimerRef.current) {
               clearTimeout(hoverTimerRef.current);
               hoverTimerRef.current = null;
             }
             setUserHovered(false);
           }}
-          onClick={userHovered ? handleLogout : undefined}
+          onClick={isDesktop ? (userHovered ? handleLogout : undefined) : handleLogout}
+          aria-label={isDesktop ? undefined : "退出"}
           className={clsx(
-            "flex items-center gap-2 h-9 rounded-pill px-[14px] backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
+            "flex items-center gap-2 h-9 rounded-pill backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
+            "md:px-[14px] px-2",
             userHovered
               ? "border border-danger bg-[rgba(196,69,58,0.06)] text-danger cursor-pointer"
-              : "border border-border-default bg-[rgba(253,252,249,0.88)] text-text-secondary cursor-default",
+              : "border border-border-default bg-[rgba(253,252,249,0.88)] text-text-secondary cursor-pointer md:cursor-default",
           )}
         >
           {userHovered ? (
@@ -180,7 +207,9 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           ) : (
             <>
               <RoleBadge role={topRole} />
-              {username ?? userId ?? "anonymous"}
+              <span className="hidden md:inline">
+                {username ?? userId ?? "anonymous"}
+              </span>
             </>
           )}
         </button>

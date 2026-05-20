@@ -152,7 +152,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: NodeCreatedEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -172,7 +172,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: EdgeCreatedEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -217,7 +217,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: EdgeRemovedEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -228,7 +228,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: DecisionCompleteEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -248,7 +248,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: OrchestrationStatusEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -265,7 +265,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: SummaryGeneratedEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }
@@ -285,7 +285,7 @@ function handleSseEvent(event: SseEvent) {
       let payload: QualityScoredEvent;
       try {
         payload = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         useUiStore.getState().addToast({ type: "warning", message: "SSE 数据解析失败" });
         break;
       }

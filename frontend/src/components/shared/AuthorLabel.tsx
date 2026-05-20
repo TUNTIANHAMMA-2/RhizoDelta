@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 interface AuthorLabelProps {
   displayName?: string | null;
   username?: string | null;
@@ -29,7 +30,6 @@ interface AuthorLabelProps {
 export function resolveAuthorName(
   displayName?: string | null,
   username?: string | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _authorId?: string | null,
   agentVersion?: string | null,
 ): string {
