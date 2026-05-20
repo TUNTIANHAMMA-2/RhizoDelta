@@ -3,6 +3,7 @@ package com.rhizodelta.infrastructure.user.api;
 import com.rhizodelta.infrastructure.security.model.AuthenticatedUsers;
 import com.rhizodelta.infrastructure.user.service.FeedService;
 import com.rhizodelta.infrastructure.web.ApiResponse;
+import com.rhizodelta.infrastructure.web.PagingParams;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,12 +26,13 @@ public class FeedController {
             Authentication authentication
     ) {
         var user = AuthenticatedUsers.require(authentication);
-        List<Map<String, Object>> items = feedService.getFeed(user.sub(), page, size);
+        PagingParams paging = PagingParams.normalize(page, size);
+        List<Map<String, Object>> items = feedService.getFeed(user.sub(), paging);
         return ApiResponse.ok(Map.of(
                 "items", items,
-                "page", page,
-                "size", size,
-                "has_next", items.size() >= size
+                "page", paging.page(),
+                "size", paging.size(),
+                "has_next", items.size() >= paging.size()
         ));
     }
 }

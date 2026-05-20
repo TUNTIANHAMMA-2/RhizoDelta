@@ -2,6 +2,7 @@ package com.rhizodelta.infrastructure.user.service;
 
 import com.rhizodelta.infrastructure.exception.ConflictException;
 import com.rhizodelta.infrastructure.user.repository.MuteRepository;
+import com.rhizodelta.infrastructure.web.PagingParams;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Service
 public class MuteService {
-    private static final Set<String> VALID_TARGET_TYPES = Set.of("topic", "user");
+    private static final Set<String> VALID_TARGET_TYPES = Set.of("topic", "node", "user");
 
     private final MuteRepository muteRepository;
 
@@ -44,17 +45,17 @@ public class MuteService {
     }
 
     public Map<String, Object> listMutes(String userId, int page, int size) {
-        int skip = Math.max(page, 0) * size;
-        List<Map<String, Object>> items = muteRepository.listMutes(userId, skip, size);
+        PagingParams paging = PagingParams.normalize(page, size);
+        List<Map<String, Object>> items = muteRepository.listMutes(userId, paging.skip(), paging.size());
         long total = muteRepository.countMutes(userId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 1;
+        int totalPages = (int) Math.ceil((double) total / paging.size());
         return Map.of(
                 "items", items,
-                "page", page,
-                "size", size,
+                "page", paging.page(),
+                "size", paging.size(),
                 "total", total,
                 "total_pages", totalPages,
-                "has_next", page + 1 < totalPages
+                "has_next", paging.page() + 1 < totalPages
         );
     }
 
@@ -70,7 +71,7 @@ public class MuteService {
 
     private static void validateTargetType(String targetType) {
         if (targetType == null || !VALID_TARGET_TYPES.contains(targetType)) {
-            throw new IllegalArgumentException("target_type must be one of: topic, user");
+            throw new IllegalArgumentException("target_type must be one of: topic, node, user");
         }
     }
 }

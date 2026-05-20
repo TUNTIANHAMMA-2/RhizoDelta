@@ -159,6 +159,24 @@ class FeedApiIntegrationTest {
     }
 
     @Test
+    void mutedNodeContentIsExcluded() {
+        String token = registerUser("alice", "password123", "Alice");
+        String topicId = createTopic("node-mute");
+        createFollow("alice", "topic", topicId);
+        String mutedNodeId = createContentNode("hidden-node-content", topicId);
+        createContentNode("visible-node-content", topicId);
+        createMute("alice", "node", mutedNodeId);
+
+        ResponseEntity<Map> response = authorizedGet(token, "/api/users/me/feed");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) responseData(response).get("items");
+        assertThat(items).extracting(i -> i.get("content"))
+                .contains("visible-node-content")
+                .doesNotContain("hidden-node-content");
+    }
+
+    @Test
     void supportsPaginationInFeed() {
         String token = registerUser("alice", "password123", "Alice");
         String topicId = createTopic("updates");
@@ -174,6 +192,24 @@ class FeedApiIntegrationTest {
         ResponseEntity<Map> page1 = authorizedGet(token, "/api/users/me/feed?page=1&size=2");
         List<?> items1 = (List<?>) responseData(page1).get("items");
         assertThat(items1).hasSize(2);
+    }
+
+    @Test
+    void rejectsOversizedFeedPageSize() {
+        String token = registerUser("alice", "password123", "Alice");
+
+        ResponseEntity<Map> response = authorizedGet(token, "/api/users/me/feed?size=1000000");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void rejectsFeedOffsetBeyondSupportedBoundary() {
+        String token = registerUser("alice", "password123", "Alice");
+
+        ResponseEntity<Map> response = authorizedGet(token, "/api/users/me/feed?page=2147483647&size=2");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -236,7 +272,8 @@ class FeedApiIntegrationTest {
                 MATCH (u:UserAccount {user_id: $userId})
                 MATCH (target) WHERE
                   ($targetType = 'user'  AND target:UserAccount AND target.user_id  = $targetId) OR
-                  ($targetType = 'topic' AND target:Topic       AND target.topic_id = $targetId)
+                  ($targetType = 'topic' AND target:Topic       AND target.topic_id = $targetId) OR
+                  ($targetType = 'node'  AND target:GraphNode   AND target.node_id  = $targetId)
                 MERGE (u)-[r:MUTED]->(target)
                   ON CREATE SET r.mute_id = randomUUID(), r.since = datetime()
                 """)
@@ -244,9 +281,10 @@ class FeedApiIntegrationTest {
                 .run();
     }
 
-    private void createContentNode(String label, String topicId) {
+    private String createContentNode(String label, String topicId) {
+        String nodeId = UUID.randomUUID().toString();
         Map<String, Object> params = new HashMap<>();
-        params.put("nodeId", UUID.randomUUID().toString());
+        params.put("nodeId", nodeId);
         params.put("topicId", topicId);
         params.put("content", label);
         neo4jClient.query("""
@@ -260,6 +298,7 @@ class FeedApiIntegrationTest {
                 """)
                 .bindAll(params)
                 .run();
+        return nodeId;
     }
 
     private void createAuthoredContent(String authorUserId, String label, String topicId) {

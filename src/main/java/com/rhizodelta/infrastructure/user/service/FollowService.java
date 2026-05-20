@@ -2,6 +2,7 @@ package com.rhizodelta.infrastructure.user.service;
 
 import com.rhizodelta.infrastructure.exception.ConflictException;
 import com.rhizodelta.infrastructure.user.repository.FollowRepository;
+import com.rhizodelta.infrastructure.web.PagingParams;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -43,17 +44,17 @@ public class FollowService {
     }
 
     public Map<String, Object> listFollows(String userId, int page, int size) {
-        int skip = Math.max(page, 0) * size;
-        List<Map<String, Object>> items = followRepository.listFollows(userId, skip, size);
+        PagingParams paging = PagingParams.normalize(page, size);
+        List<Map<String, Object>> items = followRepository.listFollows(userId, paging.skip(), paging.size());
         long total = followRepository.countFollows(userId);
-        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 1;
+        int totalPages = (int) Math.ceil((double) total / paging.size());
         return Map.of(
                 "items", items,
-                "page", page,
-                "size", size,
+                "page", paging.page(),
+                "size", paging.size(),
                 "total", total,
                 "total_pages", totalPages,
-                "has_next", page + 1 < totalPages
+                "has_next", paging.page() + 1 < totalPages
         );
     }
 

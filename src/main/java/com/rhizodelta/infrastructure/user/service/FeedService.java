@@ -2,6 +2,7 @@ package com.rhizodelta.infrastructure.user.service;
 
 import com.rhizodelta.infrastructure.user.repository.FollowRepository;
 import com.rhizodelta.infrastructure.user.repository.MuteRepository;
+import com.rhizodelta.infrastructure.web.PagingParams;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -27,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>{@code GraphNode} 关注：拉取被关注节点的 1-2 跳后代。</li>
  * </ol>
  *
- * <p>过滤：剔除 mutedUserIds 中作者的内容、mutedTopicIds 中话题的内容、软删除节点。
+ * <p>过滤：剔除 mutedUserIds 中作者的内容、mutedTopicIds 中话题的内容、mutedNodeIds 中的节点、软删除节点。
  * 用户没有任何关注时，回退全局最新内容；Cypher 异常上抛交给全局处理器。
  *
  * <p>返回字段与 {@code /api/nodes/roots} 同构（{@code GraphNodeDTO} 形状），
@@ -47,8 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 public class FeedService {
     private static final Logger LOGGER = LoggerFactory.getLogger(FeedService.class);
-    private static final int DEFAULT_PAGE_SIZE = 50;
-
     public static final String FLAG_FEED_RANKING_KEY = "rhizodelta.feature.prefers-feed-ranking.enabled";
     public static final String FLAG_AGGREGATION_KEY = "rhizodelta.feature.prefers-aggregation.enabled";
 
@@ -99,6 +98,7 @@ public class FeedService {
                 RETURN n
             }
             WITH DISTINCT n
+            WHERE NOT n.node_id IN $mutedNodeIds
             OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
             OPTIONAL MATCH (author)-[:HAS_PROFILE]->(authorProfile:UserProfile)
             WITH n, author, authorProfile, labels(n) AS nodeLabels
@@ -163,6 +163,7 @@ public class FeedService {
                 RETURN n
             }
             WITH DISTINCT n
+            WHERE NOT n.node_id IN $mutedNodeIds
             OPTIONAL MATCH (ranker:UserAccount {user_id: $userId})-[prefers:PREFERS]->(prefTopic:Topic {topic_id: n.topic_id})
             OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
             OPTIONAL MATCH (author)-[:HAS_PROFILE]->(authorProfile:UserProfile)
@@ -195,6 +196,9 @@ public class FeedService {
                 MATCH (n:Result) WHERE NOT coalesce(n._deleted, false) RETURN n
             }
             WITH n
+            WHERE NOT coalesce(n.author_id, '__none__') IN $mutedUserIds
+              AND NOT coalesce(n.topic_id, '__none__') IN $mutedTopicIds
+              AND NOT n.node_id IN $mutedNodeIds
             OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
             OPTIONAL MATCH (author)-[:HAS_PROFILE]->(authorProfile:UserProfile)
             WITH n, author, authorProfile, labels(n) AS nodeLabels
@@ -251,22 +255,33 @@ public class FeedService {
     }
 
     public List<Map<String, Object>> getFeed(String userId, int page, int size) {
-        int resolvedSize = size > 0 ? size : DEFAULT_PAGE_SIZE;
-        int skip = Math.max(page, 0) * resolvedSize;
+        return getFeed(userId, PagingParams.normalize(page, size));
+    }
+
+    public List<Map<String, Object>> getFeed(String userId, PagingParams paging) {
+        long skip = paging.skip();
+        int resolvedSize = paging.size();
 
         Variant variant;
         String cypher;
         Map<String, Object> params;
 
+        List<String> mutedUserIds = muteRepository.getMutedUserIds(userId);
+        List<String> mutedTopicIds = muteRepository.getMutedTopicIds(userId);
+        List<String> mutedNodeIds = muteRepository.getMutedNodeIds(userId);
+
         long followCount = followRepository.countFollows(userId);
         if (followCount == 0L) {
             variant = Variant.GLOBAL;
             cypher = GLOBAL_FEED_QUERY;
-            params = Map.of("skip", skip, "limit", resolvedSize);
+            params = Map.of(
+                    "mutedUserIds", mutedUserIds,
+                    "mutedTopicIds", mutedTopicIds,
+                    "mutedNodeIds", mutedNodeIds,
+                    "skip", skip,
+                    "limit", resolvedSize
+            );
         } else {
-            List<String> mutedUserIds = muteRepository.getMutedUserIds(userId);
-            List<String> mutedTopicIds = muteRepository.getMutedTopicIds(userId);
-
             boolean rankingOn = isEnabled(FLAG_FEED_RANKING_KEY);
             if (rankingOn) {
                 if (!isEnabled(FLAG_AGGREGATION_KEY) && mismatchedFlagsWarnedOnce.compareAndSet(false, true)) {
@@ -286,6 +301,7 @@ public class FeedService {
                     "userId", userId,
                     "mutedUserIds", mutedUserIds,
                     "mutedTopicIds", mutedTopicIds,
+                    "mutedNodeIds", mutedNodeIds,
                     "skip", skip,
                     "limit", resolvedSize
             );
