@@ -10,9 +10,7 @@ import java.util.Map;
 public class AuditRelationService {
     private static final String CREATE_REVIEWED_QUERY = """
             MATCH (u:UserAccount {user_id: $reviewerId})
-            MERGE (d:Decision {decision_id: $decisionId})
-              ON CREATE SET d.created_at = datetime(),
-                            d.decision_type = coalesce(d.decision_type, 'PENDING')
+            MATCH (d:Decision {decision_id: $decisionId})
             MERGE (u)-[r:REVIEWED]->(d)
               ON CREATE SET r.decision_id = $decisionId,
                             r.outcome = $outcome,
@@ -90,4 +88,3 @@ public class AuditRelationService {
                 .stream().toList();
     }
 }
-

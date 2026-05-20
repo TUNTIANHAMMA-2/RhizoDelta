@@ -170,6 +170,10 @@ public class AuthController {
         String userId = refreshTokenService.consume(request.refreshToken());
         StoredUser user = findUserById(userId)
                 .orElseThrow(() -> new NoSuchElementException("user not found"));
+        if (!UserStatus.ACTIVE.name().equals(user.status())) {
+            refreshTokenService.revokeAllForUser(userId);
+            throw new BadCredentialsException("account is not active, refresh denied");
+        }
         String token = issueToken(user);
         String newRefreshToken = refreshTokenService.issue(userId);
         return ApiResponse.ok(toSessionPayload(user, token, newRefreshToken));

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -71,7 +72,7 @@ class TokenBlacklistIntegrationTest {
 
     @Test
     void shouldAllowRequestWhenTokenNotRevoked() throws Exception {
-        when(nodeQueryService.getNodeSummaryById(TEST_NODE_ID))
+        when(nodeQueryService.getNodeById(eq(TEST_NODE_ID), anyString()))
                 .thenReturn(new NodeQueryService.LineageNode(
                         TEST_NODE_ID.toString(), "Human_Post", "content", null,
                         "author-1", null, Instant.now(), false));
@@ -96,7 +97,7 @@ class TokenBlacklistIntegrationTest {
 
     @Test
     void shouldFailOpenWhenBlacklistServiceThrows() throws Exception {
-        when(nodeQueryService.getNodeSummaryById(TEST_NODE_ID))
+        when(nodeQueryService.getNodeById(eq(TEST_NODE_ID), anyString()))
                 .thenReturn(new NodeQueryService.LineageNode(
                         TEST_NODE_ID.toString(), "Human_Post", "content", null,
                         "author-1", null, Instant.now(), false));
@@ -128,7 +129,7 @@ class TokenBlacklistIntegrationTest {
 
     @Test
     void shouldAllowWhenIssuedAfterUserLevelRevoke() throws Exception {
-        when(nodeQueryService.getNodeSummaryById(TEST_NODE_ID))
+        when(nodeQueryService.getNodeById(eq(TEST_NODE_ID), anyString()))
                 .thenReturn(new NodeQueryService.LineageNode(
                         TEST_NODE_ID.toString(), "Human_Post", "content", null,
                         "author-1", null, Instant.now(), false));

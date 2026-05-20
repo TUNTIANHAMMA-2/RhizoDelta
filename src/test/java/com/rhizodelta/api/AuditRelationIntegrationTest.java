@@ -1,6 +1,8 @@
 package com.rhizodelta.api;
 
+import com.rhizodelta.consensus.domain.decision.DecisionOperatorType;
 import com.rhizodelta.consensus.service.AuditRelationService;
+import com.rhizodelta.consensus.service.DecisionMetadataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.testcontainers.containers.Neo4jContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,8 +24,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 13.1 — 闭环验证：审计关系 REVIEWED / OPERATED 在 Neo4j 中真实持久化，
- * 而不再是被 {@code MATCH (:Decision)} 匹配 0 行后静默丢弃。
+ * 13.1 — 闭环验证：审计关系 REVIEWED / OPERATED 在 Neo4j 中真实持久化。
+ *
+ * <p>REVIEWED 只关联已有 Decision，避免复核先到时创建 {@code decision_type=PENDING} 占位节点。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -48,6 +52,9 @@ class AuditRelationIntegrationTest {
     private AuditRelationService auditRelationService;
 
     @Autowired
+    private DecisionMetadataService decisionMetadataService;
+
+    @Autowired
     private Neo4jClient neo4jClient;
 
     @BeforeEach
@@ -56,10 +63,11 @@ class AuditRelationIntegrationTest {
     }
 
     @Test
-    void recordReviewCreatesReviewedEdgeAndDecisionNode() {
+    void recordReviewCreatesReviewedEdgeForExistingDecisionNode() {
         String reviewerId = UUID.randomUUID().toString();
         String decisionId = UUID.randomUUID().toString();
         seedUser(reviewerId, "reviewer1");
+        seedDecision(decisionId, "MERGE");
 
         auditRelationService.recordReview(reviewerId, decisionId, "APPROVED");
 
@@ -73,16 +81,6 @@ class AuditRelationIntegrationTest {
                 .map(record -> ((Number) record.get("total")).longValue())
                 .orElse(0L);
         assertThat(edgeCount).isEqualTo(1L);
-
-        // 同时确认 Decision 节点也被 MERGE 出来
-        long decisionCount = neo4jClient.query(
-                "MATCH (d:Decision {decision_id: $decisionId}) RETURN count(d) AS total")
-                .bindAll(Map.of("decisionId", decisionId))
-                .fetch()
-                .one()
-                .map(record -> ((Number) record.get("total")).longValue())
-                .orElse(0L);
-        assertThat(decisionCount).isEqualTo(1L);
     }
 
     @Test
@@ -90,6 +88,7 @@ class AuditRelationIntegrationTest {
         String reviewerId = UUID.randomUUID().toString();
         String decisionId = UUID.randomUUID().toString();
         seedUser(reviewerId, "reviewer2");
+        seedDecision(decisionId, "MERGE");
 
         auditRelationService.recordReview(reviewerId, decisionId, "APPROVED");
         auditRelationService.recordReview(reviewerId, decisionId, "REJECTED");
@@ -142,12 +141,54 @@ class AuditRelationIntegrationTest {
         String reviewerId = UUID.randomUUID().toString();
         String decisionId = UUID.randomUUID().toString();
         seedUserWithProfile(reviewerId, "alice", "Alice Wonderland");
+        seedDecision(decisionId, "MERGE");
 
         auditRelationService.recordReview(reviewerId, decisionId, "APPROVED");
 
         List<Map<String, Object>> history = auditRelationService.getReviewHistory(decisionId);
         assertThat(history).hasSize(1);
         assertThat(history.get(0).get("reviewer_display_name")).isEqualTo("Alice Wonderland");
+    }
+
+    @Test
+    void reviewBeforeMetadataDoesNotLeavePendingDecisionType() {
+        String reviewerId = UUID.randomUUID().toString();
+        String decisionId = UUID.randomUUID().toString();
+        String targetNodeId = UUID.randomUUID().toString();
+        seedUser(reviewerId, "reviewer3");
+        seedGraphNode(targetNodeId);
+
+        auditRelationService.recordReview(reviewerId, decisionId, "APPROVED");
+
+        long placeholderCount = neo4jClient.query(
+                "MATCH (d:Decision {decision_id: $decisionId}) RETURN count(d) AS total")
+                .bindAll(Map.of("decisionId", decisionId))
+                .fetch()
+                .one()
+                .map(record -> ((Number) record.get("total")).longValue())
+                .orElse(0L);
+        assertThat(placeholderCount).isZero();
+
+        decisionMetadataService.recordDecision(
+                decisionId,
+                "MERGE",
+                DecisionOperatorType.AGENT,
+                "agent-1",
+                UUID.fromString(targetNodeId),
+                "reason",
+                OffsetDateTime.now()
+        );
+
+        String decisionType = neo4jClient.query("""
+                MATCH (d:Decision {decision_id: $decisionId})
+                RETURN d.decision_type AS decisionType
+                """)
+                .bindAll(Map.of("decisionId", decisionId))
+                .fetch()
+                .one()
+                .map(record -> record.get("decisionType").toString())
+                .orElseThrow();
+        assertThat(decisionType).isEqualTo("MERGE");
     }
 
     private void seedUser(String userId, String username) {
@@ -177,6 +218,18 @@ class AuditRelationIntegrationTest {
                 })
                 """)
                 .bindAll(Map.of("nodeId", nodeId))
+                .run();
+    }
+
+    private void seedDecision(String decisionId, String decisionType) {
+        neo4jClient.query("""
+                CREATE (:Decision {
+                    decision_id: $decisionId,
+                    decision_type: $decisionType,
+                    created_at: datetime()
+                })
+                """)
+                .bindAll(Map.of("decisionId", decisionId, "decisionType", decisionType))
                 .run();
     }
 }

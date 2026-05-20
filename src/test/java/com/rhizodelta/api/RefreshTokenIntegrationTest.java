@@ -159,6 +159,31 @@ class RefreshTokenIntegrationTest {
     }
 
     @Test
+    void suspendedUserRefreshReturnsUnauthorizedAndInvalidatesConsumedToken() {
+        String refreshToken = registerAndGetRefreshToken("erin", "password123", "Erin");
+        neo4jClient.query("""
+                MATCH (user:UserAccount {username: $username})
+                SET user.status = 'SUSPENDED'
+                """)
+                .bindAll(Map.of("username", "erin"))
+                .run();
+
+        ResponseEntity<Map> suspendedRefresh = restTemplate.postForEntity(
+                "/api/auth/refresh",
+                Map.of("refresh_token", refreshToken),
+                Map.class
+        );
+        assertThat(suspendedRefresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        ResponseEntity<Map> retryWithConsumedToken = restTemplate.postForEntity(
+                "/api/auth/refresh",
+                Map.of("refresh_token", refreshToken),
+                Map.class
+        );
+        assertThat(retryWithConsumedToken.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void logoutInvalidatesAllRefreshTokens() {
         // 注册一次同时拿到 access token 与 refresh token，模拟真实用户的退出。
         ResponseEntity<Map> registerResponse = restTemplate.postForEntity(
