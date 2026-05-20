@@ -13,9 +13,22 @@ public class MuteRepository {
 
     private static final String CREATE_MUTE_QUERY = """
             MATCH (u:UserAccount {user_id: $userId})
-            MATCH (target) WHERE
-              ($targetType = 'topic' AND target:Topic       AND target.topic_id = $targetId) OR
-              ($targetType = 'user'  AND target:UserAccount AND target.user_id  = $targetId)
+            CALL {
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:Topic {topic_id: targetId})
+              WHERE targetType = 'topic'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:GraphNode {node_id: targetId})
+              WHERE targetType = 'node'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:UserAccount {user_id: targetId})
+              WHERE targetType = 'user'
+              RETURN target
+            }
             OPTIONAL MATCH (u)-[existing:MUTED]->(target)
             WITH u, target, existing
             FOREACH (_ IN CASE WHEN existing IS NULL THEN [1] ELSE [] END |
@@ -39,14 +52,17 @@ public class MuteRepository {
               labels(target) AS labels,
               CASE
                 WHEN 'Topic'       IN labels(target) THEN 'topic'
+                WHEN 'GraphNode'   IN labels(target) THEN 'node'
                 WHEN 'UserAccount' IN labels(target) THEN 'user'
               END AS target_type,
               CASE
                 WHEN 'Topic'       IN labels(target) THEN target.topic_id
+                WHEN 'GraphNode'   IN labels(target) THEN target.node_id
                 WHEN 'UserAccount' IN labels(target) THEN target.user_id
               END AS target_id,
               CASE
                 WHEN 'Topic'       IN labels(target) THEN target.name
+                WHEN 'GraphNode'   IN labels(target) THEN coalesce(target.summary_content, target.content)
                 WHEN 'UserAccount' IN labels(target) THEN coalesce(profile.display_name, target.username)
               END AS target_display_name
             ORDER BY r.since DESC
@@ -74,6 +90,11 @@ public class MuteRepository {
             RETURN collect(muted.topic_id) AS mutedTopicIds
             """;
 
+    private static final String GET_MUTED_NODE_IDS_QUERY = """
+            MATCH (u:UserAccount {user_id: $userId})-[:MUTED]->(muted:GraphNode)
+            RETURN collect(muted.node_id) AS mutedNodeIds
+            """;
+
     private final Neo4jClient neo4jClient;
 
     public MuteRepository(Neo4jClient neo4jClient) {
@@ -93,7 +114,7 @@ public class MuteRepository {
                 .one();
     }
 
-    public List<Map<String, Object>> listMutes(String userId, int skip, int limit) {
+    public List<Map<String, Object>> listMutes(String userId, long skip, int limit) {
         return new ArrayList<>(neo4jClient.query(LIST_MUTES_QUERY)
                 .bindAll(Map.of("userId", userId, "skip", skip, "limit", limit))
                 .fetch()
@@ -135,6 +156,16 @@ public class MuteRepository {
                 .fetch()
                 .one()
                 .map(record -> (List<String>) record.get("mutedTopicIds"))
+                .orElse(List.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> getMutedNodeIds(String userId) {
+        return neo4jClient.query(GET_MUTED_NODE_IDS_QUERY)
+                .bind(userId).to("userId")
+                .fetch()
+                .one()
+                .map(record -> (List<String>) record.get("mutedNodeIds"))
                 .orElse(List.of());
     }
 }

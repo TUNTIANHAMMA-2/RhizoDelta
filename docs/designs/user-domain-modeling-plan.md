@@ -90,7 +90,7 @@
 | `REVIEWED` | 用户审核了某个决策 | `decision_id`, `outcome`, `at` | `UserAccount → Decision` | 🔲 待做 |
 | `OPERATED` | 用户执行过某次运营动作（admin） | `operation_id`, `at` | `UserAccount → GraphNode` | 🔲 待做 |
 | `FOLLOWS` | 关注主题/节点/用户 | `since`, `follow_id` | `UserAccount → {Topic\|GraphNode\|UserAccount}` | ✅ 已实现 |
-| `MUTED` | 屏蔽主题/用户 | `since`, `reason`, `mute_id` | `UserAccount → {Topic\|UserAccount}` | ✅ 已实现 |
+| `MUTED` | 屏蔽主题/节点/用户 | `since`, `reason`, `mute_id` | `UserAccount → {Topic\|GraphNode\|UserAccount}` | ✅ 已实现 |
 
 > **实现细节偏差**：FOLLOWS / MUTED 的删除路径使用 `follow_id` / `mute_id` 寻址（而非原设计的 `target_id`），这是更好的 RESTful 设计，为边属性扩展留出空间。
 

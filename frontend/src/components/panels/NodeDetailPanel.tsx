@@ -9,8 +9,8 @@ import { AuditPanel } from "./AuditPanel";
 import { MarkdownViewer } from "../editor/MarkdownViewer";
 import { DecisionCard } from "./DecisionCard";
 import { summarizeNode, fetchNode } from "../../api/nodes";
-import { follow, unfollow, listFollows } from "../../api/follows";
-import { mute, unmute, listMutes } from "../../api/mutes";
+import { follow, unfollow } from "../../api/follows";
+import { mute, unmute } from "../../api/mutes";
 import { resolveAuthorName } from "../shared/AuthorLabel";
 import type { DecisionExplanation } from "../../api/types";
 
@@ -53,15 +53,37 @@ export function NodeDetailPanel() {
   const closePanel = useUiStore((s) => s.closeRightPanel);
   const activeTab = useUiStore((s) => s.activeNodeTab);
   const setActiveTab = useUiStore((s) => s.setActiveNodeTab);
+  const addToast = useUiStore((s) => s.addToast);
   const nodes = useGraphStore((s) => s.nodes);
   const orchestrationStatuses = useSseStore((s) => s.orchestrationStatuses);
   const [summarizing, setSummarizing] = useState(false);
-  const [followId, setFollowId] = useState<string | null>(null);
-  const [muteId, setMuteId] = useState<string | null>(null);
-  const [following, setFollowing] = useState(false);
-  const [muting, setMuting] = useState(false);
   const [pendingFollow, setPendingFollow] = useState(false);
   const [pendingMute, setPendingMute] = useState(false);
+  const payloadNodeId = payload?.nodeId;
+
+  useEffect(() => {
+    if (!payloadNodeId) return;
+    let cancelled = false;
+
+    fetchNode(payloadNodeId)
+      .then((freshNode) => {
+        if (!cancelled) {
+          useGraphStore.getState().addNode(freshNode);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          addToast({
+            type: "error",
+            message: error instanceof Error ? error.message : "节点详情加载失败",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [payloadNodeId, addToast]);
 
   if (!payload) return null;
   const node = nodes.get(payload.nodeId);
@@ -72,45 +94,12 @@ export function NodeDetailPanel() {
     node.author_id,
     node.agent_version,
   );
+  const following = Boolean(node.is_following);
+  const muting = Boolean(node.is_muted);
 
-  // Resolve current follow/mute state for this node when the panel opens. We
-  // page through follows/mutes once — for the typical user with O(10) follows
-  // this is one round-trip; large lists fall through to "not following" which
-  // simply turns the button into a no-op (user can click again).
-  useEffect(() => {
-    let cancelled = false;
-    setFollowId(null);
-    setMuteId(null);
-    setFollowing(false);
-    setMuting(false);
-    listFollows(0, 100)
-      .then((result) => {
-        if (cancelled) return;
-        const match = result.items.find(
-          (item) => item.target_type === "node" && item.target_id === node.node_id,
-        );
-        if (match) {
-          setFollowId(match.follow_id);
-          setFollowing(true);
-        }
-      })
-      .catch(() => {});
-    listMutes(0, 100)
-      .then((result) => {
-        if (cancelled) return;
-        const match = result.items.find(
-          (item) => item.target_type === "node" && item.target_id === node.node_id,
-        );
-        if (match) {
-          setMuteId(match.mute_id);
-          setMuting(true);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [node.node_id]);
+  const updateNodePreferenceState = (patch: Partial<typeof node>) => {
+    useGraphStore.getState().addNode({ ...node, ...patch });
+  };
 
   const orchestrationStatus = orchestrationStatuses[node.node_id];
   const statusLabel = orchestrationStatus
@@ -128,21 +117,22 @@ export function NodeDetailPanel() {
 
   return (
     <aside
-      className="rd-panel w-[38vw] min-w-[420px] max-w-[720px] relative border-l border-border-default bg-bg-primary flex flex-col font-ui h-full"
+      className="rd-panel fixed inset-x-0 bottom-0 z-[90] h-[68vh] max-h-[68vh] rounded-t-[28px] border border-border-default border-b-0 bg-bg-primary shadow-2xl flex flex-col font-ui md:relative md:inset-auto md:z-auto md:h-full md:max-h-none md:w-[38vw] md:min-w-[420px] md:max-w-[720px] md:rounded-none md:border-y-0 md:border-r-0 md:border-l md:shadow-none"
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >
-      <div className="rd-marker-selected" style={{ top: 20, left: 16 }} />
+      <div className="mx-auto mt-3 h-1.5 w-12 rounded-pill bg-border-default/80 md:hidden" aria-hidden />
+      <div className="rd-marker-selected hidden md:block" style={{ top: 20, left: 16 }} />
 
       {/* Header */}
-      <div className="p-4 border-b border-border-default">
+      <div className="px-4 pt-3 pb-4 md:p-4 border-b border-border-default">
         <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2 ml-9">
+          <div className="flex items-center gap-2 md:ml-9 min-w-0">
             <span
               className="w-2 h-2 rounded-full"
               style={{ background: TYPE_COLOR[node.label] ?? "var(--color-text-tertiary)" }}
             />
-            <span className="font-semibold text-md">
+            <span className="font-semibold text-md truncate">
               {node.label.replace("_", " ")}
             </span>
           </div>
@@ -157,21 +147,28 @@ export function NodeDetailPanel() {
         <div className="flex items-center gap-2 mb-2">
           <button
             disabled={pendingFollow}
+            aria-pressed={following}
             onClick={async () => {
               if (pendingFollow) return;
               setPendingFollow(true);
               try {
-                if (following && followId) {
-                  await unfollow(followId);
-                  setFollowing(false);
-                  setFollowId(null);
+                if (following && node.follow_id) {
+                  await unfollow(node.follow_id);
+                  updateNodePreferenceState({
+                    is_following: false,
+                    follow_id: null,
+                  });
+                  addToast({ type: "success", message: "已取消关注节点" });
                 } else {
                   const created = await follow({ target_type: "node", target_id: node.node_id });
-                  setFollowId(created.follow_id);
-                  setFollowing(true);
+                  updateNodePreferenceState({
+                    is_following: true,
+                    follow_id: created.follow_id,
+                  });
+                  addToast({ type: "success", message: "已关注节点" });
                 }
               } catch {
-                // silently ignore
+                addToast({ type: "error", message: "关注状态更新失败" });
               } finally {
                 setPendingFollow(false);
               }
@@ -188,21 +185,28 @@ export function NodeDetailPanel() {
           </button>
           <button
             disabled={pendingMute}
+            aria-pressed={muting}
             onClick={async () => {
               if (pendingMute) return;
               setPendingMute(true);
               try {
-                if (muting && muteId) {
-                  await unmute(muteId);
-                  setMuting(false);
-                  setMuteId(null);
+                if (muting && node.mute_id) {
+                  await unmute(node.mute_id);
+                  updateNodePreferenceState({
+                    is_muted: false,
+                    mute_id: null,
+                  });
+                  addToast({ type: "success", message: "已取消屏蔽节点" });
                 } else {
                   const created = await mute({ target_type: "node", target_id: node.node_id });
-                  setMuteId(created.mute_id);
-                  setMuting(true);
+                  updateNodePreferenceState({
+                    is_muted: true,
+                    mute_id: created.mute_id,
+                  });
+                  addToast({ type: "success", message: "已屏蔽节点" });
                 }
               } catch {
-                // silently ignore
+                addToast({ type: "error", message: "屏蔽状态更新失败" });
               } finally {
                 setPendingMute(false);
               }
@@ -228,7 +232,7 @@ export function NodeDetailPanel() {
       <div
         role="tablist"
         aria-label="节点详情分类"
-        className="flex border-b border-border-default px-4"
+        className="flex border-b border-border-default px-4 overflow-x-auto"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;

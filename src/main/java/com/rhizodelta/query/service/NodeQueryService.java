@@ -172,6 +172,9 @@ public class NodeQueryService {
             MATCH (n:GraphNode {node_id: $nodeId})
             WHERE NOT coalesce(n._deleted, false)
             WITH n, labels(n) AS nodeLabels
+            OPTIONAL MATCH (caller:UserAccount {user_id: $callerUserId})
+            OPTIONAL MATCH (caller)-[followRel:FOLLOWS]->(n)
+            OPTIONAL MATCH (caller)-[muteRel:MUTED]->(n)
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    n.content AS content,
@@ -180,7 +183,11 @@ public class NodeQueryService {
                    n.agent_version AS agentVersion,
                    n.created_at AS createdAt,
                    n.embedding IS NOT NULL AS hasEmbedding,
-                   n.quality_overall AS qualityOverall
+                   n.quality_overall AS qualityOverall,
+                   followRel IS NOT NULL AS isFollowing,
+                   muteRel IS NOT NULL AS isMuted,
+                   followRel.follow_id AS followId,
+                   muteRel.mute_id AS muteId
             """;
 
     private static final String NODE_TYPE_QUERY = """
@@ -312,6 +319,18 @@ public class NodeQueryService {
     }
 
     /**
+     * 按节点 ID 返回面向 API 的节点摘要，并附带调用方关注/屏蔽状态。
+     *
+     * @param nodeId 节点 ID。
+     * @param callerUserId 当前调用方用户 ID；匿名访问传 {@code null}。
+     * @return 节点摘要。
+     */
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public LineageNode getNodeById(UUID nodeId, String callerUserId) {
+        return getNodeSummaryById(nodeId, callerUserId);
+    }
+
+    /**
      * 返回节点的祖先谱系节点列表。
      *
      * <p>这是 {@link #getLineageTopology(UUID, Integer)} 的便捷封装，
@@ -414,9 +433,22 @@ public class NodeQueryService {
      */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public LineageNode getNodeSummaryById(UUID nodeId) {
+        return getNodeSummaryById(nodeId, null);
+    }
+
+    /**
+     * 返回单个节点的统一摘要，并在已认证调用方存在时附带关注/屏蔽状态。
+     *
+     * @param nodeId 节点 ID。
+     * @param callerUserId 当前调用方用户 ID；匿名访问传 {@code null}。
+     * @return 节点摘要。
+     */
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public LineageNode getNodeSummaryById(UUID nodeId, String callerUserId) {
         Objects.requireNonNull(nodeId, "nodeId must not be null");
         return neo4jClient.query(NODE_SUMMARY_QUERY)
                 .bind(nodeId.toString()).to("nodeId")
+                .bind(callerUserId == null ? "" : callerUserId).to("callerUserId")
                 .fetch()
                 .one()
                 .map(NodeQueryService::toLineageNode)
@@ -532,10 +564,16 @@ public class NodeQueryService {
                 (String) record.get("content"),
                 (String) record.get("summaryContent"),
                 (String) record.get("authorId"),
+                null,
+                null,
                 (String) record.get("agentVersion"),
                 toInstant(record.get("createdAt")),
                 toBoolean(record.get("hasEmbedding")),
-                toNullableDouble(record.get("qualityOverall"))
+                toNullableDouble(record.get("qualityOverall")),
+                toBoolean(record.get("isFollowing")),
+                toBoolean(record.get("isMuted")),
+                toNullableString(record.get("followId")),
+                toNullableString(record.get("muteId"))
         );
     }
 
@@ -602,7 +640,11 @@ public class NodeQueryService {
                 node.agentVersion(),
                 node.createdAt(),
                 node.hasEmbedding(),
-                node.qualityOverall()
+                node.qualityOverall(),
+                node.isFollowing(),
+                node.isMuted(),
+                node.followId(),
+                node.muteId()
         );
     }
 
@@ -774,10 +816,16 @@ public class NodeQueryService {
                 (String) entry.get("content"),
                 (String) entry.get("summaryContent"),
                 (String) entry.get("authorId"),
+                null,
+                null,
                 (String) entry.get("agentVersion"),
                 toInstant(entry.get("createdAt")),
                 toBoolean(entry.get("hasEmbedding")),
-                toNullableDouble(entry.get("qualityOverall"))
+                toNullableDouble(entry.get("qualityOverall")),
+                toBoolean(entry.get("isFollowing")),
+                toBoolean(entry.get("isMuted")),
+                toNullableString(entry.get("followId")),
+                toNullableString(entry.get("muteId"))
         );
     }
 
@@ -812,6 +860,10 @@ public class NodeQueryService {
             return number.doubleValue();
         }
         return null;
+    }
+
+    private static String toNullableString(Object value) {
+        return value == null ? null : value.toString();
     }
 
     private static Instant toInstant(Object value) {
@@ -883,7 +935,11 @@ public class NodeQueryService {
             String agentVersion,
             Instant createdAt,
             boolean hasEmbedding,
-            Double qualityOverall) {
+            Double qualityOverall,
+            boolean isFollowing,
+            boolean isMuted,
+            String followId,
+            String muteId) {
 
         /**
          * 创建一个不包含质量分的节点摘要。
@@ -894,14 +950,14 @@ public class NodeQueryService {
                 String nodeId, String label, String content, String summaryContent,
                 String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding
         ) {
-            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, null);
+            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, null, false, false, null, null);
         }
 
         public LineageNode(
                 String nodeId, String label, String content, String summaryContent,
                 String authorId, String agentVersion, Instant createdAt, boolean hasEmbedding, Double qualityOverall
         ) {
-            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, qualityOverall);
+            this(nodeId, label, content, summaryContent, authorId, null, null, agentVersion, createdAt, hasEmbedding, qualityOverall, false, false, null, null);
         }
     }
 

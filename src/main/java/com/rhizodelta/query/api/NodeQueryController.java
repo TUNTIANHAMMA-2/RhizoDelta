@@ -79,7 +79,7 @@ public class NodeQueryController {
     @GetMapping("/{id}")
     public ApiResponse<NodePayload> getNodeById(@PathVariable("id") String id, Authentication authentication) {
         UUID nodeId = parseUuid(id);
-        NodeQueryService.LineageNode node = nodeQueryService.getNodeSummaryById(nodeId);
+        NodeQueryService.LineageNode node = nodeQueryService.getNodeById(nodeId, callerUserId(authentication));
         recordViewEvent(authentication, nodeId);
         return ApiResponse.ok(fromLineageNode(node));
     }
@@ -203,7 +203,11 @@ public class NodeQueryController {
                 node.agentVersion(),
                 node.createdAt(),
                 node.hasEmbedding(),
-                node.qualityOverall()
+                node.qualityOverall(),
+                node.isFollowing(),
+                node.isMuted(),
+                node.followId(),
+                node.muteId()
         );
     }
 
@@ -224,6 +228,13 @@ public class NodeQueryController {
             return;
         }
         preferenceEventService.recordEvent(u.sub(), null, "VIEW", 0.5, nodeId.toString());
+    }
+
+    private String callerUserId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser u)) {
+            return null;
+        }
+        return u.sub();
     }
 
     /**
@@ -265,7 +276,11 @@ public class NodeQueryController {
             @JsonProperty("agent_version") String agentVersion,
             @JsonProperty("created_at") Instant createdAt,
             @JsonProperty("has_embedding") boolean hasEmbedding,
-            @JsonProperty("quality_overall") Double qualityOverall
+            @JsonProperty("quality_overall") Double qualityOverall,
+            @JsonProperty("is_following") boolean isFollowing,
+            @JsonProperty("is_muted") boolean isMuted,
+            @JsonProperty("follow_id") String followId,
+            @JsonProperty("mute_id") String muteId
     ) {
     }
 }

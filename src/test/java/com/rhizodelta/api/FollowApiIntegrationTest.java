@@ -85,6 +85,22 @@ class FollowApiIntegrationTest {
     }
 
     @Test
+    void nodeSummaryExposesFollowStateForAuthenticatedCaller() {
+        String token = registerUser("alice", "password123", "Alice");
+        String nodeId = createHumanPost("author-follow-state", "follow state content");
+
+        authorizedPost(token, "/api/users/me/follows",
+                Map.of("target_type", "node", "target_id", nodeId));
+        ResponseEntity<Map> response = authorizedGet(token, "/api/nodes/" + nodeId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> data = responseData(response);
+        assertThat(data).containsEntry("is_following", true);
+        assertThat(data.get("follow_id")).isInstanceOf(String.class);
+        assertThat(data).containsEntry("is_muted", false);
+    }
+
+    @Test
     void duplicateFollowReturns409() {
         String token = registerUser("alice", "password123", "Alice");
         String targetId = registerAndGetUserId("bob", "password123", "Bob");
@@ -190,6 +206,28 @@ class FollowApiIntegrationTest {
                 .bindAll(Map.of("topicId", topicId, "name", name))
                 .run();
         return topicId;
+    }
+
+    private String createHumanPost(String authorId, String content) {
+        String nodeId = UUID.randomUUID().toString();
+        neo4jClient.query("""
+                CREATE (:Human_Post:GraphNode {
+                  node_id: $nodeId,
+                  request_id: $requestId,
+                  author_id: $authorId,
+                  content: $content,
+                  created_at: datetime(),
+                  root_id: $nodeId
+                })
+                """)
+                .bindAll(Map.of(
+                        "nodeId", nodeId,
+                        "requestId", UUID.randomUUID().toString(),
+                        "authorId", authorId,
+                        "content", content
+                ))
+                .run();
+        return nodeId;
     }
 
     private ResponseEntity<Map> authorizedGet(String token, String uri) {

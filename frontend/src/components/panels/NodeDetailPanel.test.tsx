@@ -8,10 +8,28 @@ import type { GraphNodeDTO } from "../../api/types";
 
 const mockSummarizeNode = vi.fn();
 const mockFetchNode = vi.fn();
+const mockFollow = vi.fn();
+const mockUnfollow = vi.fn();
+const mockListFollows = vi.fn();
+const mockMute = vi.fn();
+const mockUnmute = vi.fn();
+const mockListMutes = vi.fn();
 
 vi.mock("../../api/nodes", () => ({
   summarizeNode: (...args: unknown[]) => mockSummarizeNode(...args),
   fetchNode: (...args: unknown[]) => mockFetchNode(...args),
+}));
+
+vi.mock("../../api/follows", () => ({
+  follow: (...args: unknown[]) => mockFollow(...args),
+  unfollow: (...args: unknown[]) => mockUnfollow(...args),
+  listFollows: (...args: unknown[]) => mockListFollows(...args),
+}));
+
+vi.mock("../../api/mutes", () => ({
+  mute: (...args: unknown[]) => mockMute(...args),
+  unmute: (...args: unknown[]) => mockUnmute(...args),
+  listMutes: (...args: unknown[]) => mockListMutes(...args),
 }));
 
 vi.mock("../editor/MarkdownViewer", () => ({
@@ -64,6 +82,9 @@ function setupStores(node: GraphNodeDTO) {
 describe("NodeDetailPanel — manual summary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchNode.mockImplementation(async (nodeId: string) => (
+      useGraphStore.getState().nodes.get(nodeId) ?? makeNode({ node_id: nodeId })
+    ));
     useUiStore.setState({
       rightPanelPayload: null,
       activeNodeTab: "details",
@@ -90,10 +111,12 @@ describe("NodeDetailPanel — manual summary", () => {
     setupStores(node);
 
     const updatedNode = makeNode({ summary_content: "新摘要内容" });
+    render(<NodeDetailPanel />);
+    await waitFor(() => expect(mockFetchNode).toHaveBeenCalledWith("node-1"));
+    mockFetchNode.mockClear();
     mockSummarizeNode.mockResolvedValueOnce({ summary: "ok", source_count: 3, model_used: "test" });
     mockFetchNode.mockResolvedValueOnce(updatedNode);
 
-    render(<NodeDetailPanel />);
     fireEvent.click(screen.getByRole("button", { name: "生成摘要" }));
 
     await waitFor(() => {
@@ -110,6 +133,10 @@ describe("NodeDetailPanel — manual summary", () => {
     setupStores(node);
 
     const callOrder: string[] = [];
+    render(<NodeDetailPanel />);
+    await waitFor(() => expect(mockFetchNode).toHaveBeenCalledWith("node-1"));
+    mockFetchNode.mockClear();
+
     mockSummarizeNode.mockImplementation(() => {
       callOrder.push("summarize");
       return Promise.resolve({});
@@ -119,7 +146,6 @@ describe("NodeDetailPanel — manual summary", () => {
       return Promise.resolve(makeNode({ summary_content: "更新" }));
     });
 
-    render(<NodeDetailPanel />);
     fireEvent.click(screen.getByRole("button", { name: "生成摘要" }));
 
     await waitFor(() => expect(mockFetchNode).toHaveBeenCalled());
@@ -153,12 +179,14 @@ describe("NodeDetailPanel — manual summary", () => {
     mockSummarizeNode.mockRejectedValueOnce(new Error("server error"));
 
     render(<NodeDetailPanel />);
+    await waitFor(() => expect(mockFetchNode).toHaveBeenCalledWith("node-1"));
+    mockFetchNode.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "生成摘要" }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "生成摘要" })).not.toBeDisabled();
     });
-    // fetchNode should NOT be called when summarize fails
+    // fetchNode should NOT be called again when summarize fails
     expect(mockFetchNode).not.toHaveBeenCalled();
   });
 
@@ -167,10 +195,11 @@ describe("NodeDetailPanel — manual summary", () => {
     setupStores(node);
 
     const updated = makeNode({ content: undefined, summary_content: "通过手动刷新获取的新摘要" });
+    render(<NodeDetailPanel />);
+    await waitFor(() => expect(mockFetchNode).toHaveBeenCalledWith("node-1"));
+    mockFetchNode.mockClear();
     mockSummarizeNode.mockResolvedValueOnce({});
     mockFetchNode.mockResolvedValueOnce(updated);
-
-    render(<NodeDetailPanel />);
 
     // Verify old content shown
     expect(screen.getByTestId("markdown-viewer")).toHaveTextContent("旧摘要");
@@ -184,5 +213,70 @@ describe("NodeDetailPanel — manual summary", () => {
     // No SSE interaction needed — only API calls
     expect(mockSummarizeNode).toHaveBeenCalledTimes(1);
     expect(mockFetchNode).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches canonical node details when panel opens", async () => {
+    const stale = makeNode({
+      is_following: false,
+      is_muted: false,
+      follow_id: null,
+      mute_id: null,
+    });
+    const fresh = makeNode({
+      is_following: true,
+      is_muted: true,
+      follow_id: "follow-fresh",
+      mute_id: "mute-fresh",
+    });
+    setupStores(stale);
+    mockFetchNode.mockResolvedValueOnce(fresh);
+
+    render(<NodeDetailPanel />);
+
+    await waitFor(() => {
+      expect(mockFetchNode).toHaveBeenCalledWith("node-1");
+      expect(screen.getByRole("button", { name: "关注中" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByRole("button", { name: "已屏蔽" }).getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  it("uses node follow and mute state without loading preference lists", () => {
+    const node = makeNode({
+      is_following: true,
+      is_muted: true,
+      follow_id: "follow-1",
+      mute_id: "mute-1",
+    });
+    setupStores(node);
+
+    render(<NodeDetailPanel />);
+
+    expect(screen.getByRole("button", { name: "关注中" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "已屏蔽" }).getAttribute("aria-pressed")).toBe("true");
+    expect(mockListFollows).not.toHaveBeenCalled();
+    expect(mockListMutes).not.toHaveBeenCalled();
+  });
+
+  it("toggles aria-pressed after following a node", async () => {
+    const node = makeNode({ is_following: false, follow_id: null });
+    setupStores(node);
+    mockFollow.mockResolvedValueOnce({
+      follow_id: "follow-created",
+      target_type: "node",
+      target_id: "node-1",
+      since: new Date().toISOString(),
+      status: "following",
+    });
+
+    render(<NodeDetailPanel />);
+    const button = screen.getByRole("button", { name: "关注" });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "关注中" }).getAttribute("aria-pressed")).toBe("true");
+    });
+    expect(useUiStore.getState().toasts.some((toast) => toast.message === "已关注节点")).toBe(true);
   });
 });

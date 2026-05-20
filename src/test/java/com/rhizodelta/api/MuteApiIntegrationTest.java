@@ -83,6 +83,22 @@ class MuteApiIntegrationTest {
     }
 
     @Test
+    void nodeSummaryExposesMuteStateForAuthenticatedCaller() {
+        String token = registerUser("alice", "password123", "Alice");
+        String nodeId = createHumanPost("author-mute-state", "mute state content");
+
+        authorizedPost(token, "/api/users/me/mutes",
+                Map.of("target_type", "node", "target_id", nodeId, "reason", "hide"));
+        ResponseEntity<Map> response = authorizedGet(token, "/api/nodes/" + nodeId);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> data = responseData(response);
+        assertThat(data).containsEntry("is_muted", true);
+        assertThat(data.get("mute_id")).isInstanceOf(String.class);
+        assertThat(data).containsEntry("is_following", false);
+    }
+
+    @Test
     void duplicateMuteReturns409() {
         String token = registerUser("alice", "password123", "Alice");
         String targetId = registerAndGetUserId("bob", "password123", "Bob");
@@ -135,7 +151,7 @@ class MuteApiIntegrationTest {
         String token = registerUser("alice", "password123", "Alice");
 
         ResponseEntity<Map> response = authorizedPost(token, "/api/users/me/mutes",
-                Map.of("target_type", "node", "target_id", UUID.randomUUID().toString()));
+                Map.of("target_type", "invalid", "target_id", UUID.randomUUID().toString()));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -180,6 +196,28 @@ class MuteApiIntegrationTest {
                 .bindAll(Map.of("topicId", topicId, "name", name))
                 .run();
         return topicId;
+    }
+
+    private String createHumanPost(String authorId, String content) {
+        String nodeId = UUID.randomUUID().toString();
+        neo4jClient.query("""
+                CREATE (:Human_Post:GraphNode {
+                  node_id: $nodeId,
+                  request_id: $requestId,
+                  author_id: $authorId,
+                  content: $content,
+                  created_at: datetime(),
+                  root_id: $nodeId
+                })
+                """)
+                .bindAll(Map.of(
+                        "nodeId", nodeId,
+                        "requestId", UUID.randomUUID().toString(),
+                        "authorId", authorId,
+                        "content", content
+                ))
+                .run();
+        return nodeId;
     }
 
     private ResponseEntity<Map> authorizedGet(String token, String uri) {

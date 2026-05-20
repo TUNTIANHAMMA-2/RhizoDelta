@@ -19,10 +19,22 @@ public class FollowRepository {
 
     private static final String CREATE_FOLLOW_QUERY = """
             MATCH (u:UserAccount {user_id: $userId})
-            MATCH (target) WHERE
-              ($targetType = 'topic' AND target:Topic       AND target.topic_id = $targetId) OR
-              ($targetType = 'node'  AND target:GraphNode   AND target.node_id  = $targetId) OR
-              ($targetType = 'user'  AND target:UserAccount AND target.user_id  = $targetId)
+            CALL {
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:Topic {topic_id: targetId})
+              WHERE targetType = 'topic'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:GraphNode {node_id: targetId})
+              WHERE targetType = 'node'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:UserAccount {user_id: targetId})
+              WHERE targetType = 'user'
+              RETURN target
+            }
             OPTIONAL MATCH (u)-[existing:FOLLOWS]->(target)
             WITH u, target, existing
             FOREACH (_ IN CASE WHEN existing IS NULL THEN [1] ELSE [] END |
@@ -36,10 +48,24 @@ public class FollowRepository {
             """;
 
     private static final String EXISTS_FOLLOW_QUERY = """
-            MATCH (u:UserAccount {user_id: $userId})-[r:FOLLOWS]->(target)
-            WHERE ($targetType = 'topic' AND target:Topic       AND target.topic_id = $targetId) OR
-                  ($targetType = 'node'  AND target:GraphNode   AND target.node_id  = $targetId) OR
-                  ($targetType = 'user'  AND target:UserAccount AND target.user_id  = $targetId)
+            MATCH (u:UserAccount {user_id: $userId})
+            CALL {
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:Topic {topic_id: targetId})
+              WHERE targetType = 'topic'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:GraphNode {node_id: targetId})
+              WHERE targetType = 'node'
+              RETURN target
+            UNION
+              WITH $targetType AS targetType, $targetId AS targetId
+              MATCH (target:UserAccount {user_id: targetId})
+              WHERE targetType = 'user'
+              RETURN target
+            }
+            MATCH (u)-[r:FOLLOWS]->(target)
             RETURN r.follow_id AS follow_id
             """;
 
@@ -120,7 +146,7 @@ public class FollowRepository {
                 });
     }
 
-    public List<Map<String, Object>> listFollows(String userId, int skip, int limit) {
+    public List<Map<String, Object>> listFollows(String userId, long skip, int limit) {
         return new ArrayList<>(neo4jClient.query(LIST_FOLLOWS_QUERY)
                 .bindAll(Map.of("userId", userId, "skip", skip, "limit", limit))
                 .fetch()

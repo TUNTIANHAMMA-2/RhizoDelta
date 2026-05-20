@@ -17,12 +17,34 @@ export type HomeSortKey = "latest" | "quality" | "active" | "for_you";
 
 export const QUALITY_TOP_THRESHOLD = 0.8;
 export const QUALITY_GOOD_THRESHOLD = 0.5;
+const FOLLOWING_PAGE_SIZE = 100;
 
 export function qualityBandOf(q: number | null | undefined): QualityBand {
   if (typeof q !== "number" || Number.isNaN(q)) return "unrated";
   if (q >= QUALITY_TOP_THRESHOLD) return "top";
   if (q >= QUALITY_GOOD_THRESHOLD) return "good";
   return "basic";
+}
+
+type FollowingPage = Awaited<ReturnType<typeof listFollows>>;
+
+export async function collectFollowingTargetIds(
+  fetchPage: (page: number, size: number) => Promise<FollowingPage>,
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  let page = 0;
+  let hasNext = true;
+  while (hasNext) {
+    const response = await fetchPage(page, FOLLOWING_PAGE_SIZE);
+    for (const item of response.items) {
+      if (item.target_type === "node" || item.target_type === "user") {
+        ids.add(item.target_id);
+      }
+    }
+    hasNext = response.has_next;
+    page += 1;
+  }
+  return ids;
 }
 
 export interface HomeState {
@@ -60,8 +82,7 @@ export const useHomeStore = create<HomeState>((set) => ({
     try {
       const response = await getFeed(0, 50);
       if (myReq !== feedRequestSeq) return; // 用户已经切到别的 sortBy，丢弃
-      const items = (response.items as GraphNodeDTO[]) ?? [];
-      set({ feedItems: items });
+      set({ feedItems: response.items ?? [] });
     } catch (e) {
       if (myReq !== feedRequestSeq) return;
       const msg = e instanceof Error ? e.message : "feed request failed";
@@ -75,13 +96,7 @@ export const useHomeStore = create<HomeState>((set) => ({
   loadFollowing: async () => {
     set({ followingLoading: true });
     try {
-      const response = await listFollows(0, 200);
-      const ids = new Set<string>();
-      for (const item of response.items) {
-        if (item.target_type === "node" || item.target_type === "user") {
-          ids.add(item.target_id);
-        }
-      }
+      const ids = await collectFollowingTargetIds(listFollows);
       set({ followingTargetIds: ids });
     } catch (e) {
       useUiStore.getState().addToast({

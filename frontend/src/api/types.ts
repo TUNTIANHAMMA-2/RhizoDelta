@@ -41,7 +41,27 @@ export interface GraphNodeDTO {
   created_at: string;
   has_embedding: boolean;
   quality_overall?: number;
+  is_following?: boolean;
+  is_muted?: boolean;
+  follow_id?: string | null;
+  mute_id?: string | null;
 }
+
+export type HumanPostFeedItem = GraphNodeDTO & {
+  label: "Human_Post";
+  content: string;
+};
+
+export type AiConsensusFeedItem = GraphNodeDTO & {
+  label: "AI_Consensus";
+  summary_content: string;
+};
+
+export type ResultFeedItem = GraphNodeDTO & {
+  label: "Result";
+};
+
+export type FeedItem = HumanPostFeedItem | AiConsensusFeedItem | ResultFeedItem;
 
 export interface GraphEdgeDTO {
   source: string;
@@ -321,7 +341,7 @@ export interface MuteItem {
 }
 
 export interface FeedResponse {
-  items: GraphNodeDTO[];
+  items: FeedItem[];
   page: number;
   size: number;
   has_next: boolean;
