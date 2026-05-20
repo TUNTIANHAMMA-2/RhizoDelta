@@ -6,6 +6,7 @@ import { HumanPostNode } from "./HumanPostNode";
 import { useGraphStore } from "../../stores/graphStore";
 import type { GraphNodeDTO } from "../../api/types";
 
+
 vi.mock("./NodeActionToolbar", () => ({
   NodeActionToolbar: () => null,
 }));
@@ -22,6 +23,11 @@ vi.mock("./QualityBadge", () => ({
   QualityBadge: () => <span>quality</span>,
 }));
 
+const TestHumanPostNode = HumanPostNode as unknown as (props: {
+  data: GraphNodeDTO;
+  selected: boolean;
+}) => React.ReactElement;
+
 function makeNode(overrides: Partial<GraphNodeDTO> = {}): GraphNodeDTO {
   return {
     node_id: "node-1",
@@ -31,7 +37,7 @@ function makeNode(overrides: Partial<GraphNodeDTO> = {}): GraphNodeDTO {
     author_id: "author-1",
     author_username: "alice",
     author_display_name: "Alice",
-    agent_version: null as unknown as string,
+    agent_version: undefined,
     created_at: new Date("2026-04-23T00:00:00Z").toISOString(),
     has_embedding: false,
     ...overrides,
@@ -44,7 +50,7 @@ describe("HumanPostNode author display", () => {
   });
 
   it("prefers author_display_name in normal zoom header", () => {
-    render(<HumanPostNode data={makeNode()} selected={false} {...({} as any)} />);
+    render(<TestHumanPostNode data={makeNode()} selected={false} />);
 
     expect(screen.getByText("Alice")).toBeInTheDocument();
   });
@@ -55,7 +61,7 @@ describe("HumanPostNode author display", () => {
       author_username: "alice-user",
     });
 
-    render(<HumanPostNode data={node} selected={false} {...({} as any)} />);
+    render(<TestHumanPostNode data={node} selected={false} />);
 
     expect(screen.getByText("alice-user")).toBeInTheDocument();
   });
@@ -67,7 +73,7 @@ describe("HumanPostNode author display", () => {
       author_display_name: undefined,
     });
 
-    render(<HumanPostNode data={node} selected={false} {...({} as any)} />);
+    render(<TestHumanPostNode data={node} selected={false} />);
 
     expect(screen.getByText("Anonymous")).toBeInTheDocument();
   });
@@ -82,7 +88,7 @@ describe("HumanPostNode author display", () => {
       agent_version: "deepseek-v4-flash",
     });
 
-    render(<HumanPostNode data={node} selected={false} {...({} as any)} />);
+    render(<TestHumanPostNode data={node} selected={false} />);
 
     // 模型 slug 会被 formatAgentVersion 美化成 "DeepSeek V4 Flash"。
     expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();

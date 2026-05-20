@@ -6,11 +6,13 @@ import { NodeActionToolbar } from "./NodeActionToolbar";
 import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
 import { stripMarkdown } from "../../lib/markdown";
+import { useNodeDwellEvent } from "../../hooks/useGraphInteractions";
 
 export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps) {
   const node = data as unknown as GraphNodeDTO;
   const zoom = useGraphStore((s) => s.semanticZoom);
   const [hovered, setHovered] = useState(false);
+  const dwellRef = useNodeDwellEvent(node.node_id);
 
   const baseClass = "node-base node-result";
   const stateClass = selected ? " selected" : "";
@@ -23,6 +25,7 @@ export const ResultNode = memo(function ResultNode({ data, selected }: NodeProps
 
   return (
     <div
+      ref={dwellRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="relative w-full h-full"

@@ -7,11 +7,13 @@ import { VersionHandles } from "./VersionHandles";
 import { NodeEdgeInfo } from "./NodeEdgeInfo";
 import { QualityBadge } from "./QualityBadge";
 import { stripMarkdown } from "../../lib/markdown";
+import { useNodeDwellEvent } from "../../hooks/useGraphInteractions";
 
 export const ConsensusNode = memo(function ConsensusNode({ data, selected }: NodeProps) {
   const node = data as unknown as GraphNodeDTO;
   const zoom = useGraphStore((s) => s.semanticZoom);
   const [hovered, setHovered] = useState(false);
+  const dwellRef = useNodeDwellEvent(node.node_id);
 
   const baseClass = "node-base node-consensus";
   const stateClass = selected ? " selected" : "";
@@ -24,6 +26,7 @@ export const ConsensusNode = memo(function ConsensusNode({ data, selected }: Nod
 
   return (
     <div
+      ref={dwellRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="relative w-full h-full"

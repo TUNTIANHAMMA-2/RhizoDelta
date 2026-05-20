@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useGraphStore } from "../../stores/graphStore";
+import { sendPreferenceEventBestEffort } from "../../api/events";
 
 const HIDDEN_HANDLE_STYLE = {
   opacity: 0,
@@ -16,6 +17,10 @@ export const ExpandPlaceholder = memo(function ExpandPlaceholder({
 
   const handleClick = () => {
     if (!expanding) {
+      sendPreferenceEventBestEffort({
+        type: "EXPAND",
+        sourceNodeId: parentNodeId,
+      });
       expandChildren(parentNodeId);
     }
   };

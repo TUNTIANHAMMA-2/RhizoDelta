@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useGraphStore } from "../stores/graphStore";
 import { useUiStore } from "../stores/uiStore";
+import {
+  sendDwellEventOncePerWindow,
+  sendPreferenceEventBestEffort,
+} from "../api/events";
+
+const DWELL_VISIBLE_MS = 3000;
 
 /**
  * Hook for graph canvas interactions:
@@ -96,6 +102,10 @@ export function useGraphInteractions() {
 
     expandTimerRef.current = setTimeout(() => {
       expandTimerRef.current = null;
+      sendPreferenceEventBestEffort({
+        type: "EXPAND",
+        sourceNodeId: selectedNodeId,
+      });
       expandChildren(selectedNodeId);
     }, 1500);
 
@@ -108,4 +118,55 @@ export function useGraphInteractions() {
   }, [selectedNodeId, expandChildren, getBoundaryNodeIds]);
 
   return { focusNode, resetFocus };
+}
+
+export function useNodeDwellEvent(nodeId: string, enabled = true) {
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+  const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const element = nodeRef.current;
+    if (!enabled || !element) return;
+
+    const clearDwellTimer = () => {
+      if (dwellTimerRef.current) {
+        clearTimeout(dwellTimerRef.current);
+        dwellTimerRef.current = null;
+      }
+    };
+
+    const scheduleDwellTimer = () => {
+      if (dwellTimerRef.current) return;
+      dwellTimerRef.current = setTimeout(() => {
+        dwellTimerRef.current = null;
+        sendDwellEventOncePerWindow(nodeId);
+      }, DWELL_VISIBLE_MS);
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      scheduleDwellTimer();
+      return clearDwellTimer;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting && entry.intersectionRatio >= 0.5) {
+          scheduleDwellTimer();
+        } else {
+          clearDwellTimer();
+        }
+      },
+      { threshold: [0, 0.5] },
+    );
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      clearDwellTimer();
+    };
+  }, [enabled, nodeId]);
+
+  return nodeRef;
 }
