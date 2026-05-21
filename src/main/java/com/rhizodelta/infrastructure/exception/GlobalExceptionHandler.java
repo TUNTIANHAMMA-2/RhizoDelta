@@ -41,6 +41,15 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理已预留但尚未开放的接口能力。
+     */
+    @ExceptionHandler(UnsupportedOperationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnsupportedOperation(UnsupportedOperationException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.badRequest(exception.getMessage()));
+    }
+
+    /**
      * 处理资源不存在错误。
      */
     @ExceptionHandler(NoSuchElementException.class)

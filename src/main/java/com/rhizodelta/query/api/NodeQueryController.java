@@ -8,6 +8,7 @@ import com.rhizodelta.infrastructure.web.ApiResponse;
 import com.rhizodelta.core.domain.association.AssociationInfo;
 import com.rhizodelta.core.domain.association.AssociationType;
 import com.rhizodelta.core.service.AssociationService;
+import com.rhizodelta.query.service.DiscussionTreeQueryService;
 import com.rhizodelta.query.service.NodeQueryService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,11 +38,16 @@ import java.util.UUID;
 @RequestMapping("/api/nodes")
 public class NodeQueryController {
     private final NodeQueryService nodeQueryService;
+    private final DiscussionTreeQueryService discussionTreeQueryService;
     private final AssociationService associationService;
     private final PreferenceEventService preferenceEventService;
 
-    public NodeQueryController(NodeQueryService nodeQueryService, AssociationService associationService, PreferenceEventService preferenceEventService) {
+    public NodeQueryController(NodeQueryService nodeQueryService,
+                               DiscussionTreeQueryService discussionTreeQueryService,
+                               AssociationService associationService,
+                               PreferenceEventService preferenceEventService) {
         this.nodeQueryService = nodeQueryService;
+        this.discussionTreeQueryService = discussionTreeQueryService;
         this.associationService = associationService;
         this.preferenceEventService = preferenceEventService;
     }
@@ -139,6 +145,45 @@ public class NodeQueryController {
                 .map(this::fromLineageEdge)
                 .toList();
         return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
+    }
+
+    /**
+     * 返回以指定 Human_Post 为根的嵌套讨论树。
+     *
+     * <p>该端点面向移动端阅读视图：返回的 {@link CommentNode#children()} 只包含
+     * {@code Human_Post} 评论节点，{@code AI_Consensus} 与 {@code Result} 会作为
+     * {@link DiscussionArtifact} 挂在各自锚点评论的 {@code artifacts} 字段中。
+     *
+     * <p>参数约束：{@code max_depth} 默认为 5，允许范围 1..10；{@code limit} 默认为 200，
+     * 允许范围 1..500。MVP 阶段 {@code cursor} 非空时会返回 400，提示分页尚未支持。
+     *
+     * <p>当 {@code id} 不存在或指向软删除节点时返回 404；当 {@code id} 指向
+     * {@code AI_Consensus} 或 {@code Result} 时返回 400，因为讨论树必须从人工帖子开始。
+     *
+     * @param id 根帖 UUID 字符串。
+     * @param maxDepth 可选最大讨论深度。
+     * @param limit 可选可见 Human_Post 节点数量限制，根节点计入限制。
+     * @param cursor 预留分页游标，MVP 不支持非空值。
+     * @param authentication 当前认证信息，用于透传调用方用户 ID。
+     * @return 嵌套讨论树响应。
+     */
+    @GetMapping("/{id}/discussion-tree")
+    public ApiResponse<DiscussionTreeResponse> getDiscussionTree(
+            @PathVariable("id") String id,
+            @RequestParam(value = "max_depth", required = false) Integer maxDepth,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "cursor", required = false) String cursor,
+            Authentication authentication
+    ) {
+        UUID nodeId = parseUuid(id);
+        DiscussionTreeResponse response = discussionTreeQueryService.getDiscussionTree(
+                nodeId,
+                maxDepth,
+                limit,
+                callerUserId(authentication),
+                cursor
+        );
+        return ApiResponse.ok(response);
     }
 
     /**

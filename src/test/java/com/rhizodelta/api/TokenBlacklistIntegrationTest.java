@@ -9,6 +9,7 @@ import com.rhizodelta.infrastructure.user.service.PreferenceEventService;
 import com.rhizodelta.ai.context.service.EmbeddingService;
 import com.rhizodelta.core.service.AssociationService;
 import com.rhizodelta.query.api.NodeQueryController;
+import com.rhizodelta.query.service.DiscussionTreeQueryService;
 import com.rhizodelta.query.service.NodeQueryService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -49,6 +50,9 @@ class TokenBlacklistIntegrationTest {
 
     @MockBean
     private NodeQueryService nodeQueryService;
+
+    @MockBean
+    private DiscussionTreeQueryService discussionTreeQueryService;
 
     @MockBean
     private AssociationService associationService;
