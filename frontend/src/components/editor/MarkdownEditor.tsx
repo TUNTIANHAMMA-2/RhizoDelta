@@ -40,7 +40,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
 
 
   return (
-    <div className="flex flex-wrap gap-1 p-2 border-b border-border-default bg-bg-secondary rounded-t-sm">
+    <div className="flex gap-1 p-2 border-b border-border-default bg-bg-secondary rounded-t-sm overflow-x-auto no-scrollbar whitespace-nowrap shrink-0">
       <button
         type="button"
         onClick={() => editor.chain().focus().toggleBold().run()}

@@ -323,7 +323,7 @@ export function NodeDetailPanel() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-text-tertiary italic">暂无编排状态</div>
+                  <div className="text-text-tertiary text-[13px]">暂无编排状态</div>
                 )}
               </div>
               {parsedExplanation && <DecisionCard explanation={parsedExplanation} />}

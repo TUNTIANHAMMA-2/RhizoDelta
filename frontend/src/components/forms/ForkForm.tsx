@@ -140,20 +140,20 @@ export function ForkForm({ sourceNodeId, onSuccess }: Props) {
       <button
         type="button"
         onClick={addBranch}
-        className="bg-transparent border border-dashed border-border-default rounded-sm p-2 cursor-pointer font-ui text-sm text-text-secondary"
+        className="bg-transparent border border-dashed border-border-default rounded-sm p-2 cursor-pointer font-ui text-sm text-text-secondary w-full"
       >
         + 添加分支
       </button>
-      <div className="flex gap-3 justify-end">
+      <div className="flex flex-col-reverse md:flex-row gap-3 justify-end mt-2">
         <button
-          className="btn-secondary"
+          className="btn-secondary w-full md:w-auto py-3 md:py-2"
           type="button"
           onClick={onSuccess}
         >
           取消
         </button>
         <button
-          className="btn-primary"
+          className="btn-primary w-full md:w-auto py-3 md:py-2"
           type="submit"
           disabled={submitting || !userId}
         >

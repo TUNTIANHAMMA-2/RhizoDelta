@@ -7,11 +7,6 @@ import { searchSimilar } from "../../api/search";
 import { loadGraphForRoot } from "../../lib/loadGraphForRoot";
 import type { GraphNodeDTO, NodeLabel, SimilaritySearchResult } from "../../api/types";
 
-export interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
 const LABEL_COLOR: Record<NodeLabel, string> = {
   Human_Post: "var(--color-node-human)",
   AI_Consensus: "var(--color-node-consensus)",
@@ -49,11 +44,14 @@ const DEBOUNCE_MS = 150;
 const KBD_CLASS =
   "inline-block px-[5px] border border-border-default rounded-sm text-[10px] font-mono leading-4 bg-bg-secondary shadow-[0_1px_0_var(--color-border-default)]";
 
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+export function CommandPalette() {
+  const isOpen = useUiStore((s) => s.commandPaletteOpen);
+  const onClose = useUiStore((s) => s.closeCommandPalette);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestIdRef = useRef(0);
   const activeIndexRef = useRef(-1);
   const [activeIndex, setActiveIndex] = useState(-1);
   const listRef = useRef<HTMLDivElement>(null);
@@ -69,6 +67,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [showSimilar, setShowSimilar] = useState(false);
 
+  const [searchResults, setSearchResults] = useState<SimilaritySearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
   const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : undefined;
   const canSearchSimilar = selectedNode?.has_embedding === true;
 
@@ -81,6 +83,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setShowSimilar(false);
       setSimilarResults([]);
       setSimilarError(null);
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [isOpen]);
@@ -95,34 +100,54 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     };
   }, [query]);
 
-  const results: GraphNodeDTO[] = useMemo(() => {
+  const recentNodes: GraphNodeDTO[] = useMemo(() => {
     const all = Array.from(nodes.values());
+    return all
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, RECENT_LIMIT);
+  }, [nodes]);
 
-    if (!debouncedQuery.trim()) {
-      return all
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))
-        .slice(0, RECENT_LIMIT);
+  const hasQuery = debouncedQuery.trim().length > 0;
+
+  useEffect(() => {
+    const trimmedQuery = debouncedQuery.trim();
+    searchRequestIdRef.current += 1;
+    const requestId = searchRequestIdRef.current;
+
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
     }
 
-    const lowerQ = debouncedQuery.toLowerCase();
-    const matched: GraphNodeDTO[] = [];
+    setShowSimilar(false);
+    setSearchLoading(true);
+    setSearchError(null);
+    setSearchResults([]);
 
-    for (const node of all) {
-      if (matched.length >= MAX_RESULTS) break;
-      const content = (node.content ?? "").toLowerCase();
-      const summary = (node.summary_content ?? "").toLowerCase();
-      if (content.includes(lowerQ) || summary.includes(lowerQ)) {
-        matched.push(node);
-      }
-    }
-
-    return matched;
-  }, [nodes, debouncedQuery]);
+    searchSimilar({ query: trimmedQuery, top_k: MAX_RESULTS })
+      .then((results) => {
+        if (searchRequestIdRef.current === requestId) {
+          setSearchResults(results ?? []);
+        }
+      })
+      .catch((err) => {
+        if (searchRequestIdRef.current === requestId) {
+          setSearchError(err instanceof Error ? err.message : "搜索失败");
+        }
+      })
+      .finally(() => {
+        if (searchRequestIdRef.current === requestId) {
+          setSearchLoading(false);
+        }
+      });
+  }, [debouncedQuery]);
 
   useEffect(() => {
     setActiveIndex(-1);
     activeIndexRef.current = -1;
-  }, [results]);
+  }, [recentNodes, searchResults, showSimilar]);
 
   const handleSelect = useCallback(
     (nodeId: string) => {
@@ -188,10 +213,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         return;
       }
 
-      const currentList = showSimilar ? similarResults : results;
+      const currentList = showSimilar ? similarResults : hasQuery ? searchResults : recentNodes;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        if (currentList.length === 0) return;
         setActiveIndex((prev) => {
           const next = prev < currentList.length - 1 ? prev + 1 : 0;
           activeIndexRef.current = next;
@@ -202,6 +228,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
+        if (currentList.length === 0) return;
         setActiveIndex((prev) => {
           const next = prev > 0 ? prev - 1 : currentList.length - 1;
           activeIndexRef.current = next;
@@ -215,13 +242,16 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         if (showSimilar) {
           const item = similarResults[activeIndexRef.current];
           if (item) handleSelectSimilar(item);
+        } else if (hasQuery) {
+          const item = searchResults[activeIndexRef.current];
+          if (item) handleSelectSimilar(item);
         } else {
-          const node = results[activeIndexRef.current];
+          const node = recentNodes[activeIndexRef.current];
           if (node) handleSelect(node.node_id);
         }
       }
     },
-    [results, similarResults, showSimilar, onClose, handleSelect, handleSelectSimilar],
+    [hasQuery, recentNodes, searchResults, similarResults, showSimilar, onClose, handleSelect, handleSelectSimilar],
   );
 
   useEffect(() => {
@@ -316,21 +346,79 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 );
               })}
             </>
-          ) : (
+          ) : hasQuery ? (
             <>
-              {results.length === 0 && debouncedQuery.trim() && (
+              {searchLoading && (
+                <div className="p-4 text-center text-text-tertiary text-sm">全局搜索中...</div>
+              )}
+              {searchError && (
+                <div className="p-4 text-center text-danger text-sm">{searchError}</div>
+              )}
+              {!searchLoading && !searchError && searchResults.length === 0 && (
                 <div className="p-4 text-text-tertiary text-sm text-center">
                   没有匹配的节点
                 </div>
               )}
 
-              {results.length === 0 && !debouncedQuery.trim() && (
+              {searchResults.map((item, i) => {
+                const isOtherRhizone = !nodes.has(item.node_id);
+                const labelColor = LABEL_COLOR[item.label as NodeLabel] ?? "var(--color-text-tertiary)";
+                return (
+                  <div
+                    key={item.node_id}
+                    role="option"
+                    aria-selected={i === activeIndex}
+                    onClick={() => handleSelectSimilar(item)}
+                    onMouseEnter={() => {
+                      setActiveIndex(i);
+                      activeIndexRef.current = i;
+                    }}
+                    className={clsx(
+                      "flex items-center gap-3 px-4 py-3 cursor-pointer transition-[background] duration-[80ms]",
+                      i === activeIndex ? "bg-bg-hover" : "bg-transparent",
+                    )}
+                  >
+                    <div
+                      className="w-[3px] self-stretch rounded-[2px] shrink-0"
+                      style={{ background: labelColor }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-text-primary font-content whitespace-nowrap overflow-hidden text-ellipsis">
+                        {truncate(item.content ?? item.node_id, 80)}
+                      </div>
+                      <div className="flex items-center gap-2 mt-[2px]">
+                        <span
+                          className="inline-block px-[6px] py-[1px] rounded-sm text-[11px] font-medium leading-[1.5]"
+                          style={{
+                            color: labelColor,
+                            background: `color-mix(in srgb, ${labelColor} 10%, transparent)`,
+                          }}
+                        >
+                          {LABEL_DISPLAY[item.label as NodeLabel] ?? item.label}
+                        </span>
+                        <span className="text-[11px] text-text-tertiary">
+                          {(item.score * 100).toFixed(0)}% 相似
+                        </span>
+                        {isOtherRhizone && (
+                          <span className="text-[10px] px-1 rounded-sm bg-bg-hover text-text-tertiary">
+                            跨话题
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              {recentNodes.length === 0 && (
                 <div className="p-4 text-text-tertiary text-sm text-center">
                   当前无节点数据
                 </div>
               )}
 
-              {results.map((node, i) => {
+              {recentNodes.map((node, i) => {
                 const labelColor = LABEL_COLOR[node.label] ?? "var(--color-text-tertiary)";
                 return (
                   <div
@@ -377,7 +465,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           )}
         </div>
 
-        {canSearchSimilar && !showSimilar && (
+        {canSearchSimilar && !showSimilar && !hasQuery && (
           <div className="border-t border-border-default px-4 py-2">
             <button
               type="button"

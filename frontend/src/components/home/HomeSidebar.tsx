@@ -26,7 +26,7 @@ function SectionHeading({ children }: { children: string }) {
       <span
         className={clsx(
           metaLabel,
-          "text-text-tertiary/70 uppercase tracking-[0.18em] text-[11.5px] whitespace-nowrap",
+          "text-text-tertiary/80 tracking-[0.05em] text-[12px] whitespace-nowrap",
         )}
       >
         {children}
@@ -192,14 +192,9 @@ export function HomeSidebar() {
       aria-label={homeSidebarLabels.ariaLabel}
     >
       {/* Brand header */}
-      <div className="px-5 pt-4 md:pt-9 pb-5 md:pb-7 border-b border-border-default/50">
-        <WordMark className="block text-[28px] leading-none tracking-[-0.02em]" />
-        <div
-          className={clsx(
-            metaLabel,
-            "text-text-tertiary mt-3 uppercase tracking-[0.22em] text-[10.5px]",
-          )}
-        >
+      <div className="px-5 pt-6 pb-6 border-b border-border-default/50">
+        <WordMark className="block text-[26px] leading-none tracking-[-0.02em]" />
+        <div className="font-content text-text-secondary text-[14px] mt-2">
           {homeSidebarLabels.tagline}
         </div>
       </div>
@@ -286,19 +281,11 @@ export function HomeSidebar() {
       </nav>
 
       <div className="mt-auto px-5 py-6 border-t border-border-default/50 space-y-3">
-        <p className="font-content italic text-[13px] leading-[1.65] text-text-secondary/90">
+        <p className="font-content text-[13px] leading-[1.65] text-text-secondary/90">
           {homeSidebarLabels.footerPoem[0]}
           <br />
           {homeSidebarLabels.footerPoem[1]}
         </p>
-        <div
-          className={clsx(
-            metaLabel,
-            "text-text-tertiary/70 uppercase tracking-[0.18em] text-[10.5px]",
-          )}
-        >
-          {homeSidebarLabels.version}
-        </div>
       </div>
     </aside>
   );

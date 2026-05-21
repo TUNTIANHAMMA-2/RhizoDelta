@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useGraphStore } from "../../stores/graphStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useSse } from "../../hooks/useSse";
@@ -7,7 +7,6 @@ import { CommandPalette } from "../search/CommandPalette";
 import { EditDraftPanel } from "../panels/EditDraftPanel";
 import { ReviewPanel } from "../panels/ReviewPanel";
 import { ToastContainer } from "../feedback/Toast";
-import { Header } from "../chrome/Header";
 import { HomeSidebar } from "./HomeSidebar";
 import { HomeMainColumn } from "./HomeMainColumn";
 import { HomeRightRail } from "./HomeRightRail";
@@ -15,8 +14,10 @@ import { HomeRightRail } from "./HomeRightRail";
 export function HomePage() {
   const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
   const rightPanelMode = useUiStore((s) => s.rightPanelMode);
-  const commandPalette = useCommandPalette();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobileMenuOpen = useUiStore((s) => s.isMobileMenuOpen);
+  const setMobileMenuOpen = useUiStore((s) => s.setMobileMenuOpen);
+  
+  useCommandPalette();
 
   useEffect(() => {
     loadRhizomes();
@@ -26,31 +27,19 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen flex bg-bg-canvas font-ui">
-      <Header hideLogo />
-
-      {/* Mobile hamburger */}
-      <button
-        type="button"
-        onClick={() => setMobileNavOpen((v) => !v)}
-        className="md:hidden fixed top-3 left-3 z-[101] w-10 h-10 flex items-center justify-center bg-bg-elevated/90 backdrop-blur-md border border-border-default rounded-sm text-text-secondary"
-        aria-label={mobileNavOpen ? "关闭菜单" : "打开菜单"}
-      >
-        <span className="text-lg leading-none">{mobileNavOpen ? "×" : "☰"}</span>
-      </button>
-
       {/* Left sidebar — md+ static, mobile bottom sheet */}
       <div className="hidden md:block">
         <HomeSidebar />
       </div>
-      {mobileNavOpen && (
+      {isMobileMenuOpen && (
         <>
           <div
-            className="md:hidden fixed inset-0 z-[60] bg-text-primary/20 backdrop-blur-[2px]"
-            onClick={() => setMobileNavOpen(false)}
+            className="md:hidden fixed inset-0 z-[60] bg-text-primary/20 backdrop-blur-[2px] animate-fade-in"
+            onClick={() => setMobileMenuOpen(false)}
             aria-hidden
           />
           <div
-            className="md:hidden fixed inset-x-0 bottom-0 z-[61] max-h-[82vh] overflow-hidden rounded-t-[28px] border border-border-default/70 border-b-0 bg-bg-parchment shadow-2xl"
+            className="md:hidden fixed inset-x-0 bottom-0 z-[61] max-h-[82vh] overflow-hidden rounded-t-[28px] border border-border-default/70 border-b-0 bg-bg-parchment shadow-2xl animate-sheet-up"
             role="dialog"
             aria-modal="true"
             aria-label="移动端导航菜单"
@@ -62,7 +51,7 @@ export function HomePage() {
       )}
 
       {/* Main column */}
-      <HomeMainColumn onOpenSearch={commandPalette.open} />
+      <HomeMainColumn />
 
       {/* Right rail */}
       <HomeRightRail />
@@ -70,10 +59,7 @@ export function HomePage() {
       {/* Shared chrome */}
       {rightPanelMode === "edit" && <EditDraftPanel />}
       {rightPanelMode === "review" && <ReviewPanel />}
-      <CommandPalette
-        isOpen={commandPalette.isOpen}
-        onClose={commandPalette.close}
-      />
+      <CommandPalette />
       <ToastContainer />
     </div>
   );

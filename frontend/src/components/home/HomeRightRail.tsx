@@ -13,6 +13,7 @@ import { useNotificationStore } from "../../stores/notificationStore";
 import type { GraphNodeDTO } from "../../api/types";
 import { metaLabel, relativeTime } from "../../lib/typography";
 import { stripMarkdown } from "../../lib/markdown";
+import { HeaderActions } from "../chrome/Header";
 
 function SectionCard({
   title,
@@ -46,7 +47,7 @@ function QualityTop() {
 
   if (top5.length === 0) {
     return (
-      <div className="text-text-tertiary text-sm italic">
+      <div className="text-text-tertiary text-[13px] leading-relaxed">
         还没有被评分的话题
       </div>
     );
@@ -142,7 +143,7 @@ function QualityDistribution() {
 
   if (total === 0) {
     return (
-      <div className="text-text-tertiary text-sm italic">
+      <div className="text-text-tertiary text-[13px] leading-relaxed">
         尚无节点可统计
       </div>
     );
@@ -233,7 +234,7 @@ function PulseSparkline() {
 
   if (total === 0) {
     return (
-      <div className="text-text-tertiary text-sm italic">
+      <div className="text-text-tertiary text-[13px] leading-relaxed">
         最近 7 天安静无事
       </div>
     );
@@ -343,7 +344,7 @@ function ActivityFeed() {
 
   if (items.length === 0) {
     return (
-      <div className="text-text-tertiary text-sm italic">
+      <div className="text-text-tertiary text-[13px] leading-relaxed">
         等待第一条事件…
       </div>
     );
@@ -393,7 +394,7 @@ function MyContribution({ rhizomes }: { rhizomes: GraphNodeDTO[] }) {
   const navigate = useNavigate();
   if (!userId) {
     return (
-      <div className="text-text-tertiary text-sm italic">
+      <div className="text-text-tertiary text-[13px] leading-relaxed">
         登录后查看你的贡献
       </div>
     );
@@ -441,7 +442,7 @@ function MyContribution({ rhizomes }: { rhizomes: GraphNodeDTO[] }) {
           </div>
         </button>
       ) : (
-        <div className="text-text-tertiary text-sm italic">
+        <div className="text-text-tertiary text-[13px] leading-relaxed">
           你还没有发起过话题
         </div>
       )}
@@ -454,9 +455,14 @@ export function HomeRightRail() {
 
   return (
     <aside
-      className="hidden lg:flex w-[300px] shrink-0 h-screen sticky top-0 flex-col bg-bg-canvas border-l border-border-default/70 font-ui overflow-y-auto pt-[72px]"
+      className="hidden lg:flex w-[300px] shrink-0 h-screen sticky top-0 flex-col bg-bg-canvas border-l border-border-default/70 font-ui overflow-y-auto pt-4"
       aria-label="Home sidebar"
     >
+      {/* Desktop User/Notif Controls moved from Header */}
+      <div className="px-4 pb-4 mb-2 border-b border-border-subtle flex justify-end">
+        <HeaderActions isDesktop />
+      </div>
+
       <SectionCard title="Quality · 质量榜">
         <QualityTop />
       </SectionCard>

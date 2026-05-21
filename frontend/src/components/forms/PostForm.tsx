@@ -82,9 +82,9 @@ export function PostForm() {
         minHeight={200}
       />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end mt-2">
         <button
-          className="btn-primary"
+          className="btn-primary w-full md:w-auto py-3 md:py-2"
           type="submit"
           disabled={submitting || !userId || !content.replace(/<[^>]+>/g, "").trim()}
         >

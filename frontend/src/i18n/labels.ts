@@ -1,6 +1,6 @@
 export const homeSidebarLabels = {
   ariaLabel: "Home navigation",
-  tagline: "A thinking thicket",
+  tagline: "a thinking thicket",
   sections: {
     streams: "Streams",
     quality: "Quality",
@@ -23,5 +23,30 @@ export const homeSidebarLabels = {
     settings: "设置 · Settings",
   },
   footerPoem: ["a thicket of thoughts,", "branching outward."],
-  version: "est. 2026 · alpha",
+} as const;
+
+export const mobileDiscussionTreeLabels = {
+  replyToRoot: "回复主帖 · Reply to root",
+  replyToTarget: (preview: string) => `回复 · Reply to ${preview}`,
+  cancelReply: "取消 · Cancel",
+  sendButton: "发送 · Send",
+  sending: "发送中 · Sending…",
+  accepted: "已接单 · Queued",
+  failed: "发送失败 · Failed",
+  pendingHint: "正在处理 · Processing…",
+  artifactConsensus: "AI 共识 · AI Consensus",
+  artifactResult: "结果 · Result",
+  artifactExpand: "展开 · Expand",
+  artifactCollapse: "收起 · Collapse",
+  sourceCountInsideView: (n: number) => `来源 · Sources: ${n}`,
+  sourceCountOutsideHint: (n: number) => `还有 ${n} 条来源不在视图内 · ${n} more outside view`,
+  hasMoreChildren: (n: number) => `还有 ${n} 条回复未展示 · ${n} more replies`,
+  truncatedHint: "讨论过于庞大，已截断显示 · Discussion truncated",
+  depthBadge: (n: number) => `深度 ${n}`,
+  longPressCopy: "复制内容 · Copy",
+  longPressDetails: "查看详情 · Details",
+  longPressViewInGraph: "查看图谱位置 · View in graph",
+  longPressMenuAria: "更多操作 · More actions",
+  emptyTree: "暂无回复 · No replies yet",
+  loadError: "加载失败 · Failed to load",
 } as const;

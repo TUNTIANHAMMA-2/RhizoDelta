@@ -31,6 +31,13 @@ export interface UiState {
   headerExpanded: boolean;
   setHeaderExpanded: (v: boolean) => void;
 
+  // Command palette (lifted to store so any chrome element — Header capsule,
+  // sidebar shortcut, mobile menu — can toggle it without prop drilling.)
+  commandPaletteOpen: boolean;
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
+  toggleCommandPalette: () => void;
+
   zoomLevel: number;
   setZoomLevel: (zoom: number) => void;
   canvasMode: CanvasMode;
@@ -76,6 +83,12 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   headerExpanded: false,
   setHeaderExpanded: (v) => set({ headerExpanded: v }),
+
+  commandPaletteOpen: false,
+  openCommandPalette: () => set({ commandPaletteOpen: true }),
+  closeCommandPalette: () => set({ commandPaletteOpen: false }),
+  toggleCommandPalette: () =>
+    set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
 
   zoomLevel: 1,
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),

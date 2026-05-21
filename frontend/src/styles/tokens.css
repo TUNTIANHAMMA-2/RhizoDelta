@@ -114,6 +114,8 @@
   --animate-slide-up:       slide-up 200ms var(--ease-out);
   --animate-slide-down:     slide-down 200ms var(--ease-out);
   --animate-scale-in:       scale-in 200ms var(--ease-out);
+  --animate-sheet-up:       sheet-slide-up 280ms var(--ease-out);
+  --animate-sheet-down:     sheet-slide-down 220ms var(--ease-in-out);
   --animate-shimmer:        shimmer 1.5s linear infinite;
   --animate-spin-slow:      expand-spin 0.7s linear infinite;
 }
@@ -168,6 +170,16 @@
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sheet-slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sheet-slide-down {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(100%); }
 }
 
 @keyframes shimmer {

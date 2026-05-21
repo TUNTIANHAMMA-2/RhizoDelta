@@ -86,16 +86,16 @@ export function InjectForm({ sourceNodeId, onSuccess }: Props) {
           minHeight={180}
         />
       </div>
-      <div className="flex gap-3 justify-end">
+      <div className="flex flex-col-reverse md:flex-row gap-3 justify-end mt-2">
         <button
-          className="btn-secondary"
+          className="btn-secondary w-full md:w-auto py-3 md:py-2"
           type="button"
           onClick={onSuccess}
         >
           取消
         </button>
         <button
-          className="btn-primary"
+          className="btn-primary w-full md:w-auto py-3 md:py-2"
           type="submit"
           disabled={submitting || !userId}
         >

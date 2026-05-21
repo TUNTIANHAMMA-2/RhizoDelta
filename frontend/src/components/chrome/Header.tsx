@@ -24,7 +24,6 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-
 const SSE_STATUS_COLOR = {
   connecting: "var(--color-warning)",
   connected: "var(--color-success)",
@@ -37,29 +36,166 @@ const SSE_ANIM_CLASS = {
   disconnected: "sse-indicator--disconnected",
 } as const;
 
-// Shared capsule surface classes (liquid-glass pill)
 const CAPSULE_SURFACE =
   "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150 border border-border-default shadow-sm";
 
-export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
+/**
+ * User and Notification controls, shared between fixed and embedded headers.
+ */
+export function HeaderActions({ isDesktop }: { isDesktop: boolean }) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const sseStatus = useSseStore((s) => s.status);
   const roles = useAuthStore((s) => s.roles);
   const userId = useAuthStore((s) => s.userId);
   const username = useAuthStore((s) => s.username);
   const clearToken = useAuthStore((s) => s.clearToken);
-  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
   const rightPanelMode = useUiStore((s) => s.rightPanelMode);
   const openReviewPanel = useUiStore((s) => s.openReviewPanel);
-  const closeRightPanel = useUiStore((s) => s.closeRightPanel);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const notifContainerRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (notifOpen && notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [notifOpen, userMenuOpen]);
+
+  const topRole = roles.includes("ADMIN") ? "ADMIN" : roles.includes("AGENT") ? "AGENT" : "USER";
+
+  const handleLogout = useCallback(() => {
+    clearToken();
+    navigate("/login", { replace: true });
+  }, [clearToken, navigate]);
+
+  return (
+    <div
+      className="pointer-events-auto flex items-center gap-2 transition-transform duration-300 ease-[var(--ease-out)]"
+      style={{
+        transform:
+          isDesktop && rightPanelMode === "edit"
+            ? "translateX(calc(-1 * min(max(50vw, 520px), 920px)))"
+            : isDesktop && rightPanelMode !== "hidden"
+            ? "translateX(calc(-1 * min(max(38vw, 420px), 720px)))"
+            : "translateX(0)",
+      }}
+    >
+      {topRole === "ADMIN" && (
+        <button
+          type="button"
+          onClick={openReviewPanel}
+          className={clsx(
+            CAPSULE_SURFACE,
+            "hidden md:flex items-center h-9 rounded-pill px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-all tracking-[0.01em]",
+          )}
+        >
+          复核
+        </button>
+      )}
+
+      <div ref={userMenuRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          className={clsx(
+            "flex items-center gap-2 h-9 rounded-pill font-ui text-xs font-medium transition-all min-w-0 whitespace-nowrap cursor-pointer",
+            "md:px-[14px] px-2 md:backdrop-blur-md md:backdrop-saturate-150 md:shadow-sm",
+            userMenuOpen
+              ? "border border-border-focus bg-[rgba(253,252,249,0.95)] text-text-primary"
+              : "border border-transparent md:border-border-default bg-transparent md:bg-[rgba(253,252,249,0.88)] text-text-secondary md:hover:bg-[rgba(253,252,249,0.95)] hover:text-text-primary",
+          )}
+        >
+          {isDesktop && <RoleBadge role={topRole} />}
+          <span className="inline">{username ?? userId ?? "anonymous"}</span>
+        </button>
+
+        {userMenuOpen && (
+          <div className="absolute top-full right-0 mt-2 w-40 bg-bg-primary border border-border-default rounded-md shadow-lg z-[200] font-ui text-sm py-1">
+            <div className="px-4 py-2 border-b border-border-subtle mb-1">
+              <div className="font-semibold text-text-primary truncate">{username ?? "User"}</div>
+              <div className="text-text-tertiary text-xs truncate mt-0.5">{userId}</div>
+            </div>
+            <button
+              type="button"
+              className="w-full text-left px-4 py-2 hover:bg-bg-hover text-text-secondary transition-colors"
+              onClick={() => {
+                setUserMenuOpen(false);
+                useUiStore.getState().addToast({ type: "info", message: "用户资料页即将上线" });
+              }}
+            >
+              用户资料
+            </button>
+            <button
+              type="button"
+              className="w-full text-left px-4 py-2 hover:bg-bg-hover text-text-secondary transition-colors"
+              onClick={() => {
+                setUserMenuOpen(false);
+                navigate("/settings");
+              }}
+            >
+              设置
+            </button>
+            <div className="h-px bg-border-subtle my-1" />
+            <button
+              type="button"
+              className="w-full text-left px-4 py-2 hover:bg-danger/10 text-danger transition-colors"
+              onClick={handleLogout}
+            >
+              退出登录
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div ref={notifContainerRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setNotifOpen(!notifOpen)}
+          className={clsx(
+            CAPSULE_SURFACE,
+            "relative flex items-center justify-center w-9 h-9 rounded-full cursor-pointer p-0 transition-all",
+          )}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="absolute -top-[2px] -right-[2px] min-w-4 h-4 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+        <NotificationCenter isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
+      </div>
+    </div>
+  );
+}
+
+export function Header({
+  hideLogo = false,
+  embedded = false,
+}: {
+  hideLogo?: boolean;
+  embedded?: boolean;
+} = {}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const sseStatus = useSseStore((s) => s.status);
+  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
+  const isMobileMenuOpen = useUiStore((s) => s.isMobileMenuOpen);
+  const setMobileMenuOpen = useUiStore((s) => s.setMobileMenuOpen);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const selectNode = useGraphStore((s) => s.selectNode);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const [userHovered, setUserHovered] = useState(false);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notifContainerRef = useRef<HTMLDivElement>(null);
+  const closeRightPanel = useUiStore((s) => s.closeRightPanel);
   const isDesktop = useIsDesktop();
 
   const onWorkspace = location.pathname.startsWith("/workspace");
@@ -70,32 +206,39 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
     navigate("/");
   }, [selectNode, closeRightPanel, navigate]);
 
-  useEffect(() => {
-    if (!notifOpen) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [notifOpen]);
+  if (embedded) {
+    return (
+      <div className="w-full px-4 md:px-8 py-2">
+        <div className="w-full flex items-center justify-between gap-4">
+          {/* Mobile Menu Toggle */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden w-10 h-10 flex items-center justify-center text-text-secondary -ml-2 transition-colors hover:text-text-primary"
+            aria-label="菜单"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="4" x2="20" y1="12" y2="12" />
+              <line x1="4" x2="20" y1="6" y2="6" />
+              <line x1="4" x2="20" y1="18" y2="18" />
+            </svg>
+          </button>
 
-  const topRole = roles.includes("ADMIN")
-    ? "ADMIN"
-    : roles.includes("AGENT")
-      ? "AGENT"
-      : "USER";
+          {/* Spacer for mobile/desktop to push actions to right if no logo here */}
+          <div className="flex-1" />
 
-  const handleLogout = useCallback(() => {
-    clearToken();
-    navigate("/login", { replace: true });
-  }, [clearToken, navigate]);
+          {/* User Actions - Mobile Only in embedded home page */}
+          <div className="md:hidden">
+            <HeaderActions isDesktop={isDesktop} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <header className="fixed top-0 left-0 z-[100] flex items-start justify-between w-full p-4 pointer-events-none font-ui text-sm box-border">
       <div className="flex items-center relative w-full h-10">
-        {/* Logo 胶囊 */}
         {!hideLogo && (
           <div
             className={clsx(
@@ -104,23 +247,13 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
               onWorkspace && "cursor-pointer group",
             )}
             onClick={onWorkspace ? handleBackHome : undefined}
-            role={onWorkspace ? "link" : undefined}
-            aria-label={onWorkspace ? "Back to home" : undefined}
           >
-            {onWorkspace && (
-              <span
-                className="mr-2 text-text-tertiary group-hover:text-accent transition-colors"
-                aria-hidden
-              >
-                ←
-              </span>
-            )}
+            {onWorkspace && <span className="mr-2 text-text-tertiary group-hover:text-accent transition-colors">←</span>}
             <div className="shrink-0 flex items-center font-content font-normal text-text-primary text-md tracking-[-0.02em]">
               RhizoDelt
               <span
-                className={`${SSE_ANIM_CLASS[sseStatus]} text-lg ml-[2px]`}
-                aria-live="polite"
-                style={{ color: SSE_STATUS_COLOR[sseStatus] }}
+                className={`${SSE_ANIM_CLASS[sseStatus as keyof typeof SSE_ANIM_CLASS]} text-lg ml-[2px]`}
+                style={{ color: SSE_STATUS_COLOR[sseStatus as keyof typeof SSE_STATUS_COLOR] }}
               >
                 △
               </span>
@@ -128,10 +261,9 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
           </div>
         )}
 
-        {/* 面包屑胶囊 — 桌面端显示；移动端隐藏避免与汉堡/通知冲突 */}
         <div
           className={clsx(
-            "absolute top-0 hidden md:flex items-center h-10 rounded-md overflow-hidden transition-[all] duration-300 ease-[var(--ease-out)] z-[1]",
+            "absolute top-0 hidden md:flex items-center h-10 rounded-md overflow-hidden transition-all duration-300 ease-[var(--ease-out)] z-[1]",
             "bg-[rgba(253,252,249,0.88)] backdrop-blur-md backdrop-saturate-150",
             selectedNodeId
               ? "border border-border-default px-4 shadow-md pointer-events-auto opacity-100 max-w-[400px]"
@@ -145,109 +277,7 @@ export function Header({ hideLogo = false }: { hideLogo?: boolean } = {}) {
         </div>
       </div>
 
-      {/* 右侧控件组 — translate 量与当前 panel 宽度同步（桌面端） */}
-      <div
-        className="pointer-events-auto flex items-center gap-2 transition-transform duration-300 ease-[var(--ease-out)]"
-        style={{
-          transform:
-            isDesktop && rightPanelMode === "edit"
-              ? "translateX(calc(-1 * min(max(50vw, 520px), 920px)))"
-              : isDesktop && rightPanelMode !== "hidden"
-              ? "translateX(calc(-1 * min(max(38vw, 420px), 720px)))"
-              : "translateX(0)",
-        }}
-      >
-        {topRole === "ADMIN" && (
-          <button
-            type="button"
-            onClick={openReviewPanel}
-            className={clsx(
-              CAPSULE_SURFACE,
-              "hidden md:flex items-center h-9 rounded-pill px-[14px] cursor-pointer font-ui text-xs font-semibold text-text-secondary transition-[all] duration-[var(--transition-fast)] tracking-[0.01em]",
-            )}
-          >
-            复核
-          </button>
-        )}
-
-        {/* 用户名胶囊 — 桌面 hover 变退出按钮；移动端紧凑只显示角色徽章，点击直接退出 */}
-        <button
-          type="button"
-          onMouseEnter={() => {
-            if (!isDesktop) return;
-            hoverTimerRef.current = setTimeout(() => setUserHovered(true), 300);
-          }}
-          onMouseLeave={() => {
-            if (!isDesktop) return;
-            if (hoverTimerRef.current) {
-              clearTimeout(hoverTimerRef.current);
-              hoverTimerRef.current = null;
-            }
-            setUserHovered(false);
-          }}
-          onClick={isDesktop ? (userHovered ? handleLogout : undefined) : handleLogout}
-          aria-label={isDesktop ? undefined : "退出"}
-          className={clsx(
-            "flex items-center gap-2 h-9 rounded-pill backdrop-blur-md backdrop-saturate-150 shadow-sm font-ui text-xs font-medium transition-[all] duration-[var(--transition-fast)] min-w-0 whitespace-nowrap",
-            "md:px-[14px] px-2",
-            userHovered
-              ? "border border-danger bg-[rgba(196,69,58,0.06)] text-danger cursor-pointer"
-              : "border border-border-default bg-[rgba(253,252,249,0.88)] text-text-secondary cursor-pointer md:cursor-default",
-          )}
-        >
-          {userHovered ? (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              退出
-            </>
-          ) : (
-            <>
-              <RoleBadge role={topRole} />
-              <span className="hidden md:inline">
-                {username ?? userId ?? "anonymous"}
-              </span>
-            </>
-          )}
-        </button>
-
-
-        {/* 通知铃铛 */}
-        <div ref={notifContainerRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setNotifOpen(!notifOpen)}
-            aria-label="通知"
-            className={clsx(
-              CAPSULE_SURFACE,
-              "relative flex items-center justify-center w-9 h-9 rounded-full cursor-pointer p-0 transition-[all] duration-[var(--transition-fast)]",
-            )}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-text-secondary)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-[2px] -right-[2px] min-w-4 h-4 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </button>
-          <NotificationCenter isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
-        </div>
-      </div>
+      <HeaderActions isDesktop={isDesktop} />
     </header>
   );
 }

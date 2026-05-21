@@ -103,3 +103,23 @@
   border-radius: 50%;
   animation: expand-spin 0.7s linear infinite;
 }
+
+/* ── Mobile comment tree connector (replaces inline borderLeft on
+   CommentTreeItem so we can tween color/glow on highlight) ── */
+[data-comment-node-id]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-edge-default);
+  transition: background-color var(--transition-normal),
+              box-shadow var(--transition-normal);
+  pointer-events: none;
+}
+[data-comment-node-id][data-source-highlighted="true"]::before {
+  background: var(--color-node-consensus);
+  box-shadow: 0 0 12px var(--color-glow-consensus);
+}

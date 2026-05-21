@@ -60,7 +60,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
 
   return (
     <article
-      className="group relative flex gap-5 border-b border-border-subtle bg-bg-elevated hover:bg-bg-hover/40 transition-colors cursor-pointer py-6 pl-5 pr-6"
+      className="group relative flex md:gap-5 gap-3 border-b border-border-subtle bg-bg-elevated hover:bg-bg-hover/40 transition-colors cursor-pointer py-4 md:py-6 pl-3 pr-4 md:pl-5 md:pr-6"
       onClick={openGraph}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -74,21 +74,21 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
     >
       {/* Left label column */}
       <div
-        className="shrink-0 flex flex-col items-center gap-2 w-14 pt-1"
+        className="shrink-0 flex flex-col items-center gap-1.5 md:gap-2 w-8 md:w-14 pt-1"
         aria-hidden
       >
         <span
-          className="inline-block w-[3px] h-10 rounded-pill"
+          className="inline-block w-[3px] h-6 md:h-10 rounded-pill"
           style={{ background: labelMeta.colorVar }}
         />
         <span
-          className="font-mono text-[20px] leading-none"
+          className="font-mono text-[16px] md:text-[20px] leading-none"
           style={{ color: labelMeta.colorVar }}
         >
           {labelMeta.glyph}
         </span>
         <span
-          className={clsx(metaLabel, "text-text-tertiary text-center")}
+          className={clsx(metaLabel, "hidden md:block text-text-tertiary text-center")}
           style={{ letterSpacing: "0.06em" }}
         >
           {labelMeta.en}
@@ -96,13 +96,13 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
       </div>
 
       {/* Main column */}
-      <div className="flex-1 min-w-0 space-y-2">
-        <h3 className="font-content text-[19px] leading-[1.35] tracking-[-0.01em] text-text-primary line-clamp-2 group-hover:text-accent transition-colors">
+      <div className="flex-1 min-w-0 space-y-1.5 md:space-y-2">
+        <h3 className="font-content text-[17px] md:text-[19px] leading-[1.35] tracking-[-0.01em] text-text-primary line-clamp-2 group-hover:text-accent transition-colors">
           {title}
         </h3>
 
         {summary && (
-          <p className="font-content text-[14.5px] leading-[1.55] text-text-secondary line-clamp-2 font-light">
+          <p className="font-content text-[13.5px] md:text-[14.5px] leading-[1.55] text-text-secondary line-clamp-2 font-light">
             {summary}
           </p>
         )}
@@ -110,7 +110,7 @@ export function RhizomeCard({ node }: RhizomeCardProps) {
         <div
           className={clsx(
             metaLabel,
-            "flex items-center gap-3 text-text-tertiary pt-1 flex-wrap",
+            "flex items-center gap-2 md:gap-3 text-text-tertiary pt-0.5 md:pt-1 flex-wrap",
           )}
         >
           <span className="flex items-center gap-1.5">

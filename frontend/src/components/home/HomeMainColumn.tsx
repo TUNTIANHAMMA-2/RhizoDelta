@@ -11,10 +11,7 @@ import {
 import { useUiStore } from "../../stores/uiStore";
 import { metaLabel } from "../../lib/typography";
 import { RhizomeCard } from "./RhizomeCard";
-
-interface HomeMainColumnProps {
-  onOpenSearch: () => void;
-}
+import { Header } from "../chrome/Header";
 
 const SORT_OPTIONS: Array<{ key: HomeSortKey; en: string; zh: string }> = [
   { key: "latest", en: "Latest", zh: "最新" },
@@ -23,72 +20,37 @@ const SORT_OPTIONS: Array<{ key: HomeSortKey; en: string; zh: string }> = [
   { key: "for_you", en: "For You", zh: "为你推荐" },
 ];
 
-function Hero({ onOpenSearch }: { onOpenSearch: () => void }) {
-  const isMac =
-    typeof navigator !== "undefined" &&
-    /Mac|iPhone|iPad/.test(navigator.platform);
+function CompactSearch() {
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const chord = isMac ? "⌘K" : "Ctrl+K";
+  const openCommandPalette = useUiStore((s) => s.openCommandPalette);
 
   return (
-    <div className="relative py-14 px-8 md:px-12 lg:px-16 border-b border-border-subtle bg-bg-elevated">
-      <div className="max-w-[620px] mx-auto text-center space-y-6">
-        <div
-          className={clsx(
-            metaLabel,
-            "text-accent uppercase tracking-[0.28em]",
-          )}
-        >
-          Rhizodelta · 观察台
-        </div>
-        <h1 className="font-content text-[44px] md:text-[52px] lg:text-[60px] leading-[1.02] tracking-[-0.03em] text-text-primary">
-          Where threads
-          <br />
-          <em
-            className="italic font-light text-accent"
-            style={{ fontFeatureSettings: "'ss01'" }}
-          >
-            take root
-          </em>
-          <span className="text-text-primary">.</span>
-        </h1>
-        <p className="font-content italic text-text-secondary text-base md:text-lg leading-[1.55] max-w-lg mx-auto font-light">
-          一处可并、可分、可反思的知识丛林 ——
-          每一条观点都带出它的来路与去向。
-        </p>
-
-        <button
-          type="button"
-          onClick={onOpenSearch}
-          className="mt-4 group relative w-full max-w-md mx-auto flex items-center gap-3 border border-border-default bg-bg-primary px-4 py-3 text-left hover:border-accent transition-colors"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-text-tertiary group-hover:text-accent transition-colors"
-            aria-hidden
-          >
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <span className="flex-1 font-content text-text-tertiary text-sm">
-            搜索 rhizome、节点、作者…
-          </span>
-          <kbd
-            className={clsx(
-              metaLabel,
-              "px-2 py-1 border border-border-default rounded-sm text-text-tertiary bg-bg-canvas",
-            )}
-          >
-            {chord}
-          </kbd>
-        </button>
+    <div className="w-[90%] max-w-[800px] mx-auto mt-2 mb-4 flex flex-col md:flex-row items-center gap-4 animate-fade-in animate-slide-up [animation-delay:150ms] [animation-fill-mode:both]">
+      {/* 纯文本非胶囊 Logo，并在移动端附带轻度呼吸动效；桌面端首页不显示 Logo */}
+      <div className="md:hidden shrink-0 flex items-center font-content font-normal text-text-primary text-xl tracking-[-0.02em] animate-[pulse_2s_ease-in-out_infinite]">
+        RhizoDelt
+        <span className="text-accent text-xl ml-[2px]">△</span>
       </div>
+
+      {/* 搜索框 */}
+      <button
+        type="button"
+        onClick={openCommandPalette}
+        className="group flex-1 w-full flex items-center gap-3 border border-border-default bg-bg-primary px-4 py-2.5 text-left hover:border-accent hover:shadow-sm transition-all rounded-pill"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary group-hover:text-accent transition-colors" aria-hidden>
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <span className="flex-1 font-content text-text-tertiary text-sm truncate">搜索 rhizome、节点、作者…</span>
+        <kbd className={clsx(metaLabel, "px-2 py-0.5 border border-border-default rounded-sm text-text-tertiary bg-bg-canvas hidden sm:inline-block")}>
+          {chord}
+        </kbd>
+      </button>
+
+      {/* 桌面端：发起按钮紧靠搜索框右侧 */}
+      <NewThreadButton />
     </div>
   );
 }
@@ -101,7 +63,7 @@ function SortTabs() {
     <div
       role="tablist"
       aria-label="Sort rhizomes"
-      className="flex items-center gap-6 px-8 md:px-12 lg:px-16 py-4 border-b border-border-subtle bg-bg-elevated"
+      className="flex items-center gap-6 md:gap-8 px-5 md:px-12 lg:px-16 py-3 border-b border-border-subtle bg-bg-elevated overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap snap-x snap-mandatory"
     >
       {SORT_OPTIONS.map((opt) => {
         const active = sortBy === opt.key;
@@ -113,7 +75,7 @@ function SortTabs() {
             aria-selected={active}
             onClick={() => setSortBy(opt.key)}
             className={clsx(
-              "group relative pb-2 text-left transition-colors",
+              "group relative pb-2 text-left transition-colors shrink-0 snap-start",
               active
                 ? "text-text-primary"
                 : "text-text-tertiary hover:text-text-secondary",
@@ -123,7 +85,7 @@ function SortTabs() {
             <span
               className={clsx(
                 "block font-content text-[15px] mt-0.5",
-                active ? "italic" : "",
+                active ? "text-accent" : "",
               )}
             >
               {opt.zh}
@@ -137,23 +99,36 @@ function SortTabs() {
           </button>
         );
       })}
-      <div className="ml-auto">
-        <NewThreadButton />
-      </div>
     </div>
   );
 }
 
-function NewThreadButton() {
+function NewThreadButton({ isFab = false }: { isFab?: boolean }) {
   const openPostPanel = useUiStore((s) => s.openPostPanel);
+  
+  if (isFab) {
+    return (
+      <button
+        type="button"
+        onClick={openPostPanel}
+        className="md:hidden fixed right-5 bottom-8 z-[90] flex items-center justify-center w-14 h-14 rounded-full bg-accent-deep text-bg-primary shadow-lg hover:scale-105 active:scale-95 transition-all"
+        aria-label="New thread"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={openPostPanel}
-      className="group flex items-center gap-2 border border-accent-deep bg-accent-deep text-bg-primary px-4 py-2 hover:bg-accent hover:border-accent transition-colors"
+      className="hidden md:flex shrink-0 group items-center justify-center gap-2 border border-accent-deep bg-accent-deep text-bg-primary px-5 py-2.5 rounded-pill hover:bg-accent hover:border-accent transition-colors shadow-sm"
     >
-      <span className={clsx(metaLabel)}>New thread</span>
-      <span className="font-content italic text-sm">发起</span>
+      <span className={clsx(metaLabel, "tracking-[0.06em]")}>New thread</span>
       <span
         aria-hidden
         className="inline-block transition-transform duration-300 group-hover:translate-x-0.5"
@@ -179,7 +154,7 @@ function EmptyState({ reason }: { reason: string }) {
       <h2 className="font-content text-[28px] leading-[1.1] text-text-primary mb-3">
         {reason}
       </h2>
-      <p className="font-content italic text-text-secondary text-base max-w-md mb-6">
+      <p className="font-content text-text-secondary text-[15px] max-w-md mb-6">
         先埋下第一粒种子 —— rhizomes 从一个想法开始。
       </p>
       <button
@@ -199,7 +174,7 @@ function EmptyState({ reason }: { reason: string }) {
   );
 }
 
-export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
+export function HomeMainColumn() {
   const rhizomes = useGraphStore((s) => s.rhizomes);
   const activeNav = useHomeStore((s) => s.activeNav);
   const sortBy = useHomeStore((s) => s.sortBy);
@@ -249,18 +224,32 @@ export function HomeMainColumn({ onOpenSearch }: HomeMainColumnProps) {
             : "No rhizomes match this filter.";
 
   return (
-    <section className="flex-1 min-w-0 flex flex-col">
-      <Hero onOpenSearch={onOpenSearch} />
-      <SortTabs />
+    <section className="flex-1 min-w-0 flex flex-col pt-0 md:pt-2 relative">
+      <div className="md:hidden relative z-[100] animate-fade-in animate-slide-down">
+        <Header hideLogo embedded />
+      </div>
+      <CompactSearch />
+      <div className="animate-fade-in [animation-delay:300ms] [animation-fill-mode:both]">
+        <SortTabs />
+      </div>
       <div className="flex-1 bg-bg-elevated">
         {visible.length === 0 ? (
           <EmptyState reason={emptyReason} />
         ) : (
-          visible.map((node) => (
-            <RhizomeCard key={node.node_id} node={node} />
+          visible.map((node, i) => (
+            <div
+              key={node.node_id}
+              className={i < 8 ? "animate-fade-in animate-slide-up [animation-fill-mode:both]" : ""}
+              style={i < 8 ? { animationDelay: `${300 + i * 50}ms` } : undefined}
+            >
+              <RhizomeCard node={node} />
+            </div>
           ))
         )}
       </div>
+      
+      {/* 移动端悬浮发起按钮 */}
+      <NewThreadButton isFab />
     </section>
   );
 }

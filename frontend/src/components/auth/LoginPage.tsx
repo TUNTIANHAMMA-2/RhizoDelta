@@ -248,9 +248,13 @@ export function LoginPage() {
       </aside>
 
       {/* ═══ RIGHT — form panel ═══ */}
-      <section className="flex-1 lg:flex-[3] bg-bg-elevated relative flex items-center justify-center p-8 sm:p-12 lg:p-16 xl:p-20">
+      <section className="flex-1 lg:flex-[3] bg-bg-elevated relative overflow-hidden flex items-center justify-center p-8 sm:p-12 lg:p-16 xl:p-20">
+        {/* Mobile-only background */}
+        <div className="md:hidden absolute inset-0 opacity-40 pointer-events-none z-0">
+          <RhizomeBackdrop />
+        </div>
         <div
-          className="w-full max-w-[420px] space-y-10 animate-slide-up"
+          className="relative z-10 w-full max-w-[420px] space-y-10 animate-slide-up"
           style={{ animationDelay: "60ms", animationFillMode: "both" }}
         >
           {/* Mobile-only brand */}

@@ -1,31 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useUiStore } from "../stores/uiStore";
 
 /**
- * Manages Command Palette open/close state and the global Cmd+K / Ctrl+K shortcut.
+ * Installs the global Cmd+K / Ctrl+K listener that toggles the command palette.
+ * Mount once per top-level page that should respond to the shortcut. The open
+ * state itself lives in useUiStore so any chrome element can open the palette
+ * without prop drilling.
  *
  * - Mac: Cmd+K
  * - Other: Ctrl+K
- * - Cleans up the global keydown listener on unmount.
  */
 export function useCommandPalette() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
-  const toggle = useCallback(() => setIsOpen((v) => !v), []);
+  const toggle = useUiStore((s) => s.toggleCommandPalette);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const modKey = e.metaKey || e.ctrlKey;
-      if (modKey && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         toggle();
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [toggle]);
-
-  return { isOpen, open, close, toggle };
 }
