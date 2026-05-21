@@ -11,6 +11,11 @@ spring:
     username: guest
     password: guest
     virtual-host: /
+    listener:
+      simple:
+        auto-startup: false
+      direct:
+        auto-startup: false
 
 
 

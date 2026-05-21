@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Neo4jContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -27,16 +29,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @ActiveProfiles("test")
+@TestPropertySource(properties = {
+        "spring.rabbitmq.listener.simple.auto-startup=false",
+        "spring.rabbitmq.listener.direct.auto-startup=false"
+})
 class PostApiIntegrationTest {
+    private static final String RABBITMQ_USERNAME = "testuser";
+    private static final String RABBITMQ_PASSWORD = "testpass";
+    private static final int RABBITMQ_AMQP_PORT = 5672;
+
     @Container
     static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5")
             .withAdminPassword("testpassword");
 
+    @Container
+    static GenericContainer<?> rabbitmq = new GenericContainer<>("rabbitmq:3-management")
+            .withEnv("RABBITMQ_DEFAULT_USER", RABBITMQ_USERNAME)
+            .withEnv("RABBITMQ_DEFAULT_PASS", RABBITMQ_PASSWORD)
+            .withExposedPorts(RABBITMQ_AMQP_PORT);
+
     @DynamicPropertySource
-    static void neo4jProperties(DynamicPropertyRegistry registry) {
+    static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.neo4j.uri", neo4j::getBoltUrl);
         registry.add("spring.neo4j.authentication.username", () -> "neo4j");
         registry.add("spring.neo4j.authentication.password", neo4j::getAdminPassword);
+        registry.add("spring.rabbitmq.host", rabbitmq::getHost);
+        registry.add("spring.rabbitmq.port", () -> rabbitmq.getMappedPort(RABBITMQ_AMQP_PORT));
+        registry.add("spring.rabbitmq.username", () -> RABBITMQ_USERNAME);
+        registry.add("spring.rabbitmq.password", () -> RABBITMQ_PASSWORD);
     }
 
     @Autowired

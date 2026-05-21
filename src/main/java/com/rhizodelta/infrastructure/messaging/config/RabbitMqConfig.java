@@ -170,7 +170,8 @@ public class RabbitMqConfig {
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
             MessageConverter messageConverter,
-            MethodInterceptor rabbitRetryInterceptor
+            MethodInterceptor rabbitRetryInterceptor,
+            RabbitProperties rabbitProperties
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
@@ -178,6 +179,7 @@ public class RabbitMqConfig {
         factory.setAdviceChain(rabbitRetryInterceptor);
         factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         factory.setDefaultRequeueRejected(false);
+        factory.setAutoStartup(rabbitProperties.getListener().getSimple().isAutoStartup());
         return factory;
     }
 }
