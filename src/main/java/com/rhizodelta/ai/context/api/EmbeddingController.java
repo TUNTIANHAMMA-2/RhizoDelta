@@ -6,6 +6,7 @@ import com.rhizodelta.ai.context.domain.embedding.EmbeddingWriteRequest;
 import com.rhizodelta.ai.context.domain.embedding.EmbeddingWriteResult;
 import com.rhizodelta.ai.context.domain.embedding.SimilaritySearchRequest;
 import com.rhizodelta.ai.context.domain.embedding.SimilaritySearchResult;
+import com.rhizodelta.ai.shared.service.EmbeddingModelService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,9 +34,12 @@ import java.util.Map;
 @RequestMapping("/api/nodes")
 public class EmbeddingController {
     private final EmbeddingService embeddingService;
+    private final EmbeddingModelService embeddingModelService;
 
-    public EmbeddingController(EmbeddingService embeddingService) {
+    public EmbeddingController(EmbeddingService embeddingService,
+                               EmbeddingModelService embeddingModelService) {
         this.embeddingService = embeddingService;
+        this.embeddingModelService = embeddingModelService;
     }
 
     /**
@@ -72,10 +76,11 @@ public class EmbeddingController {
     }
 
     /**
-     * 按向量检索相似节点。
+     * 按文本或向量检索相似节点。
      *
      * <p>这里使用 {@code POST} 而不是 {@code GET}，是因为查询向量通常过长，不适合放入 URL。
-     * 该操作语义上仍然是只读且幂等的。
+     * 调用方可以直接传 {@code vector}，也可以传 {@code query} 由服务端生成 embedding。
+     * 若两者同时传入，优先使用 {@code vector}，以保持既有 API 行为稳定。
      *
      * <p>
      *
@@ -86,7 +91,11 @@ public class EmbeddingController {
     public ApiResponse<List<SimilaritySearchResult>> searchSimilar(
             @RequestBody SimilaritySearchRequest request
     ) {
-        List<SimilaritySearchResult> results = embeddingService.searchSimilar(request.vector(), request.top_k());
+        List<Float> vector = request.vector();
+        if (vector == null || vector.isEmpty()) {
+            vector = embeddingModelService.embed(request.query());
+        }
+        List<SimilaritySearchResult> results = embeddingService.searchSimilar(vector, request.top_k());
         return ApiResponse.ok(results);
     }
 }

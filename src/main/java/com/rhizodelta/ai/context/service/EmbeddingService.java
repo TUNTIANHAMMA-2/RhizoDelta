@@ -70,9 +70,9 @@ public class EmbeddingService {
               }) AS neighbors
             }
             RETURN node.node_id AS nodeId,
-                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' ELSE 'AI_Consensus' END AS label,
+                   CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    score AS score,
-                   CASE WHEN 'Human_Post' IN nodeLabels THEN node.content ELSE node.summary_content END AS content,
+                   CASE WHEN 'AI_Consensus' IN nodeLabels THEN node.summary_content ELSE node.content END AS content,
                    node.created_at AS createdAt,
                    neighbors AS neighbors
             ORDER BY score DESC

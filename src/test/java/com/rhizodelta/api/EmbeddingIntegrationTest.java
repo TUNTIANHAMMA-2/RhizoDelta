@@ -1,9 +1,11 @@
 package com.rhizodelta.api;
 
+import com.rhizodelta.ai.shared.service.EmbeddingModelService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpEntity;
@@ -25,6 +27,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -50,9 +56,13 @@ class EmbeddingIntegrationTest {
     @Autowired
     private Neo4jClient neo4jClient;
 
+    @MockBean
+    private EmbeddingModelService embeddingModelService;
+
     @BeforeEach
     void cleanDatabase() {
         neo4jClient.query("MATCH (n) DETACH DELETE n").run();
+        reset(embeddingModelService);
     }
 
     @Test
@@ -121,6 +131,31 @@ class EmbeddingIntegrationTest {
                 .contains(nodeB.toString());
         assertThat(neighbors).extracting(item -> item.get("relationship_type"))
                 .doesNotContain("CONCEPTUAL_OVERLAP", "RELATES_TO");
+        verify(embeddingModelService, never()).embed(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void searchSimilarShouldEmbedQueryTextAndUseVectorIndex() {
+        UUID nodeA = UUID.randomUUID();
+        UUID nodeB = UUID.randomUUID();
+        createHumanPostNode(nodeA, "req-query-a", "author-a", "vector-search target");
+        createHumanPostNode(nodeB, "req-query-b", "author-b", "unrelated");
+
+        writeEmbedding(nodeA, List.of(1.0f, 0.0f, 0.0f));
+        writeEmbedding(nodeB, List.of(0.0f, 1.0f, 0.0f));
+        when(embeddingModelService.embed("vector-search")).thenReturn(List.of(1.0f, 0.0f, 0.0f));
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/api/nodes/search/similar",
+                querySearchRequest("vector-search", 5),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> results = bodyList(response);
+        assertThat(results).isNotEmpty();
+        assertThat(results.get(0).get("node_id")).isEqualTo(nodeA.toString());
+        verify(embeddingModelService).embed("vector-search");
     }
 
     @Test
@@ -198,6 +233,15 @@ class EmbeddingIntegrationTest {
     private static Map<String, Object> searchRequest(List<Float> vector, Integer topK) {
         Map<String, Object> request = new HashMap<>();
         request.put("vector", vector);
+        if (topK != null) {
+            request.put("top_k", topK);
+        }
+        return request;
+    }
+
+    private static Map<String, Object> querySearchRequest(String query, Integer topK) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("query", query);
         if (topK != null) {
             request.put("top_k", topK);
         }

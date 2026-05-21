@@ -238,10 +238,9 @@ export interface EmbeddingWriteRequest {
   vector: number[];
 }
 
-export interface SimilaritySearchRequest {
-  vector: number[];
+export type SimilaritySearchRequest = {
   top_k?: number;
-}
+} & ({ vector: number[]; query?: never } | { query: string; vector?: never });
 
 export interface SimilaritySearchResult {
   node_id: string;
