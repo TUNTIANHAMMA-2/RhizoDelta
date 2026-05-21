@@ -2,6 +2,7 @@ import { request } from "./client";
 import type {
   AssociationInfo,
   AssociationType,
+  DiscussionTreeResponse,
   GraphNodeDTO,
   GraphTopologyDTO,
   EmbeddingWriteRequest,
@@ -36,6 +37,20 @@ export const fetchChildren = (
   const qs = params.toString();
   return request<GraphTopologyDTO>(
     `/api/nodes/${id}/children${qs ? `?${qs}` : ""}`,
+  );
+};
+
+export const fetchDiscussionTree = (
+  rootId: string,
+  params?: { maxDepth?: number; limit?: number; cursor?: string },
+) => {
+  const qs = new URLSearchParams();
+  if (params?.maxDepth) qs.set("max_depth", String(params.maxDepth));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  const q = qs.toString();
+  return request<DiscussionTreeResponse>(
+    `/api/nodes/${rootId}/discussion-tree${q ? `?${q}` : ""}`,
   );
 };
 

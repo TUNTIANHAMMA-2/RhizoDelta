@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { useSseStore } from "../stores/sseStore";
 import { useGraphStore } from "../stores/graphStore";
+import { graphNodeToCommentNode, useDiscussionTreeStore } from "../stores/discussionTreeStore";
 import { useNotificationStore } from "../stores/notificationStore";
 import { useUiStore } from "../stores/uiStore";
 import { fetchNode } from "../api/nodes";
@@ -20,6 +21,7 @@ const SSE_URL = "/api/events/stream";
 const MAX_RETRY_DELAY = 30_000;
 const BASE_RETRY_DELAY = 1_000;
 const MAX_RETRIES = 20;
+let discussionTreeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface SseEvent {
   type: string;
@@ -160,6 +162,14 @@ function handleSseEvent(event: SseEvent) {
         graphStore.addNode(node);
         graphStore.loadRhizomes(); // Always refresh in case it's a new root
       });
+      const dt = useDiscussionTreeStore.getState();
+      if (dt.rootId && payload.label === "Human_Post") {
+        if (discussionTreeRefreshTimer) clearTimeout(discussionTreeRefreshTimer);
+        discussionTreeRefreshTimer = setTimeout(() => {
+          discussionTreeRefreshTimer = null;
+          useDiscussionTreeStore.getState().refreshTree();
+        }, 500);
+      }
       notifStore.addNotification({
         type: "node_created",
         nodeId: payload.node_id,
@@ -253,6 +263,24 @@ function handleSseEvent(event: SseEvent) {
         break;
       }
       useSseStore.getState().setOrchestrationStatus(payload);
+      const dt = useDiscussionTreeStore.getState();
+      if (payload.request_id && dt.pendingPosts.has(payload.request_id)) {
+        if (payload.post_node_id) {
+          const pending = dt.pendingPosts.get(payload.request_id);
+          fetchNode(payload.post_node_id).then((node) => {
+            useDiscussionTreeStore.getState().resolvePendingPost(
+              payload.request_id,
+              graphNodeToCommentNode(
+                node,
+                pending?.targetNodeId ?? dt.rootId,
+                pending?.targetNodeId ? (dt.nodesById.get(pending.targetNodeId)?.depth ?? 0) + 1 : 0,
+              ),
+            );
+          });
+        } else if (payload.status === "POST_ACCEPTED") {
+          dt.markPendingAccepted(payload.request_id);
+        }
+      }
       notifStore.addNotification({
         type: "orchestration_status",
         nodeId: payload.post_node_id ?? undefined,

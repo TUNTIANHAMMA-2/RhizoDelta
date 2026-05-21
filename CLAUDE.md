@@ -60,7 +60,7 @@ RhizoDelta/
 │   │   ├── summary/                     #   摘要 Agent
 │   │   ├── quality/                     #   质量评估 Agent
 │   │   └── shared/                      #   ModelRouter / 共享枚举
-│   ├── query/                           # 节点查询 API（lineage / children / provenance）
+│   ├── query/                           # 节点查询 API（lineage / children / provenance / discussion-tree）
 │   └── infrastructure/
 │       ├── config/  exception/  web/
 │       ├── messaging/                   # RabbitMQ 配置 + PostConsumer
@@ -79,8 +79,8 @@ RhizoDelta/
 │   ├── src/
 │   │   ├── App.tsx                      # 路由根 + AuthGuard
 │   │   ├── components/                  # auth / brand / chrome / editor / feedback / forms / graph / home /
-│   │   │                                # modals / panels / sidebar / settings / shared / search
-│   │   ├── components/GraphWorkspace.tsx  # 主工作区
+│   │   │                                # mobile / modals / panels / sidebar / settings / shared / search
+│   │   ├── components/GraphWorkspace.tsx  # 视口切换壳子（mobile tree / desktop graph）
 │   │   ├── api/                         # 后端 API 封装（client / posts / decisions / ...）
 │   │   ├── stores/                      # Zustand（authStore / graphStore / sseStore / homeStore / uiStore / ...）
 │   │   ├── hooks/                       # useSse / useGraphInteractions / useCommandPalette
@@ -248,6 +248,8 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | Auth REST | `src/main/java/com/rhizodelta/infrastructure/security/api/AuthController.java` |
 | 帖子提交 | `src/main/java/com/rhizodelta/core/api/PostController.java` |
 | 帖子消费（异步管线起点） | `src/main/java/com/rhizodelta/infrastructure/messaging/consumer/PostConsumer.java` |
+| 讨论树 DTO | `src/main/java/com/rhizodelta/query/api/*DiscussionTree*.java` |
+| 讨论树查询服务 | `src/main/java/com/rhizodelta/query/service/DiscussionTreeQueryService.java` |
 | 决策（合并/分支/注入/回滚） | `src/main/java/com/rhizodelta/consensus/service/DecisionService.java` |
 | AI 状态机 | `src/main/java/com/rhizodelta/ai/routing/service/AiRoutingWorkflowService.java` |
 | 规则前置过滤 | `src/main/java/com/rhizodelta/ai/routing/service/RuleBasedPreFilterService.java` |
@@ -260,11 +262,15 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | 本地配置（gitignored） | `src/main/resources/application-local.yml` |
 | 部署模板 | `src/main/resources/application.yml.example` |
 | 前端入口 | `frontend/src/App.tsx` |
-| 主工作区 | `frontend/src/components/GraphWorkspace.tsx` |
+| 主工作区壳子 | `frontend/src/components/GraphWorkspace.tsx` |
+| 桌面图谱工作区 | `frontend/src/components/DesktopGraphWorkspace.tsx` |
+| 移动端讨论树 | `frontend/src/components/mobile/MobileDiscussionTreeView.tsx` |
 | 登录页 | `frontend/src/components/auth/LoginPage.tsx` |
 | API 客户端 | `frontend/src/api/client.ts` |
 | 图谱状态 | `frontend/src/stores/graphStore.ts` |
+| 讨论树状态 | `frontend/src/stores/discussionTreeStore.ts` |
 | SSE Hook | `frontend/src/hooks/useSse.ts` |
+| 视口 Hook | `frontend/src/hooks/useViewport.ts` |
 | Docker 编排 | `docker-compose.yml` |
 | Maven 配置 | `pom.xml` |
 | 观测看板 provisioning | `grafana/provisioning/` |
@@ -281,6 +287,7 @@ open http://127.0.0.1:3000      # admin / ${GRAFANA_ADMIN_PASSWORD}
 | 可观测性 runbook | `docs/runbooks/observability.md` |
 | Feature flags runbook | `docs/runbooks/feature-flags.md` |
 | 端口约定 runbook | `docs/runbooks/ports.md` |
+| 移动端讨论树 runbook | `docs/runbooks/mobile-discussion-tree.md` |
 | PREFERS 聚合 runbook | `docs/runbooks/prefers-aggregation.md` |
 | Hermes 监控提示词 | `docs/runbooks/hermes-monitoring.md` |
 | 用户身份完整性 | `docs/runbooks/user-identity-integrity.md` |

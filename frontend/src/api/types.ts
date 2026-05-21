@@ -277,6 +277,52 @@ export interface ForkDecisionResult {
   total_count: number;
 }
 
+// ────────────────────── 移动端讨论树 ──────────────────────
+
+export interface CommentAuthor {
+  user_id: string | null;
+  username: string | null;
+  display_name: string | null;
+}
+
+export interface DiscussionArtifact {
+  node_id: string;
+  kind: "CONSENSUS" | "RESULT";
+  anchor_node_id: string;
+  body: string | null;
+  source_node_ids: string[];
+  source_count: number;
+  created_at: string | null;
+  agent_version: string | null;
+}
+
+export interface CommentNode {
+  node_id: string;
+  content: string | null;
+  author: CommentAuthor;
+  created_at: string | null;
+  parent_id: string | null;
+  depth: number;
+  children: CommentNode[];
+  artifacts: DiscussionArtifact[];
+  has_more_children: boolean;
+  total_children_count: number;
+}
+
+export interface DiscussionTreeMeta {
+  root_node_id: string;
+  max_depth: number;
+  limit: number;
+  truncated: boolean;
+  has_more: boolean;
+  next_cursor: string | null;
+}
+
+export interface DiscussionTreeResponse {
+  root: CommentNode;
+  meta: DiscussionTreeMeta;
+}
+
 export interface RollbackResult {
   decision_id: string;
   rolled_back_node_id: string;
