@@ -266,12 +266,18 @@ public class FeedService {
         String cypher;
         Map<String, Object> params;
 
-        List<String> mutedUserIds = muteRepository.getMutedUserIds(userId);
-        List<String> mutedTopicIds = muteRepository.getMutedTopicIds(userId);
-        List<String> mutedNodeIds = muteRepository.getMutedNodeIds(userId);
+        // Merged single Cypher: was 3 separate (getMutedUserIds / getMutedTopicIds / getMutedNodeIds)
+        // queries fired sequentially before the feed query. The combined query saves 2 Neo4j
+        // round-trips per /api/feed request and keeps the same response semantics.
+        MuteRepository.MuteFilters muteFilters = muteRepository.getMuteFilters(userId);
+        List<String> mutedUserIds = muteFilters.mutedUserIds();
+        List<String> mutedTopicIds = muteFilters.mutedTopicIds();
+        List<String> mutedNodeIds = muteFilters.mutedNodeIds();
 
-        long followCount = followRepository.countFollows(userId);
-        if (followCount == 0L) {
+        // hasFollows is an EXISTS subquery — it short-circuits on the first FOLLOWS edge,
+        // so users with many follows no longer pay the full count() before personalization
+        // even starts.
+        if (!followRepository.hasFollows(userId)) {
             variant = Variant.GLOBAL;
             cypher = GLOBAL_FEED_QUERY;
             params = Map.of(

@@ -95,6 +95,26 @@ public class MuteRepository {
             RETURN collect(muted.node_id) AS mutedNodeIds
             """;
 
+    /**
+     * 一次性返回当前用户全部三种 MUTED 目标的 id 集合。
+     *
+     * <p>{@link FeedService} 之前为同一个用户分别 fire 三次独立 Cypher，再
+     * 串行等待返回；这条查询把它们折叠成一次连接占用，节省 2 次 Neo4j
+     * round-trip（每次 ~3-12ms）。{@code OPTIONAL MATCH} 保证某类 MUTED 边为空时
+     * 仍返回空集合而不是 null。
+     */
+    private static final String GET_MUTE_FILTERS_QUERY = """
+            MATCH (u:UserAccount {user_id: $userId})
+            OPTIONAL MATCH (u)-[:MUTED]->(mutedUser:UserAccount)
+            WITH u, collect(DISTINCT mutedUser.user_id) AS mutedUserIds
+            OPTIONAL MATCH (u)-[:MUTED]->(mutedTopic:Topic)
+            WITH u, mutedUserIds, collect(DISTINCT mutedTopic.topic_id) AS mutedTopicIds
+            OPTIONAL MATCH (u)-[:MUTED]->(mutedNode:GraphNode)
+            RETURN mutedUserIds,
+                   mutedTopicIds,
+                   collect(DISTINCT mutedNode.node_id) AS mutedNodeIds
+            """;
+
     private final Neo4jClient neo4jClient;
 
     public MuteRepository(Neo4jClient neo4jClient) {
@@ -167,5 +187,37 @@ public class MuteRepository {
                 .one()
                 .map(record -> (List<String>) record.get("mutedNodeIds"))
                 .orElse(List.of());
+    }
+
+    /**
+     * 一次性读取三类 MUTED 过滤器；空集合而非 null。
+     *
+     * <p>用于 {@link FeedService}：合并前要打 3 次 Cypher，现在只打 1 次。
+     */
+    @SuppressWarnings("unchecked")
+    public MuteFilters getMuteFilters(String userId) {
+        return neo4jClient.query(GET_MUTE_FILTERS_QUERY)
+                .bind(userId).to("userId")
+                .fetch()
+                .one()
+                .map(record -> new MuteFilters(
+                        (List<String>) record.getOrDefault("mutedUserIds", List.of()),
+                        (List<String>) record.getOrDefault("mutedTopicIds", List.of()),
+                        (List<String>) record.getOrDefault("mutedNodeIds", List.of())
+                ))
+                .orElse(MuteFilters.empty());
+    }
+
+    /**
+     * 合并后的过滤器投影。
+     *
+     * <p>{@link #empty()} 用于上游用户不存在时返回一个零成本的实例，让调用方不必再判 null。
+     */
+    public record MuteFilters(List<String> mutedUserIds,
+                              List<String> mutedTopicIds,
+                              List<String> mutedNodeIds) {
+        public static MuteFilters empty() {
+            return new MuteFilters(List.of(), List.of(), List.of());
+        }
     }
 }

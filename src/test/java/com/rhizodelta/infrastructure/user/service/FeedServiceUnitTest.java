@@ -32,9 +32,8 @@ class FeedServiceUnitTest {
         MuteRepository muteRepository = mock(MuteRepository.class);
         Environment env = environmentWith(false, false);
 
-        when(followRepository.countFollows("alice")).thenReturn(1L);
-        when(muteRepository.getMutedUserIds("alice")).thenReturn(List.of());
-        when(muteRepository.getMutedTopicIds("alice")).thenReturn(List.of());
+        when(followRepository.hasFollows("alice")).thenReturn(true);
+        when(muteRepository.getMuteFilters("alice")).thenReturn(MuteRepository.MuteFilters.empty());
         when(neo4jClient.query(anyString()).bindAll(any(Map.class)).fetch().all()).thenReturn(List.of());
 
         FeedService service = new FeedService(neo4jClient, muteRepository, followRepository, env, emptyMeterRegistryProvider());
@@ -54,9 +53,8 @@ class FeedServiceUnitTest {
         MuteRepository muteRepository = mock(MuteRepository.class);
         Environment env = environmentWith(true, true);
 
-        when(followRepository.countFollows("alice")).thenReturn(1L);
-        when(muteRepository.getMutedUserIds("alice")).thenReturn(List.of());
-        when(muteRepository.getMutedTopicIds("alice")).thenReturn(List.of());
+        when(followRepository.hasFollows("alice")).thenReturn(true);
+        when(muteRepository.getMuteFilters("alice")).thenReturn(MuteRepository.MuteFilters.empty());
         when(neo4jClient.query(anyString()).bindAll(any(Map.class)).fetch().all()).thenReturn(List.of());
 
         FeedService service = new FeedService(neo4jClient, muteRepository, followRepository, env, emptyMeterRegistryProvider());
@@ -78,7 +76,8 @@ class FeedServiceUnitTest {
         MuteRepository muteRepository = mock(MuteRepository.class);
         Environment env = environmentWith(true, true);
 
-        when(followRepository.countFollows("alice")).thenReturn(0L);
+        when(followRepository.hasFollows("alice")).thenReturn(false);
+        when(muteRepository.getMuteFilters("alice")).thenReturn(MuteRepository.MuteFilters.empty());
         when(neo4jClient.query(anyString()).bindAll(any(Map.class)).fetch().all()).thenReturn(List.of());
 
         FeedService service = new FeedService(neo4jClient, muteRepository, followRepository, env, emptyMeterRegistryProvider());
@@ -191,9 +190,8 @@ class FeedServiceUnitTest {
         FollowRepository followRepository = mock(FollowRepository.class);
         MuteRepository muteRepository = mock(MuteRepository.class);
 
-        when(followRepository.countFollows("alice")).thenReturn(followCount);
-        when(muteRepository.getMutedUserIds("alice")).thenReturn(List.of());
-        when(muteRepository.getMutedTopicIds("alice")).thenReturn(List.of());
+        when(followRepository.hasFollows("alice")).thenReturn(followCount > 0L);
+        when(muteRepository.getMuteFilters("alice")).thenReturn(MuteRepository.MuteFilters.empty());
         when(neo4jClient.query(anyString()).bindAll(any(Map.class)).fetch().all()).thenReturn((List) rows);
 
         ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);

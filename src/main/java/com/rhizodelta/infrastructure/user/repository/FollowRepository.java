@@ -100,6 +100,19 @@ public class FollowRepository {
             RETURN count(r) AS total
             """;
 
+    /**
+     * 仅判断"是否至少有一个 FOLLOWS 边"。
+     *
+     * <p>FeedService 之前用 {@link #countFollows} 在每次请求都数完整数量，
+     * 但 Feed 路径其实只需要"是否走 GLOBAL 兜底"这个二元判断；这里用
+     * {@code EXISTS} 子查询命中第一条边就返回，避免高 follow 量的用户每次
+     * 都做完整 count。
+     */
+    private static final String HAS_FOLLOWS_QUERY = """
+            MATCH (u:UserAccount {user_id: $userId})
+            RETURN EXISTS { MATCH (u)-[:FOLLOWS]->() } AS hasFollows
+            """;
+
     private static final String DELETE_FOLLOW_BY_ID_QUERY = """
             MATCH (:UserAccount {user_id: $userId})-[r:FOLLOWS {follow_id: $followId}]->()
             DELETE r
@@ -160,6 +173,20 @@ public class FollowRepository {
                 .one()
                 .map(record -> ((Number) record.get("total")).longValue())
                 .orElse(0L);
+    }
+
+    /**
+     * 是否至少有一个 FOLLOWS 边；命中第一条即返回，比 {@link #countFollows} 便宜。
+     *
+     * <p>仅用于 Feed 的"个性化 vs 全局兜底"二元判断。
+     */
+    public boolean hasFollows(String userId) {
+        return neo4jClient.query(HAS_FOLLOWS_QUERY)
+                .bind(userId).to("userId")
+                .fetch()
+                .one()
+                .map(record -> Boolean.TRUE.equals(record.get("hasFollows")))
+                .orElse(false);
     }
 
     public boolean deleteById(String userId, String followId) {
