@@ -31,6 +31,14 @@ public class EmbeddingTaskExecutorConfig {
     private static final int ROUTING_DEFAULT_QUEUE_CAPACITY = 50;
     private static final String ROUTING_THREAD_NAME_PREFIX = "routing-";
 
+    private static final String PREFERENCE_EVENT_CORE_POOL_SIZE_PROPERTY = "rhizodelta.preference-event.executor.corePoolSize";
+    private static final String PREFERENCE_EVENT_MAX_POOL_SIZE_PROPERTY = "rhizodelta.preference-event.executor.maxPoolSize";
+    private static final String PREFERENCE_EVENT_QUEUE_CAPACITY_PROPERTY = "rhizodelta.preference-event.executor.queueCapacity";
+    private static final int PREFERENCE_EVENT_DEFAULT_CORE_POOL_SIZE = 2;
+    private static final int PREFERENCE_EVENT_DEFAULT_MAX_POOL_SIZE = 4;
+    private static final int PREFERENCE_EVENT_DEFAULT_QUEUE_CAPACITY = 200;
+    private static final String PREFERENCE_EVENT_THREAD_NAME_PREFIX = "preference-event-";
+
     /**
      * 创建 embedding 任务线程池。
      *
@@ -64,6 +72,29 @@ public class EmbeddingTaskExecutorConfig {
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setThreadNamePrefix(ROUTING_THREAD_NAME_PREFIX);
+        executor.setCorePoolSize(corePoolSize);
+        executor.setMaxPoolSize(maxPoolSize);
+        executor.setQueueCapacity(queueCapacity);
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * 创建 PreferenceEvent 任务线程池。
+     *
+     * <p>该线程池服务于隐式 VIEW 等读路径触发的偏好事件写入，让 {@code GET /api/nodes/{id}}
+     * 等读接口在请求线程上不再等待 Neo4j 写事务返回。队列满时直接丢弃（{@code AbortPolicy} 由
+     * 服务层捕获），保证偏好事件不阻塞主请求；显式 POST 创建事件的路径仍保持同步以便给用户
+     * 即时反馈。
+     */
+    @Bean(name = "preferenceEventExecutor")
+    public Executor preferenceEventExecutor(Environment environment) {
+        int corePoolSize = resolvePositiveInt(environment, PREFERENCE_EVENT_CORE_POOL_SIZE_PROPERTY, PREFERENCE_EVENT_DEFAULT_CORE_POOL_SIZE);
+        int maxPoolSize = resolvePositiveInt(environment, PREFERENCE_EVENT_MAX_POOL_SIZE_PROPERTY, PREFERENCE_EVENT_DEFAULT_MAX_POOL_SIZE);
+        int queueCapacity = resolvePositiveInt(environment, PREFERENCE_EVENT_QUEUE_CAPACITY_PROPERTY, PREFERENCE_EVENT_DEFAULT_QUEUE_CAPACITY);
+
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix(PREFERENCE_EVENT_THREAD_NAME_PREFIX);
         executor.setCorePoolSize(corePoolSize);
         executor.setMaxPoolSize(maxPoolSize);
         executor.setQueueCapacity(queueCapacity);

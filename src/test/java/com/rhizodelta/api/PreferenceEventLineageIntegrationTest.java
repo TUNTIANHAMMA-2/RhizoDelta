@@ -8,8 +8,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +32,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,6 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "rhizodelta.preference.half-life-days=30",
         "rhizodelta.preference.window-hours=24"
 })
+@Import(PreferenceEventLineageIntegrationTest.SynchronousPreferenceEventExecutorConfig.class)
 class PreferenceEventLineageIntegrationTest {
 
     @Container
@@ -245,5 +251,21 @@ class PreferenceEventLineageIntegrationTest {
                 .bind(topicId).to("topicId")
                 .fetch().one().map(r -> ((Number) r.get("weight")).doubleValue())
                 .orElseThrow(() -> new AssertionError("PREFERS edge not present for user=" + userId + " topic=" + topicId));
+    }
+
+    /**
+     * 在该集成测试里把 {@code preferenceEventExecutor} 覆盖为同步 executor，
+     * 让 {@code GET /api/nodes/{id}} 返回时偏好事件一定已经落库。
+     *
+     * <p>生产环境保持异步，这样读路径不会被 Neo4j 写事务拖慢——只是本测试在 HTTP 调用
+     * 之后立即查询 TOWARD 边，端到端验证需要同步语义。
+     */
+    @TestConfiguration
+    static class SynchronousPreferenceEventExecutorConfig {
+        @Bean(name = "preferenceEventExecutor")
+        @Primary
+        Executor preferenceEventExecutor() {
+            return Runnable::run;
+        }
     }
 }

@@ -272,7 +272,7 @@ public class NodeQueryController {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser u)) {
             return;
         }
-        preferenceEventService.recordEvent(u.sub(), null, "VIEW", 0.5, nodeId.toString());
+        preferenceEventService.recordEventAsync(u.sub(), null, "VIEW", 0.5, nodeId.toString());
     }
 
     private String callerUserId(Authentication authentication) {
