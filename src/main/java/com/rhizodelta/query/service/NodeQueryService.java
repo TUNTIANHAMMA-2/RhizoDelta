@@ -94,7 +94,22 @@ public class NodeQueryService {
                   type: type(rel),
                   createdAt: rel.created_at
             }] AS edges
-            RETURN nodes, edges
+            // Stage 3: Resolve author identities inline so callers no longer need a follow-up
+            // AUTHOR_PROJECTION_QUERY round-trip. UNWIND over [NULL] keeps the result row alive
+            // when `nodes` is empty; the `WHERE pair.authorId IS NOT NULL` filters out the
+            // sentinel row before returning.
+            WITH nodes, edges,
+                 [n IN nodes WHERE n.authorId IS NOT NULL | n.authorId] AS allAuthorIds
+            UNWIND (CASE WHEN allAuthorIds = [] THEN [NULL] ELSE allAuthorIds END) AS aid
+            OPTIONAL MATCH (author:UserAccount {user_id: aid})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
+            WITH nodes, edges,
+                 [pair IN collect(DISTINCT {
+                   authorId: author.user_id,
+                   authorUsername: author.username,
+                   authorDisplayName: coalesce(profile.display_name, author.username)
+                 }) WHERE pair.authorId IS NOT NULL] AS authors
+            RETURN nodes, edges, authors
             """;
 
     private static final String CHILDREN_QUERY = """
@@ -165,7 +180,19 @@ public class NodeQueryService {
                   type: type(rel),
                   createdAt: rel.created_at
             }] AS edges
-            RETURN nodes, edges
+            // Stage 3: Resolve author identities inline (see LINEAGE_QUERY for rationale).
+            WITH nodes, edges,
+                 [n IN nodes WHERE n.authorId IS NOT NULL | n.authorId] AS allAuthorIds
+            UNWIND (CASE WHEN allAuthorIds = [] THEN [NULL] ELSE allAuthorIds END) AS aid
+            OPTIONAL MATCH (author:UserAccount {user_id: aid})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
+            WITH nodes, edges,
+                 [pair IN collect(DISTINCT {
+                   authorId: author.user_id,
+                   authorUsername: author.username,
+                   authorDisplayName: coalesce(profile.display_name, author.username)
+                 }) WHERE pair.authorId IS NOT NULL] AS authors
+            RETURN nodes, edges, authors
             """;
 
     private static final String NODE_SUMMARY_QUERY = """
@@ -175,11 +202,15 @@ public class NodeQueryService {
             OPTIONAL MATCH (caller:UserAccount {user_id: $callerUserId})
             OPTIONAL MATCH (caller)-[followRel:FOLLOWS]->(n)
             OPTIONAL MATCH (caller)-[muteRel:MUTED]->(n)
+            OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    n.content AS content,
                    n.summary_content AS summaryContent,
                    n.author_id AS authorId,
+                   author.username AS authorUsername,
+                   coalesce(profile.display_name, author.username) AS authorDisplayName,
                    n.agent_version AS agentVersion,
                    n.created_at AS createdAt,
                    n.embedding IS NOT NULL AS hasEmbedding,
@@ -201,11 +232,15 @@ public class NodeQueryService {
             WHERE NOT coalesce(consensus._deleted, false)
               AND NOT coalesce(source._deleted, false)
             WITH source
+            OPTIONAL MATCH (author:UserAccount {user_id: source.author_id})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN source.node_id AS nodeId,
                    'Human_Post' AS label,
                    source.content AS content,
                    source.summary_content AS summaryContent,
                    source.author_id AS authorId,
+                   author.username AS authorUsername,
+                   coalesce(profile.display_name, author.username) AS authorDisplayName,
                    source.agent_version AS agentVersion,
                    source.created_at AS createdAt,
                    source.embedding IS NOT NULL AS hasEmbedding,
@@ -218,11 +253,15 @@ public class NodeQueryService {
             WHERE NOT coalesce(target._deleted, false)
               AND NOT coalesce(parent._deleted, false)
             WITH parent, labels(parent) AS parentLabels
+            OPTIONAL MATCH (author:UserAccount {user_id: parent.author_id})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN parent.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN parentLabels THEN 'Human_Post' WHEN 'Result' IN parentLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    parent.content AS content,
                    parent.summary_content AS summaryContent,
                    parent.author_id AS authorId,
+                   author.username AS authorUsername,
+                   coalesce(profile.display_name, author.username) AS authorDisplayName,
                    parent.agent_version AS agentVersion,
                    parent.created_at AS createdAt,
                    parent.embedding IS NOT NULL AS hasEmbedding,
@@ -235,11 +274,15 @@ public class NodeQueryService {
             WHERE NOT coalesce(target._deleted, false)
               AND NOT coalesce(source._deleted, false)
             WITH source, labels(source) AS sourceLabels
+            OPTIONAL MATCH (author:UserAccount {user_id: source.author_id})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN source.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN sourceLabels THEN 'Human_Post' WHEN 'Result' IN sourceLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    source.content AS content,
                    source.summary_content AS summaryContent,
                    source.author_id AS authorId,
+                   author.username AS authorUsername,
+                   coalesce(profile.display_name, author.username) AS authorDisplayName,
                    source.agent_version AS agentVersion,
                    source.created_at AS createdAt,
                    source.embedding IS NOT NULL AS hasEmbedding,
@@ -256,29 +299,21 @@ public class NodeQueryService {
                 WHERE target.node_id <> n.node_id AND NOT coalesce(ai._deleted, false)
               }
             WITH n, labels(n) AS nodeLabels
+            OPTIONAL MATCH (author:UserAccount {user_id: n.author_id})
+            OPTIONAL MATCH (author)-[:HAS_PROFILE]->(profile:UserProfile)
             RETURN n.node_id AS nodeId,
                    CASE WHEN 'Human_Post' IN nodeLabels THEN 'Human_Post' WHEN 'Result' IN nodeLabels THEN 'Result' ELSE 'AI_Consensus' END AS label,
                    n.content AS content,
                    n.summary_content AS summaryContent,
                    n.author_id AS authorId,
+                   author.username AS authorUsername,
+                   coalesce(profile.display_name, author.username) AS authorDisplayName,
                    n.agent_version AS agentVersion,
                    n.created_at AS createdAt,
                    n.embedding IS NOT NULL AS hasEmbedding,
                    n.quality_overall AS qualityOverall
             ORDER BY createdAt DESC
             LIMIT $limit
-            """;
-    private static final String AUTHOR_PROJECTION_QUERY = """
-            MATCH (user:UserAccount)
-            WHERE user.user_id IN $authorIds
-            OPTIONAL MATCH (user)-[:HAS_PROFILE]->(profile:UserProfile)
-            WITH user, head(collect(profile.display_name)) AS profileDisplayName
-            RETURN user.user_id AS authorId,
-                   user.username AS authorUsername,
-                   CASE
-                     WHEN profileDisplayName IS NULL OR trim(profileDisplayName) = '' THEN user.username
-                     ELSE profileDisplayName
-                   END AS authorDisplayName
             """;
 
     private final HumanPostRepository humanPostRepository;
@@ -452,7 +487,6 @@ public class NodeQueryService {
                 .fetch()
                 .one()
                 .map(NodeQueryService::toLineageNode)
-                .map(this::enrichAuthorProjection)
                 .orElseThrow(() -> new NoSuchElementException("Node not found: " + nodeId));
     }
 
@@ -468,7 +502,7 @@ public class NodeQueryService {
      *   <li>{@code Result} → 沿 {@code MATERIALIZED_FROM} 返回物化来源。</li>
      * </ul>
      *
-     * <p>所有分支均会过滤掉软删除节点，并通过 {@link #enrichAuthorProjections(List)} 补齐作者投影。
+     * <p>所有分支均会过滤掉软删除节点，作者投影在主查询内的 OPTIONAL MATCH 中一次取齐。
      * 对没有上游的节点（例如根帖、独立 Result）返回空列表。
      *
      * <p>相比 {@link #getProvenance(UUID)}，该方法更轻量，更适合 UI 展示与提示词构建。
@@ -496,13 +530,12 @@ public class NodeQueryService {
             case "Result" -> RESULT_PROVENANCE_QUERY;
             default -> throw new IllegalStateException("Unsupported node label '" + label + "' for node " + nodeId);
         };
-        List<LineageNode> nodes = neo4jClient.query(query)
+        return neo4jClient.query(query)
                 .bind(nodeId.toString()).to("nodeId")
                 .fetch().all()
                 .stream()
                 .map(NodeQueryService::toLineageNode)
                 .toList();
-        return enrichAuthorProjections(nodes);
     }
 
     /**
@@ -518,13 +551,12 @@ public class NodeQueryService {
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public List<LineageNode> getRoots(Integer limit) {
         int resolvedLimit = limit == null || limit <= 0 ? 50 : limit;
-        List<LineageNode> nodes = neo4jClient.query(ROOTS_QUERY)
+        return neo4jClient.query(ROOTS_QUERY)
                 .bind(resolvedLimit).to("limit")
                 .fetch().all()
                 .stream()
-                .map(NodeQueryService::toLineageNodeMap)
+                .map(NodeQueryService::toLineageNode)
                 .toList();
-        return enrichAuthorProjections(nodes);
     }
 
     private int resolveMaxDepth(Integer maxDepth) {
@@ -558,14 +590,17 @@ public class NodeQueryService {
     }
 
     private static LineageNode toLineageNode(Map<String, Object> record) {
+        // Single-row queries (NODE_SUMMARY / ROOTS / *_PROVENANCE) now inline the author
+        // OPTIONAL MATCH so authorUsername / authorDisplayName arrive in the same record —
+        // no follow-up AUTHOR_PROJECTION_QUERY round-trip required.
         return new LineageNode(
                 (String) record.get("nodeId"),
                 (String) record.get("label"),
                 (String) record.get("content"),
                 (String) record.get("summaryContent"),
                 (String) record.get("authorId"),
-                null,
-                null,
+                (String) record.get("authorUsername"),
+                (String) record.get("authorDisplayName"),
                 (String) record.get("agentVersion"),
                 toInstant(record.get("createdAt")),
                 toBoolean(record.get("hasEmbedding")),
@@ -593,35 +628,42 @@ public class NodeQueryService {
             return new GraphTopology(List.of(), List.of());
         }
 
-        return enrichGraphTopology(toGraphTopology(records.iterator().next()));
-    }
-
-    private GraphTopology enrichGraphTopology(GraphTopology topology) {
-        return new GraphTopology(enrichAuthorProjections(topology.nodes()), topology.edges());
-    }
-
-    private List<LineageNode> enrichAuthorProjections(List<LineageNode> nodes) {
-        Set<String> authorIds = nodes.stream()
-                .map(LineageNode::authorId)
-                .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
-        if (authorIds.isEmpty()) {
-            return nodes;
+        Map<String, Object> record = records.iterator().next();
+        GraphTopology topology = toGraphTopology(record);
+        // The Cypher returns `authors` alongside `nodes`/`edges` (LINEAGE_QUERY / CHILDREN_QUERY
+        // stage 3), eliminating the follow-up AUTHOR_PROJECTION_QUERY round-trip.
+        Map<String, AuthorProjection> authorMap = parseAuthorProjections(record.get("authors"));
+        if (authorMap.isEmpty()) {
+            return topology;
         }
-        Map<String, AuthorProjection> projections = fetchAuthorProjections(authorIds);
-        return nodes.stream()
-                .map(node -> enrichAuthorProjection(node, projections))
+        List<LineageNode> nodesWithAuthor = topology.nodes().stream()
+                .map(node -> attachAuthor(node, authorMap))
                 .toList();
+        return new GraphTopology(nodesWithAuthor, topology.edges());
     }
 
-    private LineageNode enrichAuthorProjection(LineageNode node) {
-        if (node.authorId() == null) {
-            return node;
+    private static Map<String, AuthorProjection> parseAuthorProjections(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return Map.of();
         }
-        return enrichAuthorProjections(List.of(node)).get(0);
+        Map<String, AuthorProjection> result = new java.util.LinkedHashMap<>();
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            Object authorIdValue = map.get("authorId");
+            if (authorIdValue == null) {
+                continue;
+            }
+            String authorId = authorIdValue.toString();
+            String username = toNullableString(map.get("authorUsername"));
+            String displayName = toNullableString(map.get("authorDisplayName"));
+            result.put(authorId, new AuthorProjection(authorId, username, displayName));
+        }
+        return result;
     }
 
-    private LineageNode enrichAuthorProjection(LineageNode node, Map<String, AuthorProjection> projections) {
+    private static LineageNode attachAuthor(LineageNode node, Map<String, AuthorProjection> projections) {
         if (node.authorId() == null) {
             return node;
         }
@@ -646,26 +688,6 @@ public class NodeQueryService {
                 node.followId(),
                 node.muteId()
         );
-    }
-
-    private Map<String, AuthorProjection> fetchAuthorProjections(Set<String> authorIds) {
-        if (authorIds.isEmpty()) {
-            return Map.of();
-        }
-        return neo4jClient.query(AUTHOR_PROJECTION_QUERY)
-                .bind(List.copyOf(authorIds)).to("authorIds")
-                .fetch().all()
-                .stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        record -> record.get("authorId").toString(),
-                        record -> new AuthorProjection(
-                                record.get("authorId").toString(),
-                                record.get("authorUsername").toString(),
-                                record.get("authorDisplayName").toString()
-                        ),
-                        (left, right) -> left,
-                        java.util.LinkedHashMap::new
-                ));
     }
 
     private GraphTopology applyChildrenLimit(UUID nodeId, GraphTopology topology, Integer limit) {
