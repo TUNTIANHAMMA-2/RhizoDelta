@@ -3,38 +3,25 @@ import assert from "node:assert/strict";
 
 import { loadGraphForRoot } from "./loadGraphForRoot.ts";
 
-test("loadGraphForRoot should load lineage before children", async () => {
+test("loadGraphForRoot delegates to loadTopologyContext exactly once", async () => {
   const calls = [];
 
   await loadGraphForRoot("root-1", {
-    loadLineage: async (nodeId) => {
-      calls.push(`lineage:${nodeId}`);
-    },
-    loadChildren: async (nodeId) => {
-      calls.push(`children:${nodeId}`);
+    loadTopologyContext: async (nodeId) => {
+      calls.push(`topology-context:${nodeId}`);
     },
   });
 
-  assert.deepEqual(calls, ["lineage:root-1", "children:root-1"]);
+  assert.deepEqual(calls, ["topology-context:root-1"]);
 });
 
-test("loadGraphForRoot should keep lineage when children loading fails", async () => {
-  const calls = [];
-  let capturedError = null;
-
-  await loadGraphForRoot("root-2", {
-    loadLineage: async (nodeId) => {
-      calls.push(`lineage:${nodeId}`);
-    },
-    loadChildren: async () => {
-      throw new Error("children failed");
-    },
-    onChildrenError: (error) => {
-      capturedError = error;
-      calls.push("children-error");
-    },
-  });
-
-  assert.deepEqual(calls, ["lineage:root-2", "children-error"]);
-  assert.equal(capturedError?.message, "children failed");
+test("loadGraphForRoot propagates loadTopologyContext failures", async () => {
+  await assert.rejects(
+    loadGraphForRoot("root-2", {
+      loadTopologyContext: async () => {
+        throw new Error("aggregate call failed");
+      },
+    }),
+    /aggregate call failed/,
+  );
 });

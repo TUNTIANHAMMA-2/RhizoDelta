@@ -91,6 +91,46 @@ public class NodeQueryController {
     }
 
     /**
+     * 一次性返回 lineage + children 两张拓扑，让前端画布初始化少一次 HTTP RTT。
+     *
+     * <p>对应前端 {@code loadGraphForRoot}：原本顺序 await {@code GET /lineage} 再
+     * {@code GET /children}，要付两次跨网络往返；本端点把它合并成一次。后端在
+     * 同一只读事务内顺序跑两条查询；如果节点是叶子，{@code children} 会降级为空，
+     * 不抛 404——让"节点存在但无后代"和"节点不存在"语义保持单独可观察。
+     *
+     * @param id 节点 UUID 字符串。
+     * @param lineageDepth 可选谱系最大深度。
+     * @param childrenDepth 可选子树最大深度。
+     * @param childrenLimit 可选子树节点上限。
+     * @return 聚合的拓扑响应。
+     */
+    @GetMapping("/{id}/topology-context")
+    public ApiResponse<TopologyContextResponse> getTopologyContext(
+            @PathVariable("id") String id,
+            @RequestParam(value = "lineage_depth", required = false) Integer lineageDepth,
+            @RequestParam(value = "children_depth", required = false) Integer childrenDepth,
+            @RequestParam(value = "children_limit", required = false) Integer childrenLimit
+    ) {
+        UUID nodeId = parseUuid(id);
+        NodeQueryService.TopologyContext context = nodeQueryService.getTopologyContext(
+                nodeId, lineageDepth, childrenDepth, childrenLimit);
+        return ApiResponse.ok(new TopologyContextResponse(
+                toGraphTopologyResponse(context.lineage()),
+                toGraphTopologyResponse(context.children())
+        ));
+    }
+
+    private GraphTopologyResponse toGraphTopologyResponse(NodeQueryService.GraphTopology topology) {
+        List<NodePayload> nodes = topology.nodes().stream()
+                .map(this::fromLineageNode)
+                .toList();
+        List<EdgePayload> edges = topology.edges().stream()
+                .map(this::fromLineageEdge)
+                .toList();
+        return new GraphTopologyResponse(nodes, edges);
+    }
+
+    /**
      * 返回节点向上的谱系拓扑。
      *
      * <p>该接口用于展示一个节点如何沿着版本演化关系回溯到其祖先，并附带相关共识节点。
@@ -108,13 +148,7 @@ public class NodeQueryController {
     ) {
         UUID nodeId = parseUuid(id);
         NodeQueryService.GraphTopology topology = nodeQueryService.getLineageTopology(nodeId, maxDepth);
-        List<NodePayload> nodes = topology.nodes().stream()
-                .map(this::fromLineageNode)
-                .toList();
-        List<EdgePayload> edges = topology.edges().stream()
-                .map(this::fromLineageEdge)
-                .toList();
-        return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
+        return ApiResponse.ok(toGraphTopologyResponse(topology));
     }
 
     /**
@@ -138,13 +172,7 @@ public class NodeQueryController {
     ) {
         UUID nodeId = parseUuid(id);
         NodeQueryService.GraphTopology topology = nodeQueryService.getChildrenTopology(nodeId, maxDepth, limit);
-        List<NodePayload> nodes = topology.nodes().stream()
-                .map(this::fromLineageNode)
-                .toList();
-        List<EdgePayload> edges = topology.edges().stream()
-                .map(this::fromLineageEdge)
-                .toList();
-        return ApiResponse.ok(new GraphTopologyResponse(nodes, edges));
+        return ApiResponse.ok(toGraphTopologyResponse(topology));
     }
 
     /**
@@ -290,6 +318,18 @@ public class NodeQueryController {
     public record GraphTopologyResponse(
             @JsonProperty("nodes") List<NodePayload> nodes,
             @JsonProperty("edges") List<EdgePayload> edges
+    ) {
+    }
+
+    /**
+     * 表示聚合端点 {@code /api/nodes/{id}/topology-context} 的响应。
+     *
+     * <p>该对象同时携带 lineage（祖先）与 children（后代）两张子图，让前端画布的
+     * 初始化路径只付一次 HTTP RTT。
+     */
+    public record TopologyContextResponse(
+            @JsonProperty("lineage") GraphTopologyResponse lineage,
+            @JsonProperty("children") GraphTopologyResponse children
     ) {
     }
 

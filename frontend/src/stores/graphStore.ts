@@ -5,7 +5,13 @@ import type {
   GraphEdgeDTO,
   GraphNodeDTO,
 } from "../api/types";
-import { fetchLineage, fetchChildren, fetchAssociations, fetchRhizomes } from "../api/nodes";
+import {
+  fetchLineage,
+  fetchChildren,
+  fetchAssociations,
+  fetchRhizomes,
+  fetchTopologyContext,
+} from "../api/nodes";
 import { toRfNode } from "../lib/mapping";
 import { buildGraphViews } from "../lib/graphView";
 import { useUiStore } from "./uiStore";
@@ -37,6 +43,13 @@ export interface GraphState {
   loadRhizomes: () => Promise<void>;
   loadLineage: (nodeId: string, maxDepth?: number) => Promise<void>;
   loadChildren: (nodeId: string) => Promise<void>;
+  loadTopologyContext: (
+    nodeId: string,
+    options?: {
+      lineageDepth?: number;
+      childrenDepth?: number;
+    },
+  ) => Promise<void>;
   loadAssociations: (nodeId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   setSemanticZoom: (zoom: SemanticZoom) => void;
@@ -169,6 +182,67 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       useUiStore.getState().addToast({
         type: "error",
         message: e instanceof Error ? e.message : "Failed to load children",
+      });
+    }
+  },
+
+  /**
+   * 一次 HTTP 拉回 lineage + children 后用一次 set 完成视图建模——等价于
+   * `loadLineage` 后串行 `loadChildren` 的最终状态，但少一次网络往返。
+   *
+   * 沿用 `loadLineage` 的 `lineageRequestId` 节流机制；如果聚合请求返回时已经
+   * 有更新的 lineage 请求在路上，丢弃旧响应。
+   */
+  loadTopologyContext: async (nodeId, options) => {
+    const requestId = get().lineageRequestId + 1;
+    set({ lineageRequestId: requestId });
+
+    try {
+      const ctx = await fetchTopologyContext(nodeId, {
+        lineageDepth: options?.lineageDepth ?? 3,
+        childrenDepth: options?.childrenDepth ?? 2,
+      });
+      if (get().lineageRequestId !== requestId) return;
+
+      const nodesMap = new Map<string, GraphNodeDTO>();
+      ctx.lineage.nodes.forEach((n) => nodesMap.set(n.node_id, n));
+      // children 可以与 lineage 共享根节点；后写覆盖即可，DTO 是等价的。
+      ctx.children.nodes.forEach((n) => nodesMap.set(n.node_id, n));
+
+      const edgeMap = new Map<string, GraphEdgeDTO>();
+      for (const e of ctx.lineage.edges) {
+        edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+      }
+      for (const e of ctx.children.edges) {
+        edgeMap.set(`${e.source}-${e.type}-${e.target}`, e);
+      }
+      const allEdges = [...edgeMap.values()];
+
+      const priorExplorePositions = new Map(
+        get().exploreRfNodes.map((node) => [node.id, node.position]),
+      );
+      const views = buildGraphViews(
+        nodesMap.values(),
+        allEdges,
+        priorExplorePositions,
+      );
+
+      set({
+        nodes: nodesMap,
+        edges: allEdges,
+        lineageRfNodes: views.lineage.nodes,
+        lineageRfEdges: views.lineage.edges,
+        exploreRfNodes: views.explore.nodes,
+        exploreRfEdges: views.explore.edges,
+        rfNodes: views.lineage.nodes,
+        rfEdges: views.lineage.edges,
+        rootNodeId: nodeId,
+      });
+    } catch (e) {
+      useUiStore.getState().addToast({
+        type: "error",
+        message:
+          e instanceof Error ? e.message : "Failed to load graph context",
       });
     }
   },

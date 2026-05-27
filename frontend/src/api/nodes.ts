@@ -5,6 +5,7 @@ import type {
   DiscussionTreeResponse,
   GraphNodeDTO,
   GraphTopologyDTO,
+  TopologyContextDTO,
   EmbeddingWriteRequest,
 } from "./types";
 
@@ -37,6 +38,32 @@ export const fetchChildren = (
   const qs = params.toString();
   return request<GraphTopologyDTO>(
     `/api/nodes/${id}/children${qs ? `?${qs}` : ""}`,
+  );
+};
+
+/**
+ * 一次 HTTP 拉回 lineage + children，替代 `fetchLineage` 后串行 `fetchChildren`
+ * 的瀑布，节省一次跨网络 RTT。后端在同一只读事务里顺序跑两条查询；叶子节点
+ * 的 children 会降级为空（不报错）。
+ */
+export const fetchTopologyContext = (
+  id: string,
+  options?: {
+    lineageDepth?: number;
+    childrenDepth?: number;
+    childrenLimit?: number;
+  },
+) => {
+  const params = new URLSearchParams();
+  if (options?.lineageDepth)
+    params.set("lineage_depth", String(options.lineageDepth));
+  if (options?.childrenDepth)
+    params.set("children_depth", String(options.childrenDepth));
+  if (options?.childrenLimit)
+    params.set("children_limit", String(options.childrenLimit));
+  const qs = params.toString();
+  return request<TopologyContextDTO>(
+    `/api/nodes/${id}/topology-context${qs ? `?${qs}` : ""}`,
   );
 };
 

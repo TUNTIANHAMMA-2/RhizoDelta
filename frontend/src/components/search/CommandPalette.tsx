@@ -181,11 +181,10 @@ export function CommandPalette() {
       const targetNodeId = result.node_id;
       const existsLocally = nodes.has(targetNodeId);
       if (!existsLocally) {
-        const { loadLineage, loadChildren } = useGraphStore.getState();
+        const { loadTopologyContext } = useGraphStore.getState();
         try {
           await loadGraphForRoot(targetNodeId, {
-            loadLineage,
-            loadChildren,
+            loadTopologyContext,
           });
         } catch {
           // swallow — still try to select

@@ -60,8 +60,7 @@ export function DesktopGraphWorkspace() {
   useCommandPalette();
 
   const loadRhizomes = useGraphStore((s) => s.loadRhizomes);
-  const loadLineage = useGraphStore((s) => s.loadLineage);
-  const loadChildren = useGraphStore((s) => s.loadChildren);
+  const loadTopologyContext = useGraphStore((s) => s.loadTopologyContext);
   const selectNode = useGraphStore((s) => s.selectNode);
 
   const closeMobileRhizoneSheet = useCallback(() => {
@@ -80,8 +79,7 @@ export function DesktopGraphWorkspace() {
     // Priority: route param → first available rhizome
     if (rhizomeId) {
       loadGraphForRoot(rhizomeId, {
-        loadLineage,
-        loadChildren,
+        loadTopologyContext,
       });
       // Also load the rhizome list in the background for the sidebar
       loadRhizomes();
@@ -95,11 +93,10 @@ export function DesktopGraphWorkspace() {
           return;
         }
         await loadGraphForRoot(rootNodeId, {
-          loadLineage,
-          loadChildren,
+          loadTopologyContext,
         });
       })
-  }, [rhizomeId, loadRhizomes, loadLineage, loadChildren]);
+  }, [rhizomeId, loadRhizomes, loadTopologyContext]);
 
   useSse();
 

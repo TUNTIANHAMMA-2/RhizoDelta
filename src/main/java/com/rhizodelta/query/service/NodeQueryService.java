@@ -432,6 +432,41 @@ public class NodeQueryService {
     }
 
     /**
+     * 一次性返回节点的祖先谱系拓扑 + 子树拓扑，让前端的画布初始化把两次串行 HTTP
+     * 收敛为一次。同一只读事务内顺序跑两条查询；调用方仅承担一次 HTTP RTT，少一次
+     * 跨网络往返。
+     *
+     * <p>如果该节点是叶子（无后代），{@link #getChildrenTopology} 会抛
+     * {@link NoSuchElementException}（"Node not found" 语义实质等价于 "stage1 路径为空"），
+     * 这里降级为空的 children 拓扑，避免单纯的叶子节点让整个聚合端点变成 404。
+     * 真正"节点完全不存在"的场景会从 lineage 路径暴露——它会返回空 nodes/empty edges，
+     * 调用方按现有 404 规约（参见 NodeQueryController#getNodeById）处理。
+     *
+     * @param nodeId 根节点 ID。
+     * @param lineageDepth 可选谱系深度（由 {@link #getLineageTopology} 进一步校验/裁剪）。
+     * @param childrenDepth 可选子树深度。
+     * @param childrenLimit 可选子树节点数上限。
+     * @return 同一根节点的 lineage + children 拓扑。
+     */
+    @Transactional(transactionManager = "transactionManager", readOnly = true)
+    public TopologyContext getTopologyContext(UUID nodeId,
+                                              Integer lineageDepth,
+                                              Integer childrenDepth,
+                                              Integer childrenLimit) {
+        Objects.requireNonNull(nodeId, "nodeId must not be null");
+        GraphTopology lineage = getLineageTopology(nodeId, lineageDepth);
+        GraphTopology children;
+        try {
+            children = getChildrenTopology(nodeId, childrenDepth, childrenLimit);
+        } catch (NoSuchElementException leafOrMissing) {
+            // 叶子节点 vs. 真不存在：在 lineage 已经把"真不存在"暴露为空集的前提下，
+            // 这里只可能是"叶子"，回退为空 children 而不是 404。
+            children = new GraphTopology(List.of(), List.of());
+        }
+        return new TopologyContext(lineage, children);
+    }
+
+    /**
      * 返回共识节点的来源帖子实体。
      *
      * <p>该方法适用于需要完整帖子对象而非摘要投影的场景。
@@ -929,6 +964,17 @@ public class NodeQueryService {
     public record GraphTopology(
             List<LineageNode> nodes,
             List<LineageEdge> edges) {
+    }
+
+    /**
+     * 表示一次聚合的图谱上下文（lineage + children）。
+     *
+     * <p>该对象专门服务 {@code /api/nodes/{id}/topology-context} 端点，让前端画布的初始化
+     * 在一次 HTTP RTT 内拿到完整骨架。
+     */
+    public record TopologyContext(
+            GraphTopology lineage,
+            GraphTopology children) {
     }
 
     /**

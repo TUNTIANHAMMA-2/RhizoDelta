@@ -14,8 +14,7 @@ export function RhizoneList() {
 
   const rhizomes = useGraphStore((s) => s.rhizomes);
   const rootNodeId = useGraphStore((s) => s.rootNodeId);
-  const loadLineage = useGraphStore((s) => s.loadLineage);
-  const loadChildren = useGraphStore((s) => s.loadChildren);
+  const loadTopologyContext = useGraphStore((s) => s.loadTopologyContext);
   const selectNode = useGraphStore((s) => s.selectNode);
 
   const handleRhizomeClick = (node: GraphNodeDTO) => {
@@ -24,8 +23,7 @@ export function RhizoneList() {
       closeRightPanel,
       loadGraphForRoot: (nodeId) =>
         loadGraphForRoot(nodeId, {
-          loadLineage,
-          loadChildren,
+          loadTopologyContext,
         }),
     });
   };

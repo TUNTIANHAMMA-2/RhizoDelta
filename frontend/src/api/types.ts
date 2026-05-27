@@ -75,6 +75,17 @@ export interface GraphTopologyDTO {
   edges: GraphEdgeDTO[];
 }
 
+/**
+ * 聚合端点 `GET /api/nodes/{id}/topology-context` 的响应。
+ *
+ * lineage 是节点的祖先视图，children 是子树视图。一次 HTTP 拿到，
+ * 节省一次跨网络 RTT；后端在同一只读事务内顺序跑两条查询。
+ */
+export interface TopologyContextDTO {
+  lineage: GraphTopologyDTO;
+  children: GraphTopologyDTO;
+}
+
 // ────────────────────── SSE 事件 ──────────────────────
 
 export interface NodeCreatedEvent {
